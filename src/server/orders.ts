@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { estimateFor } from "@/lib/pricing";
+import { loyaltyRate } from "@/lib/loyalty";
 import { PICKUP_CODE_LEN, PICKUP_CODE_TRIES } from "@/lib/status";
 import type {
   CreateOrderInput,
@@ -14,6 +15,7 @@ import { db } from "./db";
 import { photosForOrder } from "./photos";
 import { reviewForOrder } from "./reviews";
 import { ApiError, canCancel, nextStatus } from "./rules";
+import { deliveredCount } from "./auth";
 
 type OrderRow = {
   id: string;
@@ -34,6 +36,7 @@ type OrderRow = {
   code_attempts: number;
   paid_at: string | null;
   payment_status: string;
+  user_id: string | null;
 };
 
 function genCode() {
@@ -90,7 +93,7 @@ export function getOrder(id: string): Order | undefined {
   return row ? rowToOrder(row) : undefined;
 }
 
-export function createOrder(input: CreateOrderInput): Order {
+export function createOrder(input: CreateOrderInput, userId: string): Order {
   const pieces = Math.round(input.pieces);
   if (!Number.isFinite(pieces) || pieces < 1 || pieces > 80) {
     throw new ApiError(400, "Parça sayısı 1–80 olmalı.");
@@ -123,7 +126,13 @@ export function createOrder(input: CreateOrderInput): Order {
     throw new ApiError(400, "Saat dilimi geçersiz.");
   }
 
-  const quote = estimateFor(provider, pieces, input.packageId, express);
+  const quote = estimateFor(
+    provider,
+    pieces,
+    input.packageId,
+    express,
+    loyaltyRate(deliveredCount(userId)),
+  );
   const now = new Date().toISOString();
   const id = `k-${randomUUID().slice(0, 8)}`;
 
@@ -144,11 +153,11 @@ export function createOrder(input: CreateOrderInput): Order {
         `INSERT INTO orders (
           id, provider_id, package_id, pieces, express, drop_method, drop_point_id,
           slot, note, total, commission, status, created_at, updated_at,
-          pickup_code, code_attempts, paid_at, payment_status
+          pickup_code, code_attempts, paid_at, payment_status, user_id
         ) VALUES (
           @id, @provider_id, @package_id, @pieces, @express, @drop_method, @drop_point_id,
           @slot, @note, @total, @commission, @status, @created_at, @updated_at,
-          NULL, 0, NULL, 'authorized'
+          NULL, 0, NULL, 'authorized', @user_id
         )`,
       )
       .run({
@@ -166,6 +175,7 @@ export function createOrder(input: CreateOrderInput): Order {
         status: "onay_bekliyor",
         created_at: now,
         updated_at: now,
+        user_id: userId,
       });
     db()
       .prepare(

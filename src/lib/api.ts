@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { CreateOrderInput, DropPoint, Order, Provider } from "./types";
+import type { Account, CreateOrderInput, DropPoint, Order, Provider } from "./types";
+import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
   providers: Provider[];
@@ -38,9 +39,14 @@ export function useOrders() {
   const [ready, setReady] = useState(false);
 
   const reload = useCallback(async () => {
-    const data = await readJson<{ orders: Order[] }>(await fetch("/api/orders"));
-    setOrders(data.orders);
-    setReady(true);
+    try {
+      const data = await readJson<{ orders: Order[] }>(await fetch("/api/orders"));
+      setOrders(data.orders);
+      setReady(true);
+    } catch {
+      setOrders([]);
+      setReady(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -76,4 +82,70 @@ export async function patchOrder(
     }),
   );
   return data.order;
+}
+
+export function useSession() {
+  const [account, setAccount] = useState<Account | null>(null);
+  const [loyalty, setLoyalty] = useState<Loyalty | null>(null);
+  const [ready, setReady] = useState(false);
+
+  const reload = useCallback(async () => {
+    const data = await readJson<{ account: Account | null; loyalty: Loyalty | null }>(
+      await fetch("/api/auth/session"),
+    );
+    setAccount(data.account);
+    setLoyalty(data.loyalty);
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return { account, loyalty, ready, reload };
+}
+
+export async function requestOtp(phone: string) {
+  return readJson<{ ok: boolean; sms: string; demoCode: string }>(
+    await fetch("/api/auth/otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
+    }),
+  );
+}
+
+export async function verifyOtp(phone: string, code: string) {
+  const data = await readJson<{ account: Account }>(
+    await fetch("/api/auth/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, code }),
+    }),
+  );
+  return data.account;
+}
+
+export async function patchAccount(body: { name: string; identity?: boolean }) {
+  return readJson<{ account: Account; loyalty: Loyalty }>(
+    await fetch("/api/account", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+export async function postPasskey(credentialId: string, assert = false) {
+  return readJson<{ account: Account; loyalty: Loyalty }>(
+    await fetch("/api/auth/passkey", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credentialId, assert }),
+    }),
+  );
+}
+
+export async function logoutSession() {
+  await readJson<{ ok: boolean }>(await fetch("/api/auth/session", { method: "DELETE" }));
 }

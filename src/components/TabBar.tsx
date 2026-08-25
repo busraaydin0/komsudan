@@ -2,12 +2,13 @@
 
 import { useOrders } from "@/lib/api";
 
-export type AppTab = "harita" | "siparis" | "hizmet";
+export type AppTab = "harita" | "siparis" | "hizmet" | "hesap";
 
 const ITEMS: { id: AppTab; label: string }[] = [
   { id: "harita", label: "Harita" },
   { id: "siparis", label: "Siparişim" },
   { id: "hizmet", label: "Hizmet" },
+  { id: "hesap", label: "Hesap" },
 ];
 
 export function TabBar({ tab, onTab }: { tab: AppTab; onTab: (t: AppTab) => void }) {
@@ -20,7 +21,7 @@ export function TabBar({ tab, onTab }: { tab: AppTab; onTab: (t: AppTab) => void
       className="k-tabbar absolute inset-x-0 bottom-0 z-40 mx-auto max-w-lg border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--card)_92%,transparent)] backdrop-blur-md"
       aria-label="Ana menü"
     >
-      <ul className="grid grid-cols-3">
+      <ul className="grid grid-cols-4">
         {ITEMS.map((item) => {
           const on = tab === item.id;
           const badge = item.id === "siparis" ? openOrder : item.id === "hizmet" ? openDesk : false;
@@ -74,11 +75,19 @@ function TabIcon({ id, on }: { id: AppTab; on: boolean }) {
       </svg>
     );
   }
+  if (id === "hizmet") {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect x="4" y="8" width="16" height="11" rx="2" stroke={stroke} strokeWidth="1.8" />
+        <path d="M8 8V6.5A4 4 0 0 1 16 6.5V8" stroke={stroke} strokeWidth="1.8" />
+        <path d="M4 13h16" stroke={stroke} strokeWidth="1.8" />
+      </svg>
+    );
+  }
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="4" y="8" width="16" height="11" rx="2" stroke={stroke} strokeWidth="1.8" />
-      <path d="M8 8V6.5A4 4 0 0 1 16 6.5V8" stroke={stroke} strokeWidth="1.8" />
-      <path d="M4 13h16" stroke={stroke} strokeWidth="1.8" />
+      <circle cx="12" cy="8" r="3.2" stroke={stroke} strokeWidth="1.8" />
+      <path d="M5 19.2c.8-3.4 3.5-5.2 7-5.2s6.2 1.8 7 5.2" stroke={stroke} strokeWidth="1.8" />
     </svg>
   );
 }

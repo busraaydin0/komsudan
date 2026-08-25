@@ -98,3 +98,11 @@ export type CreateOrderInput = {
   slot: string;
   note: string;
 };
+
+export type Account = {
+  id: string;
+  phone: string;
+  name: string;
+  identityVerified: boolean;
+  passkeyEnabled: boolean;
+};

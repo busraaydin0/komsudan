@@ -5,9 +5,9 @@ export const MIN_ORDER = 100;
 export const COMMISSION = 0.1;
 export const EXPRESS_BUMP = 0.25;
 
-export function estimate(pieces: number, packageId: PackageId, express: boolean) {
+export function estimate(pieces: number, packageId: PackageId, express: boolean, loyaltyRate = 0) {
   const base = PACKAGES.find((p) => p.id === packageId)?.pricePerPiece ?? 0;
-  return quote(pieces, base, express);
+  return quote(pieces, base, express, loyaltyRate);
 }
 
 export function estimateFor(
@@ -15,19 +15,29 @@ export function estimateFor(
   pieces: number,
   packageId: PackageId,
   express: boolean,
+  loyaltyRate = 0,
 ) {
   const base =
     provider.packages.find((p) => p.id === packageId)?.pricePerPiece ??
     PACKAGES.find((p) => p.id === packageId)?.pricePerPiece ??
     0;
-  return quote(pieces, base, express);
+  return quote(pieces, base, express, loyaltyRate);
 }
 
-function quote(pieces: number, base: number, express: boolean) {
+function quote(pieces: number, base: number, express: boolean, loyaltyRate = 0) {
   const raw = pieces * base * (express ? 1 + EXPRESS_BUMP : 1);
-  const total = Math.max(MIN_ORDER, Math.round(raw));
+  const before = Math.max(MIN_ORDER, Math.round(raw));
+  const rate = Math.min(0.2, Math.max(0, loyaltyRate));
+  const total = Math.max(1, Math.round(before * (1 - rate)));
   const commission = Math.round(total * COMMISSION);
-  return { total, commission, providerNet: total - commission, perPiece: base };
+  return {
+    total,
+    before,
+    loyaltyRate: rate,
+    commission,
+    providerNet: total - commission,
+    perPiece: base,
+  };
 }
 
 export function tl(n: number) {

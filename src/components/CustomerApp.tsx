@@ -33,6 +33,8 @@ type Sheet = "list" | "provider" | "checkout" | "track";
 type Props = {
   pane?: "map" | "orders";
   mapActive?: boolean;
+  loyaltyRate?: number;
+  loyaltyLabel?: string;
   onOpenOrders?: () => void;
   onPlacedOrder?: () => void;
   onBackToMap?: () => void;
@@ -41,6 +43,8 @@ type Props = {
 export function CustomerApp({
   pane = "map",
   mapActive = true,
+  loyaltyRate = 0,
+  loyaltyLabel = "Komşu",
   onOpenOrders,
   onPlacedOrder,
   onBackToMap,
@@ -77,8 +81,8 @@ export function CustomerApp({
   const selected = selectedId ? providers.find((p) => p.id === selectedId) : undefined;
   const active = orders.find((o) => o.id === activeId) ?? orders[0];
   const quote = selected
-    ? estimateFor(selected, pieces, pkg, express && selected.express)
-    : { total: 0, commission: 0, providerNet: 0, perPiece: 0 };
+    ? estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
+    : { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 };
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -337,6 +341,7 @@ export function CustomerApp({
                 note={note}
                 onNote={setNote}
                 quote={quote}
+                loyaltyLabel={loyaltyLabel}
                 err={err}
                 placing={placing}
                 onBack={() => setSheet("provider")}
@@ -519,6 +524,7 @@ function Checkout({
   note,
   onNote,
   quote,
+  loyaltyLabel,
   err,
   placing,
   onBack,
@@ -538,7 +544,8 @@ function Checkout({
   onSlot: (s: string) => void;
   note: string;
   onNote: (s: string) => void;
-  quote: { total: number; commission: number; providerNet: number };
+  quote: { total: number; before: number; loyaltyRate: number; commission: number; providerNet: number };
+  loyaltyLabel: string;
   err: string;
   placing: boolean;
   onBack: () => void;
@@ -637,7 +644,10 @@ function Checkout({
       />
       <p className="mt-4 font-[family-name:var(--font-display)] text-2xl tabular-nums">{tl(quote.total)}</p>
       <p className="text-xs text-[var(--muted)]">
-        Min. {tl(100)}. Siparişte karttan ön otorizasyon; teslim kodu doğrulanınca tahsilat.
+        {quote.loyaltyRate > 0
+          ? `${loyaltyLabel} · %${Math.round(quote.loyaltyRate * 100)} indirim, önce ${tl(quote.before)}. `
+          : `Min. ${tl(100)}. `}
+        Siparişte karttan ön otorizasyon; teslim kodu doğrulanınca tahsilat.
       </p>
       {err && <p className="k-rise mt-2 text-sm text-[var(--clay)]">{err}</p>}
       <button

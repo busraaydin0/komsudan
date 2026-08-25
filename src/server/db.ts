@@ -66,6 +66,27 @@ const SCHEMA = `
       created_at TEXT NOT NULL,
       FOREIGN KEY (provider_id) REFERENCES providers(id)
     );
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      phone TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL DEFAULT '',
+      identity_verified INTEGER NOT NULL DEFAULT 0,
+      passkey_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS otps (
+      phone TEXT PRIMARY KEY,
+      code_hash TEXT NOT NULL,
+      expires_at TEXT NOT NULL
+    );
 `;
 
 function open() {
@@ -93,6 +114,7 @@ function migrate(db: Database.Database) {
   if (!cols.has("payment_status")) {
     db.exec("ALTER TABLE orders ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'authorized'");
   }
+  if (!cols.has("user_id")) db.exec("ALTER TABLE orders ADD COLUMN user_id TEXT");
   db.exec(`
     UPDATE orders SET payment_status = 'captured'
     WHERE status = 'teslim_edildi' AND payment_status = 'authorized';
