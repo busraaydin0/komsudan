@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PACKAGES } from "@/lib/data";
 import { patchOrder, uploadOrderPhoto, uploadPortfolioPhoto, useCatalog, useOrders } from "@/lib/api";
 import { tl } from "@/lib/pricing";
@@ -28,6 +28,17 @@ const BADGE: Record<OrderStatus, string> = {
   iptal: "bg-[var(--paper)] text-[var(--muted)]",
 };
 
+function monthKey(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(key: string) {
+  const [y, m] = key.split("-").map(Number);
+  const label = new Date(y, m - 1, 1).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
+  return label.charAt(0).toLocaleUpperCase("tr-TR") + label.slice(1);
+}
+
 export function ProviderDesk() {
   const { providers, dropPoints, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload } = useOrders();
@@ -35,6 +46,22 @@ export function ProviderDesk() {
     .filter((o) => o.paymentStatus === "captured")
     .reduce((s, o) => s + (o.total - o.commission), 0);
   const open = orders.filter((o) => o.status !== "teslim_edildi" && o.status !== "iptal");
+  const [openMonth, setOpenMonth] = useState<string | null>(null);
+  const months = useMemo(() => {
+    const map = new Map<string, Order[]>();
+    for (const o of orders) {
+      if (o.status !== "teslim_edildi" && o.status !== "iptal") continue;
+      const key = monthKey(o.createdAt);
+      const list = map.get(key);
+      if (list) list.push(o);
+      else map.set(key, [o]);
+    }
+    return [...map.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  }, [orders]);
+
+  function reloadAll() {
+    void Promise.all([reload(), reloadCatalog()]);
+  }
 
   return (
     <div className="min-h-full bg-[var(--paper)]">
@@ -101,18 +128,64 @@ export function ProviderDesk() {
             Henüz sipariş yok. Haritadan bir katlayan seçip sipariş bırak.
           </p>
         ) : (
-          <ul className="mt-3 space-y-3">
-            {orders.map((o, i) => (
-              <OrderCard
-                key={o.id}
-                order={o}
-                providers={providers}
-                dropPoints={dropPoints}
-                onChanged={() => void Promise.all([reload(), reloadCatalog()])}
-                delay={i * 50}
-              />
-            ))}
-          </ul>
+          <div className="mt-3 space-y-5">
+            {open.length > 0 && (
+              <div>
+                <p className="text-xs font-medium tracking-wide text-[var(--teal)] uppercase">Açık</p>
+                <ul className="mt-2 space-y-3">
+                  {open.map((o, i) => (
+                    <OrderCard
+                      key={o.id}
+                      order={o}
+                      providers={providers}
+                      dropPoints={dropPoints}
+                      onChanged={reloadAll}
+                      delay={i * 40}
+                    />
+                  ))}
+                </ul>
+              </div>
+            )}
+            {months.length > 0 && (
+              <div>
+                <p className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">Aylar</p>
+                <ul className="mt-2 space-y-2">
+                  {months.map(([key, list]) => {
+                    const on = openMonth === key;
+                    return (
+                      <li key={key} className="overflow-hidden rounded-3xl ring-1 ring-[var(--line)]">
+                        <button
+                          type="button"
+                          aria-expanded={on}
+                          onClick={() => setOpenMonth(on ? null : key)}
+                          className="k-press flex w-full items-baseline justify-between bg-[var(--card)] px-4 py-3 text-left"
+                        >
+                          <span className="font-[family-name:var(--font-display)] text-lg">
+                            {monthLabel(key)}
+                          </span>
+                          <span className="text-xs text-[var(--muted)]">{list.length} iş</span>
+                        </button>
+                        {on && (
+                          <ul className="space-y-3 bg-[var(--paper)] px-3 pt-1 pb-3">
+                            {list.map((o, i) => (
+                              <OrderCard
+                                key={o.id}
+                                order={o}
+                                providers={providers}
+                                dropPoints={dropPoints}
+                                onChanged={reloadAll}
+                                delay={i * 30}
+                              />
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
         )}
       </main>
     </div>
@@ -169,6 +242,8 @@ function OrderCard({
         {p?.name} · {order.pieces} parça · {pack?.title}
       </p>
       <p className="mt-1 text-sm text-[var(--muted)]">
+        {new Date(order.createdAt).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
+        {" · "}
         {order.drop === "kapi" ? "Kapı teslim" : drop?.name ?? "Nötr nokta"} · {order.slot}
       </p>
       {order.note && <p className="mt-1 text-sm">Not: {order.note}</p>}
