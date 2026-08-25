@@ -9,9 +9,18 @@ export type Catalog = {
   dropPoints: DropPoint[];
 };
 
+function errorMessage(data: { error?: unknown }) {
+  if (typeof data.error === "string") return data.error;
+  if (data.error && typeof data.error === "object" && "message" in data.error) {
+    const message = (data.error as { message: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return "İstek başarısız.";
+}
+
 async function readJson<T>(res: Response): Promise<T> {
-  const data = (await res.json()) as T & { error?: string };
-  if (!res.ok) throw new Error(data.error ?? "İstek başarısız.");
+  const data = (await res.json()) as T & { error?: unknown };
+  if (!res.ok) throw new Error(errorMessage(data));
   return data;
 }
 
