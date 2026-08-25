@@ -10,6 +10,8 @@
   --teal: #1a6b63;
   --clay: #c45c26;
   --sand: #efe4d4;
+  --load-low: #c49a2a;
+  --load-full: #b4473a;
   --background: var(--paper);
   --foreground: var(--ink);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -115,14 +117,31 @@ input:focus-visible {
   box-shadow: 0 0 0 4px rgba(26, 107, 99, 0.18);
 }
 
+.katla-pin[data-load="low"] .dot,
+.katla-pin[data-load="low"] .stem {
+  background: var(--load-low);
+}
+
+.katla-pin[data-load="low"]:hover .dot {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--load-low) 22%, transparent);
+}
+
+.katla-pin[data-load="full"] .dot,
+.katla-pin[data-load="full"] .stem {
+  background: var(--load-full);
+}
+
+.katla-pin[data-load="full"]:hover .dot {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--load-full) 22%, transparent);
+}
+
 .katla-pin.is-on .dot {
-  background: #c45c26;
   animation: k-pin-pop 0.42s var(--ease-out);
-  box-shadow: 0 0 0 5px rgba(196, 92, 38, 0.22);
+  box-shadow: 0 0 0 3px var(--card), 0 0 0 5px rgba(28, 23, 18, 0.16);
 }
 
 .katla-pin.is-on .stem {
-  background: #c45c26;
+  filter: brightness(0.92);
 }
 
 .katla-drop {

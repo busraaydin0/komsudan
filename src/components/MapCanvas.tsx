@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Map, Marker, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import { PILOT } from "@/lib/data";
+import { seatTone } from "@/lib/seat";
 import type { DropPoint, LngLat, MapMode, Provider } from "@/lib/types";
 
 /** Next/Turbopack does not emit the worker next to maplibre-gl-shared.mjs. */
@@ -140,6 +141,7 @@ export function MapCanvas({
       el.type = "button";
       el.className = "katla-pin";
       el.dataset.id = p.id;
+      el.dataset.load = seatTone(p.remaining, p.capacity);
       el.style.setProperty("--pin-delay", `${i * 40}ms`);
       el.innerHTML = `<span class="dot">${p.rating.toFixed(1)}</span><span class="stem"></span>`;
       el.addEventListener("click", (e) => {
@@ -218,6 +220,16 @@ export function MapCanvas({
       essential: true,
     });
   }, [selectedId, dropId]);
+
+  useEffect(() => {
+    for (const m of markers.current) {
+      const el = m.getElement();
+      const id = el.dataset.id;
+      if (!id) continue;
+      const p = providers.find((x) => x.id === id);
+      if (p) el.dataset.load = seatTone(p.remaining, p.capacity);
+    }
+  }, [providers]);
 
   useEffect(() => {
     const map = mapRef.current;

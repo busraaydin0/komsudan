@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PILOT, trustLabel } from "@/lib/data";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFor, tl } from "@/lib/pricing";
+import { seatLabel, seatTone } from "@/lib/seat";
 import { postOrder, postReview, useCatalog, useOrders } from "@/lib/api";
 import { trackSteps } from "@/lib/status";
 import { PhotoStrip, ReviewComposer, ReviewList } from "@/components/Photos";
@@ -434,7 +435,26 @@ function List({
       ) : (
         <ul className="space-y-2">
           {ranked.map(({ p, km }, i) => {
-            const fill = p.capacity > 0 ? Math.max(6, Math.round((p.remaining / p.capacity) * 100)) : 0;
+            const tone = seatTone(p.remaining, p.capacity);
+            const load = seatLabel(tone);
+            const fill =
+              tone === "full"
+                ? 100
+                : p.capacity > 0
+                  ? Math.max(8, Math.round((p.remaining / p.capacity) * 100))
+                  : 0;
+            const bar =
+              tone === "full"
+                ? "bg-[var(--load-full)]"
+                : tone === "low"
+                  ? "bg-[var(--load-low)]"
+                  : "bg-[var(--teal)]";
+            const tag =
+              tone === "full"
+                ? "text-[var(--load-full)]"
+                : tone === "low"
+                  ? "text-[var(--load-low)]"
+                  : "";
             return (
               <li key={p.id} className="k-rise" style={{ animationDelay: `${i * 45}ms` }}>
                 <button
@@ -447,10 +467,16 @@ function List({
                     <span className="mt-0.5 block text-xs text-[var(--muted)]">
                       {p.neighborhood} · {formatKm(km)} · {trustLabel(p.trust)}
                       {p.hasDryer ? " · kurutucu" : ""}
+                      {load ? (
+                        <span className={tag}>
+                          {" · "}
+                          {load}
+                        </span>
+                      ) : null}
                     </span>
                     <span className="mt-2 block h-1 w-28 overflow-hidden rounded-full bg-[var(--line)]">
                       <span
-                        className="block h-full rounded-full bg-[var(--teal)] transition-[width] duration-500"
+                        className={`block h-full rounded-full transition-[width,background-color] duration-500 ${bar}`}
                         style={{ width: `${fill}%` }}
                       />
                     </span>
@@ -490,6 +516,7 @@ function ProviderPane({
   onBack: () => void;
   onNext: () => void;
 }) {
+  const tone = seatTone(p.remaining, p.capacity);
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
@@ -497,7 +524,14 @@ function ProviderPane({
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">{p.name}</h2>
       <p className="text-sm text-[var(--muted)]">
-        {p.neighborhood} · {formatKm(km)} · {p.rating} ({p.reviews} yorum) · bugün {p.remaining} parça yer
+        {p.neighborhood} · {formatKm(km)} · {p.rating} ({p.reviews} yorum) ·{" "}
+        <span
+          className={
+            tone === "full" ? "text-[var(--load-full)]" : tone === "low" ? "text-[var(--load-low)]" : ""
+          }
+        >
+          {p.remaining <= 0 ? "bugün dolu" : `bugün ${p.remaining} parça yer`}
+        </span>
       </p>
       <p className="mt-3 text-sm leading-relaxed">{p.bio}</p>
       {(p.workPhotos.length > 0 || p.recentReviews.length > 0) && (
