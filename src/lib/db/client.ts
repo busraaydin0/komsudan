@@ -4,12 +4,25 @@ import Database from "better-sqlite3";
 import { migrate } from "./migrate";
 import { seedCatalog } from "./seed";
 
-const g = globalThis as typeof globalThis & { __komsuDb?: Database.Database };
+const g = globalThis as typeof globalThis & {
+  __komsuDb?: Database.Database;
+  __komsuSeeding?: boolean;
+};
 
 export function uploadsDir() {
   const dir = path.join(process.cwd(), "data", "uploads");
   fs.mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+function prepare(database: Database.Database) {
+  migrate(database);
+  g.__komsuSeeding = true;
+  try {
+    seedCatalog(database);
+  } finally {
+    g.__komsuSeeding = false;
+  }
 }
 
 function open() {
@@ -19,16 +32,13 @@ function open() {
   const database = new Database(path.join(dir, "komsudan.db"));
   database.pragma("journal_mode = WAL");
   database.pragma("foreign_keys = ON");
-  migrate(database);
-  seedCatalog(database);
+  g.__komsuDb = database;
+  prepare(database);
   return database;
 }
 
 export function db() {
-  if (!g.__komsuDb) g.__komsuDb = open();
-  else {
-    migrate(g.__komsuDb);
-    seedCatalog(g.__komsuDb);
-  }
+  if (!g.__komsuDb) return open();
+  if (!g.__komsuSeeding) prepare(g.__komsuDb);
   return g.__komsuDb;
 }
