@@ -1,5 +1,5 @@
-import { ProviderDesk } from "@/components/ProviderDesk";
+import { redirect } from "next/navigation";
 
 export default function HizmetPage() {
-  return <ProviderDesk />;
+  redirect("/?tab=masa");
 }

@@ -1,4 +1,4 @@
-import type { DropPoint, LngLat, Provider, ServicePackage } from "./types";
+import type { DropPoint, LngLat, Provider, Review, ServicePackage } from "./types";
 
 export const PILOT = {
   id: "cankaya-cukurambar",
@@ -47,6 +47,8 @@ export const PROVIDERS: Provider[] = [
     drops: ["kapi", "nokta"],
     slots,
     bio: "Kurucu hizmet veren. Makine kurutucu var, aynı gün bitirebiliyor.",
+    workPhotos: [],
+    recentReviews: [],
   },
   {
     id: "ayse",
@@ -66,6 +68,8 @@ export const PROVIDERS: Provider[] = [
     drops: ["kapi", "nokta"],
     slots: slots.slice(2),
     bio: "Kurutma ipte; yağmurlu günde ertesi sabaha kayabilir.",
+    workPhotos: [],
+    recentReviews: [],
   },
   {
     id: "merve",
@@ -85,6 +89,8 @@ export const PROVIDERS: Provider[] = [
     drops: ["kapi", "nokta"],
     slots,
     bio: "Ütü ağırlıklı. Gömlek ve iş kıyafeti için tercih ediliyor.",
+    workPhotos: [],
+    recentReviews: [],
   },
   {
     id: "fatma",
@@ -102,6 +108,8 @@ export const PROVIDERS: Provider[] = [
     drops: ["nokta"],
     slots: slots.slice(1),
     bio: "Kapı teslimi henüz açık değil — nötr noktada bırak / al.",
+    workPhotos: [],
+    recentReviews: [],
   },
   {
     id: "zeynep",
@@ -119,6 +127,8 @@ export const PROVIDERS: Provider[] = [
     drops: ["nokta"],
     slots: slots.slice(2),
     bio: "İlk siparişlerde yalnızca nötr nokta. Yıkama ve katlama.",
+    workPhotos: [],
+    recentReviews: [],
   },
   {
     id: "hatice",
@@ -136,6 +146,8 @@ export const PROVIDERS: Provider[] = [
     drops: ["kapi", "nokta"],
     slots,
     bio: "Nevresim ve havlu gibi hacimli işlerde kapasitesi yüksek.",
+    workPhotos: [],
+    recentReviews: [],
   },
   {
     id: "nurcan",
@@ -153,6 +165,8 @@ export const PROVIDERS: Provider[] = [
     drops: ["nokta"],
     slots: slots.slice(0, 3),
     bio: "Yeni katıldı. Kimlik doğrulaması tamam, sicil beyanı var.",
+    workPhotos: [],
+    recentReviews: [],
   },
   {
     id: "gulsen",
@@ -170,6 +184,101 @@ export const PROVIDERS: Provider[] = [
     drops: ["kapi", "nokta"],
     slots,
     bio: "En çok tekrar sipariş alan kurucu. Çocuklu aileler tercih ediyor.",
+    workPhotos: [],
+    recentReviews: [],
+  },
+];
+
+export const SEED_REVIEWS: Review[] = [
+  {
+    id: "rev-elif-1",
+    providerId: "elif",
+    orderId: null,
+    rating: 5,
+    body: "Gömlekler ütülü, kokusu temiz. Kapıda kimseyle karşılaşmadan teslim aldık.",
+    author: "D.K.",
+    createdAt: "2026-07-12T10:00:00.000Z",
+  },
+  {
+    id: "rev-elif-2",
+    providerId: "elif",
+    orderId: null,
+    rating: 5,
+    body: "Aynı gün yetiştirdi. Nevresim iki parça sayıldı, şeffaf oldu.",
+    author: "M.Y.",
+    createdAt: "2026-06-28T18:20:00.000Z",
+  },
+  {
+    id: "rev-gulsen-1",
+    providerId: "gulsen",
+    orderId: null,
+    rating: 5,
+    body: "Çocuk kıyafetlerini ayrı poşetledi. Tekrar bırakacağım.",
+    author: "S.A.",
+    createdAt: "2026-07-02T09:10:00.000Z",
+  },
+  {
+    id: "rev-gulsen-2",
+    providerId: "gulsen",
+    orderId: null,
+    rating: 4,
+    body: "Katlaması düzgün. Nötr noktada 10 dk bekledim, o kadar.",
+    author: "H.T.",
+    createdAt: "2026-05-19T14:00:00.000Z",
+  },
+  {
+    id: "rev-merve-1",
+    providerId: "merve",
+    orderId: null,
+    rating: 5,
+    body: "İş gömlekleri tam istediğim gibi. Ütü farkı belli oluyor.",
+    author: "A.B.",
+    createdAt: "2026-07-21T11:40:00.000Z",
+  },
+  {
+    id: "rev-hatice-1",
+    providerId: "hatice",
+    orderId: null,
+    rating: 5,
+    body: "Havlu ve nevresim yığını tek seferde bitti. Fotoğrafları da attı.",
+    author: "N.E.",
+    createdAt: "2026-06-08T16:05:00.000Z",
+  },
+  {
+    id: "rev-ayse-1",
+    providerId: "ayse",
+    orderId: null,
+    rating: 4,
+    body: "İpte kurutmuş, koku doğal. Yağmurda bir gün kaydı, haber verdi.",
+    author: "C.R.",
+    createdAt: "2026-07-30T08:15:00.000Z",
+  },
+  {
+    id: "rev-fatma-1",
+    providerId: "fatma",
+    orderId: null,
+    rating: 5,
+    body: "Muhtarlık dolabına bıraktım, akşam hazırdı. Kapı yok diye üzülmedim.",
+    author: "L.K.",
+    createdAt: "2026-06-15T12:00:00.000Z",
+  },
+  {
+    id: "rev-zeynep-1",
+    providerId: "zeynep",
+    orderId: null,
+    rating: 4,
+    body: "İlk siparişimdi, katlama özenliydi. Henüz ütü yok, o yüzden 4.",
+    author: "P.S.",
+    createdAt: "2026-08-03T19:30:00.000Z",
+  },
+  {
+    id: "rev-nurcan-1",
+    providerId: "nurcan",
+    orderId: null,
+    rating: 5,
+    body: "Yeni olmasına rağmen net iletişim. Poşetler ayrı, leke gitmiş.",
+    author: "G.M.",
+    createdAt: "2026-08-11T10:45:00.000Z",
   },
 ];
 

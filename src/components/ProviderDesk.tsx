@@ -1,18 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { DROP_POINTS, PACKAGES, providerById } from "@/lib/data";
+import { useState } from "react";
+import { PACKAGES } from "@/lib/data";
+import { patchOrder, useCatalog, useOrders } from "@/lib/api";
 import { tl } from "@/lib/pricing";
-import { patchOrder, useOrders } from "@/lib/store";
-import type { Order, OrderStatus } from "@/lib/types";
-
-const NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
-  onay_bekliyor: "teslim_alindi",
-  teslim_alindi: "yikaniyor",
-  yikaniyor: "utuleniyor",
-  utuleniyor: "hazir",
-  hazir: "teslim_edildi",
-};
+import { nextStatus } from "@/lib/status";
+import type { DropPoint, Order, OrderStatus, Provider } from "@/lib/types";
 
 const LABEL: Record<OrderStatus, string> = {
   onay_bekliyor: "Bekliyor",
@@ -24,46 +17,76 @@ const LABEL: Record<OrderStatus, string> = {
   iptal: "İptal",
 };
 
+const BADGE: Record<OrderStatus, string> = {
+  onay_bekliyor: "bg-[var(--sand)] text-[var(--clay)]",
+  teslim_alindi: "bg-[color-mix(in_srgb,var(--teal)_14%,transparent)] text-[var(--teal)]",
+  yikaniyor: "bg-[color-mix(in_srgb,var(--teal)_14%,transparent)] text-[var(--teal)]",
+  utuleniyor: "bg-[color-mix(in_srgb,var(--teal)_14%,transparent)] text-[var(--teal)]",
+  hazir: "bg-[color-mix(in_srgb,var(--teal)_18%,transparent)] text-[var(--teal)]",
+  teslim_edildi: "bg-[var(--paper)] text-[var(--muted)]",
+  iptal: "bg-[var(--paper)] text-[var(--muted)]",
+};
+
 export function ProviderDesk() {
-  const orders = useOrders();
+  const { providers, dropPoints } = useCatalog();
+  const { orders, ready, reload } = useOrders();
   const wallet = orders
-    .filter((o) => o.status === "teslim_edildi")
+    .filter((o) => o.paymentStatus === "captured")
     .reduce((s, o) => s + (o.total - o.commission), 0);
   const open = orders.filter((o) => o.status !== "teslim_edildi" && o.status !== "iptal");
 
   return (
-    <div className="min-h-dvh bg-[var(--paper)]">
-      <header className="mx-auto flex max-w-lg items-center justify-between px-5 pt-6">
+    <div className="min-h-full bg-[var(--paper)]">
+      <header className="k-rise mx-auto flex max-w-lg items-center justify-between px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <div>
-          <p className="font-[family-name:var(--font-display)] text-2xl">Komşudan masa</p>
+          <p className="flex items-center gap-1.5 font-[family-name:var(--font-display)] text-2xl">
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
+            Komşudan masa
+          </p>
           <p className="text-xs text-[var(--muted)]">Hizmet veren · Çukurambar pilotu</p>
         </div>
-        <Link href="/" className="text-sm text-[var(--teal)]">
-          Harita
-        </Link>
       </header>
 
-      <main className="mx-auto max-w-lg px-5 pb-16">
+      <main className="mx-auto max-w-lg px-5 pb-[calc(var(--tabbar)+1.5rem)]">
         <div className="mt-6 grid grid-cols-2 gap-2">
-          <div className="rounded-2xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]">
-            <p className="text-xs text-[var(--muted)]">Cüzdan (simülasyon)</p>
-            <p className="font-[family-name:var(--font-display)] text-2xl">{tl(wallet)}</p>
+          <div
+            className="k-rise rounded-2xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]"
+            style={{ animationDelay: "40ms" }}
+          >
+            <p className="text-xs text-[var(--muted)]">Cüzdan (tahsil)</p>
+            <p className="font-[family-name:var(--font-display)] text-2xl tabular-nums">{tl(wallet)}</p>
           </div>
-          <div className="rounded-2xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]">
+          <div
+            className="k-rise rounded-2xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]"
+            style={{ animationDelay: "90ms" }}
+          >
             <p className="text-xs text-[var(--muted)]">Açık iş</p>
-            <p className="font-[family-name:var(--font-display)] text-2xl">{open.length}</p>
+            <p className="font-[family-name:var(--font-display)] text-2xl tabular-nums">{open.length}</p>
           </div>
         </div>
 
-        <h2 className="mt-8 font-[family-name:var(--font-display)] text-xl">Gelen siparişler</h2>
-        {orders.length === 0 ? (
-          <p className="mt-3 text-sm text-[var(--muted)]">
+        <h2 className="k-rise mt-8 font-[family-name:var(--font-display)] text-xl">Gelen siparişler</h2>
+        {!ready ? (
+          <ul className="mt-3 space-y-3">
+            {[0, 1].map((i) => (
+              <li key={i} className="k-skel h-32 rounded-3xl" />
+            ))}
+          </ul>
+        ) : orders.length === 0 ? (
+          <p className="k-rise mt-3 text-sm text-[var(--muted)]">
             Henüz sipariş yok. Haritadan bir katlayan seçip sipariş bırak.
           </p>
         ) : (
           <ul className="mt-3 space-y-3">
-            {orders.map((o) => (
-              <OrderCard key={o.id} order={o} />
+            {orders.map((o, i) => (
+              <OrderCard
+                key={o.id}
+                order={o}
+                providers={providers}
+                dropPoints={dropPoints}
+                onChanged={reload}
+                delay={i * 50}
+              />
             ))}
           </ul>
         )}
@@ -72,54 +95,129 @@ export function ProviderDesk() {
   );
 }
 
-function OrderCard({ order }: { order: Order }) {
-  const p = providerById(order.providerId);
-  const pack = PACKAGES.find((x) => x.id === order.packageId);
-  const drop = DROP_POINTS.find((d) => d.id === order.dropPointId);
-  const next = NEXT[order.status];
+function OrderCard({
+  order,
+  providers,
+  dropPoints,
+  onChanged,
+  delay,
+}: {
+  order: Order;
+  providers: Provider[];
+  dropPoints: DropPoint[];
+  onChanged: () => Promise<void>;
+  delay: number;
+}) {
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState("");
+  const p = providers.find((x) => x.id === order.providerId);
+  const pack =
+    p?.packages.find((x) => x.id === order.packageId) ??
+    PACKAGES.find((x) => x.id === order.packageId);
+  const drop = dropPoints.find((d) => d.id === order.dropPointId);
+  const next = nextStatus(order.status, order.packageId);
+
+  async function act(action: "accept" | "reject" | "advance" | "deliver") {
+    if (busy) return;
+    setBusy(true);
+    setErr("");
+    try {
+      await patchOrder(order.id, action, action === "deliver" ? code : undefined);
+      setCode("");
+      await onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "İşlem alınamadı.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <li className="rounded-3xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]">
-      <p className="text-xs text-[var(--teal)]">{LABEL[order.status]}</p>
-      <p className="mt-1 font-medium">
+    <li
+      className="k-rise rounded-3xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)] transition-shadow duration-200 hover:shadow-[0_10px_28px_rgba(28,23,18,0.08)]"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <p className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE[order.status]}`}>
+        {LABEL[order.status]}
+      </p>
+      <p className="mt-2 font-medium">
         {p?.name} · {order.pieces} parça · {pack?.title}
       </p>
       <p className="mt-1 text-sm text-[var(--muted)]">
         {order.drop === "kapi" ? "Kapı teslim" : drop?.name ?? "Nötr nokta"} · {order.slot}
       </p>
       {order.note && <p className="mt-1 text-sm">Not: {order.note}</p>}
-      <p className="mt-2 text-sm">
+      <p className="mt-2 text-sm tabular-nums">
         {tl(order.total)} · eline {tl(order.total - order.commission)}
+        {order.paymentStatus === "captured" ? " · tahsil edildi" : ""}
+        {order.paymentStatus === "authorized" ? " · tutanakta" : ""}
       </p>
+      {err && <p className="k-rise mt-2 text-sm text-[var(--clay)]">{err}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         {order.status === "onay_bekliyor" && (
           <>
             <button
               type="button"
-              onClick={() => patchOrder(order.id, { status: "teslim_alindi" })}
-              className="rounded-full bg-[var(--teal)] px-3 py-1.5 text-xs text-white"
+              disabled={busy}
+              onClick={() => void act("accept")}
+              className="k-press k-cta rounded-full bg-[var(--teal)] px-3 py-1.5 text-xs text-white"
             >
-              Kabul
+              {busy ? "…" : "Kabul"}
             </button>
             <button
               type="button"
-              onClick={() => patchOrder(order.id, { status: "iptal" })}
-              className="rounded-full px-3 py-1.5 text-xs ring-1 ring-[var(--line)]"
+              disabled={busy}
+              onClick={() => void act("reject")}
+              className="k-press rounded-full px-3 py-1.5 text-xs ring-1 ring-[var(--line)]"
             >
               Red
             </button>
           </>
         )}
-        {next && order.status !== "onay_bekliyor" && (
+        {next && order.status !== "onay_bekliyor" && order.status !== "hazir" && (
           <button
             type="button"
-            onClick={() => patchOrder(order.id, { status: next })}
-            className="rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs text-[var(--paper)]"
+            disabled={busy}
+            onClick={() => void act("advance")}
+            className="k-press k-cta rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs text-[var(--paper)]"
           >
-            {LABEL[next]}
+            {busy ? "…" : LABEL[next]}
           </button>
         )}
       </div>
+      {order.status === "hazir" && (
+        <form
+          className="mt-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void act("deliver");
+          }}
+        >
+          <p className="text-xs text-[var(--muted)]">
+            Müşterinin 6 haneli teslim kodunu gir. Doğruysa ödeme cüzdana geçer.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="••••••"
+              className="w-28 rounded-full bg-[var(--paper)] px-3 py-1.5 text-center font-[family-name:var(--font-display)] text-lg tabular-nums tracking-[0.2em] ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
+              aria-label="Teslim kodu"
+            />
+            <button
+              type="submit"
+              disabled={busy || code.length !== 6}
+              className="k-press k-cta rounded-full bg-[var(--teal)] px-3 py-1.5 text-xs text-white disabled:opacity-50"
+            >
+              {busy ? "…" : "Doğrula · tahsil et"}
+            </button>
+          </div>
+        </form>
+      )}
     </li>
   );
 }

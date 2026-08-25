@@ -21,6 +21,22 @@ export type ServicePackage = {
   pricePerPiece: number;
 };
 
+export type WorkPhoto = {
+  id: string;
+  url: string;
+  createdAt: string;
+};
+
+export type Review = {
+  id: string;
+  providerId: string;
+  orderId: string | null;
+  rating: number;
+  body: string;
+  author: string;
+  createdAt: string;
+};
+
 export type Provider = {
   id: string;
   name: string;
@@ -37,6 +53,8 @@ export type Provider = {
   drops: DropMethod[];
   slots: string[];
   bio: string;
+  workPhotos: WorkPhoto[];
+  recentReviews: Review[];
 };
 
 export type DropPoint = {
@@ -45,6 +63,8 @@ export type DropPoint = {
   hint: string;
   loc: LngLat;
 };
+
+export type PaymentStatus = "authorized" | "captured" | "voided";
 
 export type Order = {
   id: string;
@@ -60,4 +80,21 @@ export type Order = {
   commission: number;
   status: OrderStatus;
   createdAt: string;
+  photos: WorkPhoto[];
+  review: Review | null;
+  /** Only while status is `hazir`. Customer shows this; desk must not display it. */
+  pickupCode: string | null;
+  paymentStatus: PaymentStatus;
+  paidAt: string | null;
+};
+
+export type CreateOrderInput = {
+  providerId: string;
+  packageId: PackageId;
+  pieces: number;
+  express: boolean;
+  drop: DropMethod;
+  dropPointId: string | null;
+  slot: string;
+  note: string;
 };

@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { Map, Marker, type StyleSpecification } from "maplibre-gl";
-import { DROP_POINTS, PILOT, PROVIDERS } from "@/lib/data";
-import type { LngLat, MapMode } from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import { Map, Marker, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
+import { PILOT } from "@/lib/data";
+import type { DropPoint, LngLat, MapMode, Provider } from "@/lib/types";
 
-/** OSM sokak haritası (Carto Voyager) + 3D için bina vektörü. */
+/** Next/Turbopack does not emit the worker next to maplibre-gl-shared.mjs. */
+setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+
+/** OSM sokak haritası (Carto Voyager). 3D binalar yüklenince eklenir. */
 const STYLE: StyleSpecification = {
   version: 8,
   sources: {
@@ -20,11 +23,6 @@ const STYLE: StyleSpecification = {
       maxzoom: 20,
       attribution: "© OpenStreetMap © CARTO",
     },
-    buildings: {
-      type: "vector",
-      url: "https://tiles.openfreemap.org/planet",
-      maxzoom: 14,
-    },
   },
   layers: [{ id: "carto", type: "raster", source: "carto" }],
 };
@@ -34,17 +32,39 @@ type Props = {
   selectedId: string | null;
   dropId: string | null;
   user: LngLat | null;
+  providers: Provider[];
+  dropPoints: DropPoint[];
   onSelect: (id: string) => void;
   onSelectDrop: (id: string) => void;
+  visible?: boolean;
 };
+
+function tightBounds(): [[number, number], [number, number]] {
+  return [
+    [PILOT.bounds.west, PILOT.bounds.south],
+    [PILOT.bounds.east, PILOT.bounds.north],
+  ];
+}
+
+let cameraGen = 0;
+
+function pinKey(providers: Provider[], dropPoints: DropPoint[]) {
+  return [
+    ...providers.map((p) => `${p.id}:${p.loc.lng}:${p.loc.lat}:${p.rating}`),
+    ...dropPoints.map((d) => `${d.id}:${d.loc.lng}:${d.loc.lat}`),
+  ].join("|");
+}
 
 export function MapCanvas({
   mode,
   selectedId,
   dropId,
   user,
+  providers,
+  dropPoints,
   onSelect,
   onSelectDrop,
+  visible = true,
 }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
@@ -53,9 +73,17 @@ export function MapCanvas({
   const onSelectRef = useRef(onSelect);
   const onSelectDropRef = useRef(onSelectDrop);
   const modeRef = useRef(mode);
+  const providersRef = useRef(providers);
+  const selectedRef = useRef(selectedId);
+  const dropIdRef = useRef(dropId);
+  const [mapReady, setMapReady] = useState(false);
   onSelectRef.current = onSelect;
   onSelectDropRef.current = onSelectDrop;
   modeRef.current = mode;
+  providersRef.current = providers;
+  selectedRef.current = selectedId;
+  dropIdRef.current = dropId;
+  const pins = pinKey(providers, dropPoints);
 
   useEffect(() => {
     if (!root.current || mapRef.current) return;
@@ -67,60 +95,34 @@ export function MapCanvas({
       zoom: PILOT.zoom,
       minZoom: 13.2,
       maxZoom: 18,
-      pitch: mode === "3d" ? 52 : 0,
-      bearing: mode === "3d" ? -12 : 0,
-      maxPitch: 62,
-      maxBounds: [
-        [PILOT.bounds.west, PILOT.bounds.south],
-        [PILOT.bounds.east, PILOT.bounds.north],
-      ],
+      pitch: mode === "3d" ? 58 : 0,
+      bearing: mode === "3d" ? -18 : 0,
+      maxPitch: 75,
+      pitchWithRotate: true,
+      canvasContextAttributes: { antialias: true },
+      ...(mode === "3d" ? {} : { maxBounds: tightBounds() }),
       attributionControl: { compact: true },
     });
     mapRef.current = map;
+    setMapReady(true);
 
-    map.on("load", () => {
-      addBuildings(map);
-      syncMode(map, modeRef.current);
+    const onReady = () => {
       map.resize();
+      ensureBuildings(map, modeRef.current);
+      syncMode(map, modeRef.current);
+    };
+    map.on("load", onReady);
+    map.once("idle", () => syncMode(map, modeRef.current));
+    map.on("sourcedata", (e) => {
+      if (e.sourceId === "openfreemap" && e.isSourceLoaded) {
+        ensureBuildings(map, modeRef.current);
+      }
     });
 
-    const pins: Marker[] = [];
-    for (const p of PROVIDERS) {
-      const el = document.createElement("button");
-      el.type = "button";
-      el.className = "katla-pin";
-      el.dataset.id = p.id;
-      el.innerHTML = `<span class="dot">${p.rating.toFixed(1)}</span><span class="stem"></span>`;
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        onSelectRef.current(p.id);
-      });
-      pins.push(
-        new Marker({ element: el, anchor: "bottom" })
-          .setLngLat([p.loc.lng, p.loc.lat])
-          .addTo(map),
-      );
-    }
-    for (const d of DROP_POINTS) {
-      const el = document.createElement("button");
-      el.type = "button";
-      el.className = "katla-drop";
-      el.dataset.drop = d.id;
-      el.title = d.name;
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        onSelectDropRef.current(d.id);
-      });
-      pins.push(
-        new Marker({ element: el, anchor: "bottom" })
-          .setLngLat([d.loc.lng, d.loc.lat])
-          .addTo(map),
-      );
-    }
-    markers.current = pins;
-
     return () => {
-      pins.forEach((m) => m.remove());
+      setMapReady(false);
+      markers.current.forEach((m) => m.remove());
+      markers.current = [];
       userMarker.current?.remove();
       map.remove();
       mapRef.current = null;
@@ -129,11 +131,71 @@ export function MapCanvas({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    const apply = () => syncMode(map, mode);
-    if (map.loaded()) apply();
-    else map.once("load", apply);
-  }, [mode]);
+    if (!mapReady || !map) return;
+
+    markers.current.forEach((m) => m.remove());
+    const next: Marker[] = [];
+    providers.forEach((p, i) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "katla-pin";
+      el.dataset.id = p.id;
+      el.style.setProperty("--pin-delay", `${i * 40}ms`);
+      el.innerHTML = `<span class="dot">${p.rating.toFixed(1)}</span><span class="stem"></span>`;
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onSelectRef.current(p.id);
+      });
+      next.push(
+        new Marker({ element: el, anchor: "bottom" })
+          .setLngLat([p.loc.lng, p.loc.lat])
+          .addTo(map),
+      );
+    });
+    dropPoints.forEach((d, i) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "katla-drop";
+      el.dataset.drop = d.id;
+      el.title = d.name;
+      el.style.setProperty("--pin-delay", `${80 + i * 40}ms`);
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onSelectDropRef.current(d.id);
+      });
+      next.push(
+        new Marker({ element: el, anchor: "bottom" })
+          .setLngLat([d.loc.lng, d.loc.lat])
+          .addTo(map),
+      );
+    });
+    markers.current = next;
+    for (const m of next) {
+      const el = m.getElement();
+      el.classList.toggle(
+        "is-on",
+        el.dataset.id === selectedRef.current || el.dataset.drop === dropIdRef.current,
+      );
+    }
+    return () => {
+      next.forEach((m) => m.remove());
+      if (markers.current === next) markers.current = [];
+    };
+    // pins: recreate only when ids/locations change, not on remaining polls
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, pins]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    syncMode(map, mode);
+  }, [mode, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!visible || !map) return;
+    map.resize();
+  }, [visible]);
 
   useEffect(() => {
     for (const m of markers.current) {
@@ -144,13 +206,16 @@ export function MapCanvas({
     }
     const map = mapRef.current;
     if (!map || !selectedId) return;
-    const p = PROVIDERS.find((x) => x.id === selectedId);
+    const p = providersRef.current.find((x) => x.id === selectedId);
     if (!p) return;
     map.easeTo({
       center: [p.loc.lng, p.loc.lat],
       zoom: Math.max(map.getZoom(), 16.2),
       duration: 650,
       offset: [0, -80],
+      pitch: modeRef.current === "3d" ? Math.max(map.getPitch(), 52) : 0,
+      bearing: modeRef.current === "3d" ? map.getBearing() : 0,
+      essential: true,
     });
   }, [selectedId, dropId]);
 
@@ -183,50 +248,83 @@ export function MapCanvas({
 }
 
 function syncMode(map: Map, mode: MapMode) {
-  if (mode === "3d") {
-    map.easeTo({ pitch: 52, bearing: -12, duration: 800 });
+  const three = mode === "3d";
+  const gen = ++cameraGen;
+  map.getContainer().dataset.view = mode;
+  map.stop();
+  if (three) map.setMaxBounds(null);
+  else map.setPitch(0);
+
+  const pitch = three ? 58 : 0;
+  const bearing = three ? -18 : 0;
+  map.setPitch(pitch);
+  map.setBearing(bearing);
+  if (map.loaded()) {
+    map.easeTo({ pitch, bearing, duration: 720, essential: true });
+  } else {
+    map.jumpTo({ pitch, bearing });
+  }
+
+  if (three) {
     map.dragRotate.enable();
     map.touchZoomRotate.enableRotation();
-    if (map.getLayer("3d-buildings")) {
-      map.setLayoutProperty("3d-buildings", "visibility", "visible");
+    map.touchPitch.enable();
+    try {
+      map.setSky({ "atmosphere-blend": 0.6 });
+    } catch {
+      /* style not loaded yet */
     }
   } else {
-    map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
-    if (map.getLayer("3d-buildings")) {
-      map.setLayoutProperty("3d-buildings", "visibility", "none");
+    map.touchPitch.disable();
+    try {
+      map.setSky({ "atmosphere-blend": 0 });
+    } catch {
+      /* style not loaded yet */
     }
+    map.once("moveend", () => {
+      if (gen !== cameraGen) return;
+      if (map.getContainer().dataset.view === "2d") map.setMaxBounds(tightBounds());
+    });
   }
+  ensureBuildings(map, mode);
 }
 
-function addBuildings(map: Map) {
-  if (map.getLayer("3d-buildings") || !map.getSource("buildings")) return;
-  try {
-    map.addLayer({
-      id: "3d-buildings",
-      source: "buildings",
-      "source-layer": "building",
-      type: "fill-extrusion",
-      minzoom: 14,
-      paint: {
-        "fill-extrusion-color": "#c9b79a",
-        "fill-extrusion-height": [
-          "coalesce",
-          ["get", "render_height"],
-          ["get", "height"],
-          14,
-        ],
-        "fill-extrusion-base": [
-          "coalesce",
-          ["get", "render_min_height"],
-          ["get", "min_height"],
-          0,
-        ],
-        "fill-extrusion-opacity": 0.55,
-      },
-    });
-  } catch {
-    /* raster-only 3D (pitch) still works */
+function ensureBuildings(map: Map, mode: MapMode) {
+  if (!map.isStyleLoaded()) return;
+  if (!map.getSource("openfreemap")) {
+    try {
+      map.addSource("openfreemap", {
+        type: "vector",
+        url: "https://tiles.openfreemap.org/planet",
+      });
+    } catch {
+      /* already added */
+    }
+  }
+  if (!map.getLayer("3d-buildings") && map.getSource("openfreemap")) {
+    try {
+      map.addLayer({
+        id: "3d-buildings",
+        source: "openfreemap",
+        "source-layer": "building",
+        type: "fill-extrusion",
+        minzoom: 14,
+        filter: ["!=", ["get", "hide_3d"], true],
+        paint: {
+          "fill-extrusion-color": "#8f7d64",
+          "fill-extrusion-height": ["coalesce", ["get", "render_height"], 16],
+          "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+          "fill-extrusion-opacity": 0.86,
+          "fill-extrusion-vertical-gradient": true,
+        },
+      });
+    } catch {
+      /* TileJSON / source-layer not ready; sourcedata retries */
+    }
+  }
+  if (map.getLayer("3d-buildings")) {
+    map.setLayoutProperty("3d-buildings", "visibility", mode === "3d" ? "visible" : "none");
   }
 }

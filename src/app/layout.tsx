@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 
@@ -16,6 +16,20 @@ export const metadata: Metadata = {
   title: "Komşudan — bırak, işlensin, al",
   description:
     "Çukurambar pilotu. Çamaşır ve ütüyü eve girmeden yakındaki komşuya bırak.",
+  applicationName: "Komşudan",
+  appleWebApp: {
+    capable: true,
+    title: "Komşudan",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: { telephone: false },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1a6b63",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -1,14 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { DROP_POINTS, PILOT, PROVIDERS, providerById, trustLabel } from "@/lib/data";
+import { PILOT, trustLabel } from "@/lib/data";
 import { formatKm, kmBetween } from "@/lib/geo";
-import { estimate, tl } from "@/lib/pricing";
-import { addOrder, newOrderId, useOrders } from "@/lib/store";
+import { estimateFor, tl } from "@/lib/pricing";
+import { postOrder, useCatalog, useOrders } from "@/lib/api";
+import { trackSteps } from "@/lib/status";
 import type {
   DropMethod,
+  DropPoint,
   LngLat,
   MapMode,
   Order,
@@ -18,15 +19,34 @@ import type {
 
 const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), {
   ssr: false,
-  loading: () => <div className="absolute inset-0 bg-[var(--paper)]" />,
+  loading: () => (
+    <div className="absolute inset-0 bg-[var(--paper)]">
+      <div className="k-skel absolute inset-0 opacity-40" />
+    </div>
+  ),
 });
 
 const PIECES = [8, 12, 16, 24, 32];
 
 type Sheet = "list" | "provider" | "checkout" | "track";
 
-export function CustomerApp() {
-  const orders = useOrders();
+type Props = {
+  pane?: "map" | "orders";
+  mapActive?: boolean;
+  onOpenOrders?: () => void;
+  onPlacedOrder?: () => void;
+  onBackToMap?: () => void;
+};
+
+export function CustomerApp({
+  pane = "map",
+  mapActive = true,
+  onOpenOrders,
+  onPlacedOrder,
+  onBackToMap,
+}: Props) {
+  const { providers, dropPoints, ready, reload: reloadCatalog } = useCatalog();
+  const { orders, reload: reloadOrders } = useOrders();
   const [mode, setMode] = useState<MapMode>("3d");
   const [user, setUser] = useState<LngLat | null>(null);
   const [far, setFar] = useState(false);
@@ -42,18 +62,23 @@ export function CustomerApp() {
   const [note, setNote] = useState("");
   const [dryerOnly, setDryerOnly] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+  const [placing, setPlacing] = useState(false);
 
   const origin = user ?? PILOT.center;
   const ranked = useMemo(() => {
-    return PROVIDERS.filter((p) => (dryerOnly ? p.hasDryer : true))
+    return providers
+      .filter((p) => (dryerOnly ? p.hasDryer : true))
       .map((p) => ({ p, km: kmBetween(origin, p.loc) }))
       .sort((a, b) => a.km - b.km);
-  }, [origin, dryerOnly]);
+  }, [origin, dryerOnly, providers]);
   const available = ranked.filter(({ p }) => p.remaining > 0).length;
 
-  const selected = selectedId ? providerById(selectedId) : undefined;
+  const selected = selectedId ? providers.find((p) => p.id === selectedId) : undefined;
   const active = orders.find((o) => o.id === activeId) ?? orders[0];
-  const quote = estimate(pieces, pkg, express && Boolean(selected?.express));
+  const quote = selected
+    ? estimateFor(selected, pieces, pkg, express && selected.express)
+    : { total: 0, commission: 0, providerNet: 0, perPiece: 0 };
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -73,13 +98,35 @@ export function CustomerApp() {
   }, []);
 
   useEffect(() => {
+    if (pane === "map") {
+      setSheet("list");
+      setSelectedId(null);
+    }
+  }, [pane]);
+
+  useEffect(() => {
+    if (pane !== "orders") return;
+    setHello(false);
+    const prefer =
+      orders.find((o) => o.status === "hazir") ??
+      orders.find((o) => o.status !== "teslim_edildi" && o.status !== "iptal") ??
+      orders[0];
+    if (prefer) {
+      setActiveId(prefer.id);
+      setSheet("track");
+    } else {
+      setSheet("list");
+    }
+  }, [pane, orders]);
+
+  useEffect(() => {
     if (selected) {
       setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : selected.packages[0].id);
       setSlot(selected.slots[0] ?? "");
       setDrop(selected.drops.includes("kapi") ? "kapi" : "nokta");
       setExpress(false);
       if (!selected.drops.includes("nokta")) setDropId(null);
-      else if (!dropId) setDropId(DROP_POINTS[0].id);
+      else if (!dropId) setDropId(dropPoints[0]?.id ?? null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
@@ -90,26 +137,30 @@ export function CustomerApp() {
     setHello(false);
   }
 
-  function place() {
-    if (!selected) return;
-    const order: Order = {
-      id: newOrderId(),
-      providerId: selected.id,
-      packageId: pkg,
-      pieces,
-      express: express && selected.express,
-      drop,
-      dropPointId: drop === "nokta" ? dropId : null,
-      slot,
-      note,
-      total: quote.total,
-      commission: quote.commission,
-      status: "onay_bekliyor",
-      createdAt: new Date().toISOString(),
-    };
-    addOrder(order);
-    setActiveId(order.id);
-    setSheet("track");
+  async function place() {
+    if (!selected || placing) return;
+    setErr("");
+    setPlacing(true);
+    try {
+      const order = await postOrder({
+        providerId: selected.id,
+        packageId: pkg,
+        pieces,
+        express: express && selected.express,
+        drop,
+        dropPointId: drop === "nokta" ? dropId : null,
+        slot,
+        note,
+      });
+      await Promise.all([reloadOrders(), reloadCatalog()]);
+      setActiveId(order.id);
+      setSheet("track");
+      onPlacedOrder?.();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Sipariş alınamadı.");
+    } finally {
+      setPlacing(false);
+    }
   }
 
   return (
@@ -119,146 +170,206 @@ export function CustomerApp() {
         selectedId={selectedId}
         dropId={drop === "nokta" ? dropId : null}
         user={user}
+        providers={providers}
+        dropPoints={dropPoints}
+        visible={mapActive}
         onSelect={openProvider}
         onSelectDrop={(id) => {
           setDropId(id);
           setDrop("nokta");
         }}
       />
+      <div className="k-map-vignette pointer-events-none absolute inset-0 z-[1]" />
 
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between p-3 sm:p-4">
-        <div className="pointer-events-auto rounded-2xl bg-[var(--card)]/92 px-3 py-2 shadow-[0_8px_30px_rgba(28,23,18,0.08)] ring-1 ring-[var(--line)] backdrop-blur">
-          <p className="font-[family-name:var(--font-display)] text-lg leading-none">Komşudan</p>
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-4">
+        <div className="k-glass k-rise pointer-events-auto rounded-2xl px-3 py-2 ring-1 ring-[var(--line)]">
+          <p className="flex items-center gap-1.5 font-[family-name:var(--font-display)] text-lg leading-none">
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
+            Komşudan
+          </p>
           <p className="mt-0.5 text-[11px] text-[var(--muted)]">{PILOT.label}</p>
         </div>
-        <div className="pointer-events-auto flex items-center gap-2">
-          <div className="flex rounded-full bg-[var(--card)]/92 p-1 ring-1 ring-[var(--line)] backdrop-blur">
+        <div className="k-rise pointer-events-auto flex items-center gap-2" style={{ animationDelay: "60ms" }}>
+          <div
+            className="k-glass relative grid grid-cols-2 rounded-full p-1 ring-1 ring-[var(--line)]"
+            role="group"
+            aria-label="Harita görünümü"
+          >
+            <span
+              aria-hidden
+              className="pointer-events-none absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-[var(--ink)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+              style={{
+                transform: mode === "3d" ? "translateX(calc(100% + 4px))" : "translateX(0)",
+              }}
+            />
             {(["2d", "3d"] as const).map((m) => (
               <button
                 key={m}
                 type="button"
+                aria-pressed={mode === m}
                 onClick={() => setMode(m)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium uppercase ${
-                  mode === m ? "bg-[var(--ink)] text-[var(--paper)]" : "text-[var(--muted)]"
+                className={`relative z-10 rounded-full px-3 py-1.5 text-xs font-medium uppercase transition-colors duration-200 ${
+                  mode === m ? "text-[var(--paper)]" : "text-[var(--muted)]"
                 }`}
               >
                 {m}
               </button>
             ))}
           </div>
-          <Link
-            href="/hizmet"
-            className="rounded-full bg-[var(--card)]/92 px-3 py-2 text-xs ring-1 ring-[var(--line)] backdrop-blur"
-          >
-            Hizmet ver
-          </Link>
         </div>
       </header>
 
-      <div className="pointer-events-none absolute top-20 left-3 z-10 sm:top-22">
-        <div className="pointer-events-auto flex flex-wrap gap-1.5">
+      {pane === "map" && (
+      <div className="pointer-events-none absolute top-[calc(env(safe-area-inset-top)+5rem)] left-3 z-10">
+        <div className="k-rise pointer-events-auto flex flex-wrap gap-1.5" style={{ animationDelay: "90ms" }}>
           <button
             type="button"
             onClick={() => setDryerOnly((v) => !v)}
-            className={`rounded-full px-3 py-1.5 text-xs ring-1 backdrop-blur ${
+            className={`k-chip rounded-full px-3 py-1.5 text-xs ring-1 backdrop-blur ${
               dryerOnly
                 ? "bg-[var(--teal)] text-white ring-[var(--teal)]"
-                : "bg-[var(--card)]/92 ring-[var(--line)]"
+                : "k-glass ring-[var(--line)]"
             }`}
           >
             Kurutucu var
           </button>
         </div>
         {far && (
-          <p className="pointer-events-auto mt-2 max-w-[16rem] rounded-xl bg-[var(--card)]/92 px-3 py-2 text-xs text-[var(--muted)] ring-1 ring-[var(--line)]">
+          <p className="k-glass k-rise pointer-events-auto mt-2 max-w-[16rem] rounded-xl px-3 py-2 text-xs text-[var(--muted)] ring-1 ring-[var(--line)]">
             Pilot bölge Çukurambar. Harita oraya alındı — sen uzaktasın.
           </p>
         )}
       </div>
+      )}
 
-      {hello && sheet === "list" && (
-        <div className="absolute inset-x-0 top-[28%] z-10 mx-auto max-w-md px-4">
-          <div className="rounded-3xl bg-[var(--card)]/95 p-5 shadow-[0_20px_50px_rgba(28,23,18,0.12)] ring-1 ring-[var(--line)] backdrop-blur">
-            <p className="text-xs tracking-wide text-[var(--teal)] uppercase">Bırak · işlensin · al</p>
-            <h1 className="mt-1 font-[family-name:var(--font-display)] text-3xl leading-tight">
-              Çevrende{" "}
-              <span className="text-[var(--teal)]">{available}</span> kişi şu
-              anda müsait.
-            </h1>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak.
-            </p>
-            <button
-              type="button"
-              onClick={() => setHello(false)}
-              className="mt-4 rounded-full bg-[var(--clay)] px-5 py-2.5 text-sm font-medium text-white"
-            >
-              Haritayı aç
-            </button>
+      {hello && sheet === "list" && pane === "map" && (
+        <>
+          <button
+            type="button"
+            aria-label="Karşılamayı kapat"
+            onClick={() => setHello(false)}
+            className="k-welcome-dim absolute inset-0 z-[15] bg-[rgba(28,23,18,0.18)]"
+          />
+          <div className="absolute inset-x-0 top-[26%] z-20 mx-auto max-w-md px-4">
+            <div className="k-welcome k-glass rounded-3xl p-5 shadow-[var(--shadow-pop)] ring-1 ring-[var(--line)]">
+              <p className="text-[11px] font-medium tracking-[0.14em] text-[var(--teal)] uppercase">
+                Bırak · işlensin · al
+              </p>
+              <h1 className="mt-1.5 font-[family-name:var(--font-display)] text-3xl leading-tight">
+                Çevrende{" "}
+                <span className="text-[var(--teal)] tabular-nums">{ready ? available : "—"}</span>{" "}
+                kişi şu anda müsait.
+              </h1>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak.
+              </p>
+              <button
+                type="button"
+                onClick={() => setHello(false)}
+                className="k-press k-cta mt-4 rounded-full bg-[var(--clay)] px-5 py-2.5 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.28)]"
+              >
+                Haritayı aç
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       <section
-        className={`absolute inset-x-0 bottom-0 z-10 mx-auto max-w-lg px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${
-          sheet === "list" ? "max-h-[42vh]" : "max-h-[78vh]"
+        className={`absolute inset-x-0 z-10 mx-auto max-w-lg px-3 transition-[max-height,top] duration-500 ease-[var(--ease-out)] ${
+          pane === "orders"
+            ? "top-[calc(env(safe-area-inset-top)+4.25rem)] bottom-[var(--tabbar)]"
+            : `bottom-[var(--tabbar)] ${sheet === "list" ? "max-h-[38vh]" : "max-h-[calc(100dvh-var(--tabbar)-5.5rem)]"}`
         }`}
       >
-        <div className="overflow-y-auto rounded-t-3xl bg-[var(--card)] shadow-[0_-12px_40px_rgba(28,23,18,0.12)] ring-1 ring-[var(--line)]">
-          <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-[var(--line)]" />
-          {sheet === "list" && (
-            <List
-              ranked={ranked}
-              onPick={openProvider}
-              onTrack={
-                orders[0]
-                  ? () => {
-                      setActiveId(orders[0].id);
-                      setSheet("track");
-                    }
-                  : undefined
-              }
-            />
-          )}
-          {sheet === "provider" && selected && (
-            <ProviderPane
-              p={selected}
-              km={kmBetween(origin, selected.loc)}
-              pkg={pkg}
-              onPkg={setPkg}
-              onBack={() => {
-                setSheet("list");
-                setSelectedId(null);
-              }}
-              onNext={() => setSheet("checkout")}
-            />
-          )}
-          {sheet === "checkout" && selected && (
-            <Checkout
-              p={selected}
-              pieces={pieces}
-              onPieces={setPieces}
-              express={express}
-              onExpress={setExpress}
-              drop={drop}
-              onDrop={setDrop}
-              dropId={dropId}
-              onDropId={setDropId}
-              slot={slot}
-              onSlot={setSlot}
-              note={note}
-              onNote={setNote}
-              quote={quote}
-              onBack={() => setSheet("provider")}
-              onPlace={place}
-            />
-          )}
-          {sheet === "track" && active && (
-            <Track
-              order={active}
-              onBack={() => setSheet("list")}
-            />
-          )}
+        <div className="h-full overflow-y-auto rounded-t-3xl bg-[var(--card)] shadow-[var(--shadow-sheet)] ring-1 ring-[var(--line)]">
+          <div className="sticky top-0 z-10 flex justify-center bg-[var(--card)] pt-2 pb-1">
+            <div className="h-1 w-10 rounded-full bg-[var(--line)]" />
+          </div>
+          <div key={sheet} className="k-sheet">
+            {sheet === "list" && pane === "map" && (
+              <List
+                ranked={ranked}
+                ready={ready}
+                onPick={openProvider}
+                onTrack={
+                  orders[0]
+                    ? () => {
+                        const prefer =
+                          orders.find((o) => o.status === "hazir") ??
+                          orders.find((o) => o.status !== "teslim_edildi" && o.status !== "iptal") ??
+                          orders[0];
+                        setActiveId(prefer.id);
+                        setSheet("track");
+                        onOpenOrders?.();
+                      }
+                    : undefined
+                }
+              />
+            )}
+            {sheet === "provider" && selected && (
+              <ProviderPane
+                p={selected}
+                km={kmBetween(origin, selected.loc)}
+                pkg={pkg}
+                onPkg={setPkg}
+                onBack={() => {
+                  setSheet("list");
+                  setSelectedId(null);
+                }}
+                onNext={() => setSheet("checkout")}
+              />
+            )}
+            {sheet === "checkout" && selected && (
+              <Checkout
+                p={selected}
+                pieces={pieces}
+                onPieces={setPieces}
+                express={express}
+                onExpress={setExpress}
+                drop={drop}
+                onDrop={setDrop}
+                dropId={dropId}
+                dropPoints={dropPoints}
+                onDropId={setDropId}
+                slot={slot}
+                onSlot={setSlot}
+                note={note}
+                onNote={setNote}
+                quote={quote}
+                err={err}
+                placing={placing}
+                onBack={() => setSheet("provider")}
+                onPlace={() => void place()}
+              />
+            )}
+            {sheet === "track" && active && (
+              <Track
+                order={active}
+                provider={providers.find((p) => p.id === active.providerId)}
+                backLabel={pane === "orders" ? "Harita" : "Liste"}
+                onBack={() => {
+                  if (pane === "orders") onBackToMap?.();
+                  else setSheet("list");
+                }}
+              />
+            )}
+            {pane === "orders" && !active && (
+              <div className="p-6 pt-2">
+                <h2 className="font-[family-name:var(--font-display)] text-2xl">Siparişin</h2>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  Henüz sipariş yok. Haritadan bir komşu seç, çamaşırı bırak.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onBackToMap?.()}
+                  className="k-press k-cta mt-4 rounded-full bg-[var(--clay)] px-5 py-2.5 text-sm font-medium text-white"
+                >
+                  Haritaya dön
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </section>
     </div>
@@ -267,46 +378,71 @@ export function CustomerApp() {
 
 function List({
   ranked,
+  ready,
   onPick,
   onTrack,
 }: {
   ranked: { p: Provider; km: number }[];
+  ready: boolean;
   onPick: (id: string) => void;
   onTrack?: () => void;
 }) {
   return (
-    <div className="p-4">
+    <div className="p-4 pt-2">
       <div className="mb-3 flex items-baseline justify-between">
         <h2 className="font-[family-name:var(--font-display)] text-xl">Yakındakiler</h2>
         {onTrack && (
-          <button type="button" onClick={onTrack} className="text-xs text-[var(--teal)]">
+          <button type="button" onClick={onTrack} className="k-press text-xs text-[var(--teal)]">
             Siparişimi gör
           </button>
         )}
       </div>
-      <ul className="space-y-2">
-        {ranked.map(({ p, km }) => (
-          <li key={p.id}>
-            <button
-              type="button"
-              onClick={() => onPick(p.id)}
-              className="flex w-full items-start justify-between rounded-2xl bg-[var(--paper)] px-3 py-3 text-left ring-1 ring-[var(--line)]"
-            >
-              <span>
-                <span className="block font-medium">{p.name}</span>
-                <span className="mt-0.5 block text-xs text-[var(--muted)]">
-                  {p.neighborhood} · {formatKm(km)} · {trustLabel(p.trust)}
-                  {p.hasDryer ? " · kurutucu" : ""}
-                </span>
-              </span>
-              <span className="text-right text-sm">
-                <span className="block">{p.rating.toFixed(1)}</span>
-                <span className="text-xs text-[var(--muted)]">{tl(p.packages.find((x) => x.id === "tam")?.pricePerPiece ?? p.packages.at(-1)!.pricePerPiece)}/parça</span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      {!ready ? (
+        <ul className="space-y-2">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="k-skel h-[4.25rem] rounded-2xl" />
+          ))}
+        </ul>
+      ) : (
+        <ul className="space-y-2">
+          {ranked.map(({ p, km }, i) => {
+            const fill = p.capacity > 0 ? Math.max(6, Math.round((p.remaining / p.capacity) * 100)) : 0;
+            return (
+              <li key={p.id} className="k-rise" style={{ animationDelay: `${i * 45}ms` }}>
+                <button
+                  type="button"
+                  onClick={() => onPick(p.id)}
+                  className="k-card flex w-full items-start justify-between rounded-2xl bg-[var(--paper)] px-3 py-3 text-left ring-1 ring-[var(--line)]"
+                >
+                  <span className="min-w-0">
+                    <span className="block font-medium">{p.name}</span>
+                    <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                      {p.neighborhood} · {formatKm(km)} · {trustLabel(p.trust)}
+                      {p.hasDryer ? " · kurutucu" : ""}
+                    </span>
+                    <span className="mt-2 block h-1 w-28 overflow-hidden rounded-full bg-[var(--line)]">
+                      <span
+                        className="block h-full rounded-full bg-[var(--teal)] transition-[width] duration-500"
+                        style={{ width: `${fill}%` }}
+                      />
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-right text-sm">
+                    <span className="block tabular-nums">{p.rating.toFixed(1)}</span>
+                    <span className="text-xs text-[var(--muted)]">
+                      {tl(
+                        p.packages.find((x) => x.id === "tam")?.pricePerPiece ??
+                          p.packages.at(-1)!.pricePerPiece,
+                      )}
+                      /parça
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
@@ -327,30 +463,30 @@ function ProviderPane({
   onNext: () => void;
 }) {
   return (
-    <div className="p-4">
-      <button type="button" onClick={onBack} className="text-xs text-[var(--muted)]">
+    <div className="p-4 pt-2">
+      <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
         ← Liste
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">{p.name}</h2>
       <p className="text-sm text-[var(--muted)]">
         {p.neighborhood} · {formatKm(km)} · {p.rating} ({p.reviews} yorum) · bugün {p.remaining} parça yer
       </p>
-      <p className="mt-3 text-sm">{p.bio}</p>
+      <p className="mt-3 text-sm leading-relaxed">{p.bio}</p>
       <div className="mt-4 grid gap-2">
         {p.packages.map((pack) => (
           <button
             key={pack.id}
             type="button"
             onClick={() => onPkg(pack.id)}
-            className={`rounded-2xl px-3 py-3 text-left ring-1 ${
+            className={`k-chip rounded-2xl px-3 py-3 text-left ring-1 ${
               pkg === pack.id
-                ? "bg-[#efe4d4] ring-[var(--clay)]"
+                ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
                 : "bg-[var(--paper)] ring-[var(--line)]"
             }`}
           >
             <span className="flex justify-between font-medium">
               {pack.title}
-              <span>{tl(pack.pricePerPiece)}/parça</span>
+              <span className="tabular-nums">{tl(pack.pricePerPiece)}/parça</span>
             </span>
             <span className="mt-0.5 block text-xs text-[var(--muted)]">{pack.blurb}</span>
           </button>
@@ -359,7 +495,7 @@ function ProviderPane({
       <button
         type="button"
         onClick={onNext}
-        className="mt-4 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white"
+        className="k-press k-cta mt-4 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.22)]"
       >
         Devam · parça ve teslimat
       </button>
@@ -376,12 +512,15 @@ function Checkout({
   drop,
   onDrop,
   dropId,
+  dropPoints,
   onDropId,
   slot,
   onSlot,
   note,
   onNote,
   quote,
+  err,
+  placing,
   onBack,
   onPlace,
 }: {
@@ -393,18 +532,21 @@ function Checkout({
   drop: DropMethod;
   onDrop: (v: DropMethod) => void;
   dropId: string | null;
+  dropPoints: DropPoint[];
   onDropId: (id: string) => void;
   slot: string;
   onSlot: (s: string) => void;
   note: string;
   onNote: (s: string) => void;
   quote: { total: number; commission: number; providerNet: number };
+  err: string;
+  placing: boolean;
   onBack: () => void;
   onPlace: () => void;
 }) {
   return (
-    <div className="p-4">
-      <button type="button" onClick={onBack} className="text-xs text-[var(--muted)]">
+    <div className="p-4 pt-2">
+      <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
         ← Paket
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Kaç parça?</h2>
@@ -417,8 +559,10 @@ function Checkout({
             key={n}
             type="button"
             onClick={() => onPieces(n)}
-            className={`rounded-full px-3 py-1.5 text-sm ring-1 ${
-              pieces === n ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]" : "ring-[var(--line)]"
+            className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
+              pieces === n
+                ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]"
+                : "ring-[var(--line)]"
             }`}
           >
             {n} parça
@@ -442,7 +586,7 @@ function Checkout({
             key={d}
             type="button"
             onClick={() => onDrop(d)}
-            className={`rounded-full px-3 py-1.5 text-sm ring-1 ${
+            className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
               drop === d ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
             }`}
           >
@@ -452,13 +596,13 @@ function Checkout({
       </div>
       {drop === "nokta" && (
         <div className="mt-2 grid gap-1.5">
-          {DROP_POINTS.map((d) => (
+          {dropPoints.map((d) => (
             <button
               key={d.id}
               type="button"
               onClick={() => onDropId(d.id)}
-              className={`rounded-xl px-3 py-2 text-left text-sm ring-1 ${
-                dropId === d.id ? "bg-[#efe4d4] ring-[var(--clay)]" : "ring-[var(--line)]"
+              className={`k-chip rounded-xl px-3 py-2 text-left text-sm ring-1 ${
+                dropId === d.id ? "bg-[var(--sand)] ring-[var(--clay)]" : "ring-[var(--line)]"
               }`}
             >
               {d.name}
@@ -474,8 +618,10 @@ function Checkout({
             key={s}
             type="button"
             onClick={() => onSlot(s)}
-            className={`rounded-full px-3 py-1.5 text-xs ring-1 ${
-              slot === s ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]" : "ring-[var(--line)]"
+            className={`k-chip rounded-full px-3 py-1.5 text-xs ring-1 ${
+              slot === s
+                ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]"
+                : "ring-[var(--line)]"
             }`}
           >
             {s}
@@ -486,32 +632,25 @@ function Checkout({
         value={note}
         onChange={(e) => onNote(e.target.value)}
         placeholder="Nevresim, leke, hassas kumaş, kapı kodu…"
-        className="mt-4 w-full resize-none rounded-2xl bg-[var(--paper)] px-3 py-2 text-sm ring-1 ring-[var(--line)] outline-none"
+        className="mt-4 w-full resize-none rounded-2xl bg-[var(--paper)] px-3 py-2 text-sm ring-1 ring-[var(--line)] outline-none transition-[box-shadow] duration-200 focus:ring-[var(--teal)]"
         rows={2}
       />
-      <p className="mt-4 font-[family-name:var(--font-display)] text-2xl">{tl(quote.total)}</p>
+      <p className="mt-4 font-[family-name:var(--font-display)] text-2xl tabular-nums">{tl(quote.total)}</p>
       <p className="text-xs text-[var(--muted)]">
-        Min. {tl(100)}. Karttan ön otorizasyon; iş bitince tahsilat. Ödeme henüz simülasyon.
+        Min. {tl(100)}. Siparişte karttan ön otorizasyon; teslim kodu doğrulanınca tahsilat.
       </p>
+      {err && <p className="k-rise mt-2 text-sm text-[var(--clay)]">{err}</p>}
       <button
         type="button"
+        disabled={placing}
         onClick={onPlace}
-        className="mt-3 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white"
+        className="k-press k-cta mt-3 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.22)]"
       >
-        Siparişi bırak
+        {placing ? "Gönderiliyor…" : "Siparişi bırak"}
       </button>
     </div>
   );
 }
-
-const STEPS: Order["status"][] = [
-  "onay_bekliyor",
-  "teslim_alindi",
-  "yikaniyor",
-  "utuleniyor",
-  "hazir",
-  "teslim_edildi",
-];
 
 const STEP_LABEL: Record<Order["status"], string> = {
   onay_bekliyor: "Onay bekliyor",
@@ -523,37 +662,97 @@ const STEP_LABEL: Record<Order["status"], string> = {
   iptal: "İptal",
 };
 
-function Track({ order, onBack }: { order: Order; onBack: () => void }) {
-  const p = providerById(order.providerId);
-  const idx = STEPS.indexOf(order.status);
+function Track({
+  order,
+  provider,
+  backLabel,
+  onBack,
+}: {
+  order: Order;
+  provider: Provider | undefined;
+  backLabel: string;
+  onBack: () => void;
+}) {
+  const steps = trackSteps(order.packageId);
+  const idx = steps.indexOf(order.status);
   return (
-    <div className="p-4">
-      <button type="button" onClick={onBack} className="text-xs text-[var(--muted)]">
-        ← Harita
+    <div className="p-4 pt-2">
+      <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
+        ← {backLabel}
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Sipariş {order.id}</h2>
       <p className="text-sm text-[var(--muted)]">
-        {p?.name} · {order.pieces} parça · {tl(order.total)}
+        {provider?.name} · {order.pieces} parça · {tl(order.total)}
       </p>
-      <ol className="mt-4 space-y-2">
-        {STEPS.map((s, i) => (
-          <li
-            key={s}
-            className={`flex items-center gap-2 text-sm ${
-              i <= idx ? "text-[var(--ink)]" : "text-[var(--muted)]"
-            }`}
-          >
-            <span
-              className={`h-2.5 w-2.5 rounded-full ${
-                i <= idx ? "bg-[var(--teal)]" : "bg-[var(--line)]"
-              }`}
-            />
-            {STEP_LABEL[s]}
-          </li>
-        ))}
+      {order.status === "iptal" && (
+        <p className="mt-3 text-sm text-[var(--clay)]">
+          Sipariş iptal edildi. Ön otorizasyon çözüldü, para çekilmedi.
+        </p>
+      )}
+      {order.status === "hazir" && order.pickupCode && (
+        <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] px-4 py-3 ring-1 ring-[var(--teal)]">
+          <p className="text-[11px] font-medium tracking-[0.14em] text-[var(--teal)] uppercase">
+            Teslim kodu
+          </p>
+          <p className="mt-1 font-[family-name:var(--font-display)] text-4xl tabular-nums tracking-[0.28em]">
+            {order.pickupCode}
+          </p>
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            Uygulamada ve SMS simülasyonunda. Teslim alırken komşuna söyle; kod girilince{" "}
+            {tl(order.total)} tahsil edilir.
+          </p>
+        </div>
+      )}
+      {order.paymentStatus === "authorized" && order.status !== "iptal" && order.status !== "hazir" && (
+        <p className="mt-3 text-xs text-[var(--muted)]">
+          Kartta {tl(order.total)} tutanak (ön otorizasyon). Teslim kodundan sonra geçer.
+        </p>
+      )}
+      {order.paymentStatus === "captured" && (
+        <p className="mt-3 text-sm text-[var(--teal)]">
+          Ödeme alındı · {tl(order.total)}
+          {order.paidAt
+            ? ` · ${new Date(order.paidAt).toLocaleString("tr-TR", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`
+            : ""}
+        </p>
+      )}
+      <ol className="mt-5">
+        {steps.map((s, i) => {
+          const done = i < idx;
+          const current = i === idx && order.status !== "iptal";
+          return (
+            <li key={s} className="relative flex gap-3 pb-4 last:pb-0">
+              {i < steps.length - 1 && (
+                <span
+                  className={`absolute top-3 left-[5px] h-[calc(100%-4px)] w-px ${
+                    done ? "bg-[var(--teal)]" : "bg-[var(--line)]"
+                  }`}
+                />
+              )}
+              <span
+                className={`relative z-10 mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                  current
+                    ? "k-pulse-dot bg-[var(--teal)]"
+                    : done
+                      ? "bg-[var(--teal)]"
+                      : "bg-[var(--line)]"
+                }`}
+              />
+              <span
+                className={`text-sm ${
+                  current || done ? "text-[var(--ink)]" : "text-[var(--muted)]"
+                } ${current ? "font-medium" : ""}`}
+              >
+                {STEP_LABEL[s]}
+              </span>
+            </li>
+          );
+        })}
       </ol>
-      <p className="mt-4 text-xs text-[var(--muted)]">
-        Durumu hizmet veren panelinden ilerlet. Bu tarayıcıda kayıtlı.
+      <p className="mt-2 text-xs text-[var(--muted)]">
+        {order.status === "hazir"
+          ? "Komşu masasında kodu girince iş biter ve para geçer."
+          : "Durumu hizmet veren panelinden ilerlet. Canlı sunucudan güncellenir."}
       </p>
     </div>
   );
