@@ -1,11 +1,24 @@
 import { db, toDrop, toProvider } from "./db";
 import type { DropPoint, Provider } from "@/lib/types";
+import { workPhotosForProvider } from "./photos";
+import { ratingFor, reviewsForProvider } from "./reviews";
+
+function hydrate(p: Provider): Provider {
+  const live = ratingFor(p.id, p.rating, p.reviews);
+  return {
+    ...p,
+    rating: live.rating,
+    reviews: live.reviews,
+    workPhotos: workPhotosForProvider(p.id, 12),
+    recentReviews: reviewsForProvider(p.id).slice(0, 6),
+  };
+}
 
 export function getProvider(id: string): Provider | undefined {
   const row = db()
     .prepare("SELECT id, payload, remaining FROM providers WHERE id = ?")
     .get(id) as { id: string; payload: string; remaining: number } | undefined;
-  return row ? toProvider(row) : undefined;
+  return row ? hydrate(toProvider(row)) : undefined;
 }
 
 export function listDrops(): DropPoint[] {
@@ -26,5 +39,5 @@ export function providersLive(): Provider[] {
       payload: string;
       remaining: number;
     }[]
-  ).map(toProvider);
+  ).map((row) => hydrate(toProvider(row)));
 }

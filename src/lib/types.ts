@@ -35,6 +35,7 @@ export type Review = {
   body: string;
   author: string;
   createdAt: string;
+  photos?: WorkPhoto[];
 };
 
 export type Provider = {

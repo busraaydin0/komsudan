@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, CreateOrderInput, DropPoint, Order, Provider } from "./types";
+import type { Account, CreateOrderInput, DropPoint, Order, Provider, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -148,4 +148,33 @@ export async function postPasskey(credentialId: string, assert = false) {
 
 export async function logoutSession() {
   await readJson<{ ok: boolean }>(await fetch("/api/auth/session", { method: "DELETE" }));
+}
+
+export async function uploadOrderPhoto(orderId: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = await readJson<{ photo: WorkPhoto; order: Order }>(
+    await fetch(`/api/orders/${orderId}/photos`, { method: "POST", body }),
+  );
+  return data;
+}
+
+export async function uploadPortfolioPhoto(providerId: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = await readJson<{ photo: WorkPhoto; photos: WorkPhoto[] }>(
+    await fetch(`/api/providers/${providerId}/photos`, { method: "POST", body }),
+  );
+  return data;
+}
+
+export async function postReview(orderId: string, input: { rating: number; body: string; files: File[] }) {
+  const body = new FormData();
+  body.append("rating", String(input.rating));
+  body.append("body", input.body);
+  for (const file of input.files) body.append("file", file);
+  const data = await readJson<{ review: Review }>(
+    await fetch(`/api/orders/${orderId}/review`, { method: "POST", body }),
+  );
+  return data.review;
 }

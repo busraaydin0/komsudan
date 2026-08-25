@@ -87,6 +87,16 @@ const SCHEMA = `
       code_hash TEXT NOT NULL,
       expires_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS gallery_photos (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL,
+      order_id TEXT,
+      review_id TEXT,
+      kind TEXT NOT NULL,
+      mime TEXT NOT NULL,
+      ext TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
 `;
 
 function open() {
@@ -172,7 +182,10 @@ function seed(db: Database.Database) {
 
 export function db() {
   if (!g.__komsuDb) g.__komsuDb = open();
-  else migrate(g.__komsuDb);
+  else {
+    migrate(g.__komsuDb);
+    seed(g.__komsuDb);
+  }
   return g.__komsuDb;
 }
 

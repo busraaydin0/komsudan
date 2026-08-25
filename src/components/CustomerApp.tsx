@@ -5,8 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { PILOT, trustLabel } from "@/lib/data";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFor, tl } from "@/lib/pricing";
-import { postOrder, useCatalog, useOrders } from "@/lib/api";
+import { postOrder, postReview, useCatalog, useOrders } from "@/lib/api";
 import { trackSteps } from "@/lib/status";
+import { PhotoStrip, ReviewComposer, ReviewList } from "@/components/Photos";
 import type {
   DropMethod,
   DropPoint,
@@ -349,7 +350,27 @@ export function CustomerApp({
               />
             )}
             {sheet === "track" && active && (
-              <Track
+              <>
+                {pane === "orders" && orders.length > 1 && (
+                  <div className="flex gap-1.5 overflow-x-auto px-4 pb-1">
+                    {orders.map((o) => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() => setActiveId(o.id)}
+                        className={`k-chip shrink-0 rounded-full px-2.5 py-1 text-[11px] ring-1 ${
+                          o.id === active.id
+                            ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]"
+                            : "ring-[var(--line)]"
+                        }`}
+                      >
+                        {STEP_LABEL[o.status]}
+                        {!o.review && o.status === "teslim_edildi" ? " · yorum" : ""}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <Track
                 order={active}
                 provider={providers.find((p) => p.id === active.providerId)}
                 backLabel={pane === "orders" ? "Harita" : "Liste"}
@@ -357,7 +378,9 @@ export function CustomerApp({
                   if (pane === "orders") onBackToMap?.();
                   else setSheet("list");
                 }}
+                onReload={() => void Promise.all([reloadOrders(), reloadCatalog()])}
               />
+              </>
             )}
             {pane === "orders" && !active && (
               <div className="p-6 pt-2">
@@ -477,6 +500,18 @@ function ProviderPane({
         {p.neighborhood} · {formatKm(km)} · {p.rating} ({p.reviews} yorum) · bugün {p.remaining} parça yer
       </p>
       <p className="mt-3 text-sm leading-relaxed">{p.bio}</p>
+      {p.workPhotos.length > 0 && (
+        <>
+          <h3 className="mt-4 text-sm font-medium">İşler</h3>
+          <PhotoStrip photos={p.workPhotos} />
+        </>
+      )}
+      {p.recentReviews.length > 0 && (
+        <>
+          <h3 className="mt-4 text-sm font-medium">Yorumlar</h3>
+          <ReviewList reviews={p.recentReviews} />
+        </>
+      )}
       <div className="mt-4 grid gap-2">
         {p.packages.map((pack) => (
           <button
@@ -677,14 +712,18 @@ function Track({
   provider,
   backLabel,
   onBack,
+  onReload,
 }: {
   order: Order;
   provider: Provider | undefined;
   backLabel: string;
   onBack: () => void;
+  onReload: () => void;
 }) {
   const steps = trackSteps(order.packageId);
   const idx = steps.indexOf(order.status);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
@@ -726,6 +765,12 @@ function Track({
             : ""}
         </p>
       )}
+      {order.photos.length > 0 && (
+        <>
+          <h3 className="mt-4 text-sm font-medium">İş fotoğrafları</h3>
+          <PhotoStrip photos={order.photos} />
+        </>
+      )}
       <ol className="mt-5">
         {steps.map((s, i) => {
           const done = i < idx;
@@ -762,8 +807,36 @@ function Track({
       <p className="mt-2 text-xs text-[var(--muted)]">
         {order.status === "hazir"
           ? "Hizmet veren kodu girince iş biter ve para geçer."
-          : "Durumu Hizmet sekmesinden ilerlet. Canlı sunucudan güncellenir."}
+          : order.status === "teslim_edildi"
+            ? "Teslim bitti. İstersen yorum ve fotoğraf bırak."
+            : "Durumu Hizmet sekmesinden ilerlet. Canlı sunucudan güncellenir."}
       </p>
+      {order.status === "teslim_edildi" && order.review && (
+        <div className="mt-4">
+          <h3 className="text-sm font-medium">Yorumun</h3>
+          <ReviewList reviews={[order.review]} />
+        </div>
+      )}
+      {order.status === "teslim_edildi" && !order.review && (
+        <ReviewComposer
+          busy={busy}
+          err={err}
+          onSubmit={(input) => {
+            void (async () => {
+              setBusy(true);
+              setErr("");
+              try {
+                await postReview(order.id, input);
+                onReload();
+              } catch (e) {
+                setErr(e instanceof Error ? e.message : "Yorum alınamadı.");
+              } finally {
+                setBusy(false);
+              }
+            })();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -7,9 +7,10 @@ import { db, uploadsDir } from "./db";
 import { ApiError } from "./rules";
 
 export const PHOTO_MAX = 4;
+export const PORTFOLIO_MAX = 16;
 export const PHOTO_BYTES = 2.5 * 1024 * 1024;
 
-type PhotoRow = {
+type OrderPhotoRow = {
   id: string;
   order_id: string;
   provider_id: string;
@@ -18,21 +19,26 @@ type PhotoRow = {
   created_at: string;
 };
 
-function toPhoto(row: PhotoRow): WorkPhoto {
-  return { id: row.id, url: `/api/photos/${row.id}`, createdAt: row.created_at };
+type GalleryRow = {
+  id: string;
+  provider_id: string;
+  order_id: string | null;
+  review_id: string | null;
+  kind: string;
+  mime: string;
+  ext: string;
+  created_at: string;
+};
+
+function toPhoto(id: string, createdAt: string): WorkPhoto {
+  return { id, url: `/api/photos/${id}`, createdAt };
 }
 
 function sniff(buf: Buffer): { mime: string; ext: string } | null {
   if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
     return { mime: "image/jpeg", ext: "jpg" };
   }
-  if (
-    buf.length >= 8 &&
-    buf[0] === 0x89 &&
-    buf[1] === 0x50 &&
-    buf[2] === 0x4e &&
-    buf[3] === 0x47
-  ) {
+  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
     return { mime: "image/png", ext: "png" };
   }
   if (
@@ -45,23 +51,70 @@ function sniff(buf: Buffer): { mime: string; ext: string } | null {
   return null;
 }
 
-export function photosForOrder(orderId: string): WorkPhoto[] {
-  const rows = db()
-    .prepare("SELECT * FROM order_photos WHERE order_id = ? ORDER BY created_at ASC")
-    .all(orderId) as PhotoRow[];
-  return rows.map(toPhoto);
+function writeFile(buf: Buffer) {
+  const kind = sniff(buf);
+  if (!kind) throw new ApiError(400, "Yalnızca JPEG, PNG veya WebP.");
+  if (buf.length > PHOTO_BYTES) throw new ApiError(400, "Fotoğraf 2,5 MB’ı geçemesin.");
+  const id = randomUUID().slice(0, 12);
+  fs.writeFileSync(path.join(uploadsDir(), `${id}.${kind.ext}`), buf);
+  return { id, ...kind, now: new Date().toISOString() };
 }
 
-export function photosForProvider(providerId: string, limit = 8): WorkPhoto[] {
-  const rows = db()
+export async function bufferFromUpload(req: Request) {
+  const ct = req.headers.get("content-type") ?? "";
+  if (ct.includes("multipart/form-data")) {
+    const form = await req.formData();
+    const f = form.get("file");
+    if (!(f instanceof File) || f.size === 0) throw new ApiError(400, "Fotoğraf seç.");
+    return Buffer.from(await f.arrayBuffer());
+  }
+  const buf = Buffer.from(await req.arrayBuffer());
+  if (!buf.length) throw new ApiError(400, "Fotoğraf seç.");
+  return buf;
+}
+
+export function photosForOrder(orderId: string): WorkPhoto[] {
+  const orderRows = db()
+    .prepare("SELECT * FROM order_photos WHERE order_id = ? ORDER BY created_at ASC")
+    .all(orderId) as OrderPhotoRow[];
+  const extra = db()
     .prepare(
-      `SELECT * FROM order_photos
-       WHERE provider_id = ?
-       ORDER BY created_at DESC
-       LIMIT ?`,
+      "SELECT * FROM gallery_photos WHERE order_id = ? AND kind = 'order' ORDER BY created_at ASC",
     )
-    .all(providerId, limit) as PhotoRow[];
-  return rows.map(toPhoto);
+    .all(orderId) as GalleryRow[];
+  return [
+    ...orderRows.map((r) => toPhoto(r.id, r.created_at)),
+    ...extra.map((r) => toPhoto(r.id, r.created_at)),
+  ];
+}
+
+export function photosForReview(reviewId: string): WorkPhoto[] {
+  const rows = db()
+    .prepare("SELECT * FROM gallery_photos WHERE review_id = ? ORDER BY created_at ASC")
+    .all(reviewId) as GalleryRow[];
+  return rows.map((r) => toPhoto(r.id, r.created_at));
+}
+
+export function workPhotosForProvider(providerId: string, limit = 12): WorkPhoto[] {
+  const portfolio = db()
+    .prepare(
+      `SELECT * FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'
+       ORDER BY created_at DESC`,
+    )
+    .all(providerId) as GalleryRow[];
+  const fromOrders = db()
+    .prepare(
+      `SELECT * FROM order_photos WHERE provider_id = ? ORDER BY created_at DESC LIMIT ?`,
+    )
+    .all(providerId, limit) as OrderPhotoRow[];
+  const seen = new Set<string>();
+  const out: WorkPhoto[] = [];
+  for (const row of [...portfolio, ...fromOrders.map((r) => ({ ...r, kind: "order" }))]) {
+    if (seen.has(row.id) || out.length >= limit) continue;
+    seen.add(row.id);
+    out.push(toPhoto(row.id, row.created_at));
+  }
+  return out;
 }
 
 export function addPhoto(orderId: string, buf: Buffer): WorkPhoto {
@@ -72,42 +125,62 @@ export function addPhoto(orderId: string, buf: Buffer): WorkPhoto {
   if (!canAddPhotos(order.status as OrderStatus)) {
     throw new ApiError(409, "Bu aşamada fotoğraf eklenmez.");
   }
-
-  const kind = sniff(buf);
-  if (!kind) throw new ApiError(400, "Yalnızca JPEG, PNG veya WebP.");
-  if (buf.length > PHOTO_BYTES) throw new ApiError(400, "Fotoğraf 2,5 MB’ı geçemesin.");
-
-  const count = (
-    db().prepare("SELECT COUNT(*) AS n FROM order_photos WHERE order_id = ?").get(orderId) as {
-      n: number;
-    }
-  ).n;
-  if (count >= PHOTO_MAX) throw new ApiError(409, `En fazla ${PHOTO_MAX} fotoğraf.`);
-
-  const id = randomUUID().slice(0, 12);
-  const now = new Date().toISOString();
-  const file = path.join(uploadsDir(), `${id}.${kind.ext}`);
-  fs.writeFileSync(file, buf);
+  const n = photosForOrder(orderId).length;
+  if (n >= PHOTO_MAX) throw new ApiError(409, `En fazla ${PHOTO_MAX} fotoğraf.`);
+  const file = writeFile(buf);
   db()
     .prepare(
       `INSERT INTO order_photos (id, order_id, provider_id, mime, ext, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .run(id, orderId, order.provider_id, kind.mime, kind.ext, now);
-  return toPhoto({
-    id,
-    order_id: orderId,
-    provider_id: order.provider_id,
-    mime: kind.mime,
-    ext: kind.ext,
-    created_at: now,
-  });
+    .run(file.id, orderId, order.provider_id, file.mime, file.ext, file.now);
+  return toPhoto(file.id, file.now);
+}
+
+export function addPortfolioPhoto(providerId: string, buf: Buffer): WorkPhoto {
+  const exists = db().prepare("SELECT id FROM providers WHERE id = ?").get(providerId);
+  if (!exists) throw new ApiError(404, "Hizmet veren bulunamadı.");
+  const n = (
+    db()
+      .prepare("SELECT COUNT(*) AS n FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'")
+      .get(providerId) as { n: number }
+  ).n;
+  if (n >= PORTFOLIO_MAX) throw new ApiError(409, `En fazla ${PORTFOLIO_MAX} iş fotoğrafı.`);
+  const file = writeFile(buf);
+  db()
+    .prepare(
+      `INSERT INTO gallery_photos (id, provider_id, order_id, review_id, kind, mime, ext, created_at)
+       VALUES (?, ?, NULL, NULL, 'portfolio', ?, ?, ?)`,
+    )
+    .run(file.id, providerId, file.mime, file.ext, file.now);
+  return toPhoto(file.id, file.now);
+}
+
+export function addReviewPhoto(reviewId: string, buf: Buffer): WorkPhoto {
+  const review = db()
+    .prepare("SELECT id, provider_id FROM reviews WHERE id = ?")
+    .get(reviewId) as { id: string; provider_id: string } | undefined;
+  if (!review) throw new ApiError(404, "Yorum yok.");
+  const n = photosForReview(reviewId).length;
+  if (n >= PHOTO_MAX) throw new ApiError(409, `Yoruma en fazla ${PHOTO_MAX} fotoğraf.`);
+  const file = writeFile(buf);
+  db()
+    .prepare(
+      `INSERT INTO gallery_photos (id, provider_id, order_id, review_id, kind, mime, ext, created_at)
+       VALUES (?, ?, NULL, ?, 'review', ?, ?, ?)`,
+    )
+    .run(file.id, review.provider_id, reviewId, file.mime, file.ext, file.now);
+  return toPhoto(file.id, file.now);
 }
 
 export function readPhoto(id: string): { buf: Buffer; mime: string } | undefined {
-  const row = db().prepare("SELECT * FROM order_photos WHERE id = ?").get(id) as
-    | PhotoRow
+  const order = db().prepare("SELECT * FROM order_photos WHERE id = ?").get(id) as
+    | OrderPhotoRow
     | undefined;
+  const gallery = order
+    ? null
+    : (db().prepare("SELECT * FROM gallery_photos WHERE id = ?").get(id) as GalleryRow | undefined);
+  const row = order ?? gallery;
   if (!row) return undefined;
   const file = path.join(uploadsDir(), `${row.id}.${row.ext}`);
   if (!fs.existsSync(file)) return undefined;

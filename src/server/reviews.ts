@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { canReview } from "@/lib/status";
 import type { OrderStatus, Review } from "@/lib/types";
 import { db } from "./db";
+import { photosForReview } from "./photos";
 import { ApiError } from "./rules";
 
 type ReviewRow = {
@@ -23,6 +24,7 @@ function toReview(row: ReviewRow): Review {
     body: row.body,
     author: row.author,
     createdAt: row.created_at,
+    photos: photosForReview(row.id),
   };
 }
 
@@ -55,7 +57,8 @@ export function ratingFor(
 
 export function createReview(
   orderId: string,
-  input: { rating: number; body: string; author: string },
+  input: { rating: number; body: string },
+  author: string,
 ): Review {
   const order = db()
     .prepare("SELECT id, provider_id, status FROM orders WHERE id = ?")
@@ -72,7 +75,7 @@ export function createReview(
   const body = input.body.trim().slice(0, 400);
   if (body.length < 8) throw new ApiError(400, "Yorum en az birkaç cümle olsun.");
 
-  const author = input.author.trim().slice(0, 40) || "Komşu";
+  const authorName = author.trim().slice(0, 40) || "Komşu";
   const now = new Date().toISOString();
   const id = `rev-${randomUUID().slice(0, 8)}`;
 
@@ -82,7 +85,7 @@ export function createReview(
         `INSERT INTO reviews (id, order_id, provider_id, rating, body, author, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(id, orderId, order.provider_id, rating, body, author, now);
+      .run(id, orderId, order.provider_id, rating, body, authorName, now);
   } catch {
     throw new ApiError(409, "Bu siparişe yorum zaten var.");
   }

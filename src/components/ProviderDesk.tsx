@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { PACKAGES } from "@/lib/data";
-import { patchOrder, useCatalog, useOrders } from "@/lib/api";
+import { patchOrder, uploadOrderPhoto, uploadPortfolioPhoto, useCatalog, useOrders } from "@/lib/api";
 import { tl } from "@/lib/pricing";
-import { nextStatus } from "@/lib/status";
+import { canAddPhotos, nextStatus } from "@/lib/status";
 import type { DropPoint, Order, OrderStatus, Provider } from "@/lib/types";
+import { PhotoAdd, PhotoStrip } from "@/components/Photos";
 
 const LABEL: Record<OrderStatus, string> = {
   onay_bekliyor: "Bekliyor",
@@ -28,7 +29,7 @@ const BADGE: Record<OrderStatus, string> = {
 };
 
 export function ProviderDesk() {
-  const { providers, dropPoints } = useCatalog();
+  const { providers, dropPoints, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload } = useOrders();
   const wallet = orders
     .filter((o) => o.paymentStatus === "captured")
@@ -65,6 +66,29 @@ export function ProviderDesk() {
           </div>
         </div>
 
+        <h2 className="k-rise mt-8 font-[family-name:var(--font-display)] text-xl">İş fotoğrafları</h2>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          Bugüne kadar yaptığın işlerden kareler. Müşteri kartında görünür.
+        </p>
+        <ul className="mt-3 space-y-3">
+          {providers.map((p) => (
+            <li key={p.id} className="rounded-3xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium">{p.name}</p>
+                <PortfolioAdd
+                  providerId={p.id}
+                  onDone={() => void Promise.all([reload(), reloadCatalog()])}
+                />
+              </div>
+              {p.workPhotos.length ? (
+                <PhotoStrip photos={p.workPhotos} size="sm" />
+              ) : (
+                <p className="mt-2 text-xs text-[var(--muted)]">Henüz fotoğraf yok.</p>
+              )}
+            </li>
+          ))}
+        </ul>
+
         <h2 className="k-rise mt-8 font-[family-name:var(--font-display)] text-xl">Gelen siparişler</h2>
         {!ready ? (
           <ul className="mt-3 space-y-3">
@@ -84,7 +108,7 @@ export function ProviderDesk() {
                 order={o}
                 providers={providers}
                 dropPoints={dropPoints}
-                onChanged={reload}
+                onChanged={() => void Promise.all([reload(), reloadCatalog()])}
                 delay={i * 50}
               />
             ))}
@@ -105,7 +129,7 @@ function OrderCard({
   order: Order;
   providers: Provider[];
   dropPoints: DropPoint[];
-  onChanged: () => Promise<void>;
+  onChanged: () => void;
   delay: number;
 }) {
   const [err, setErr] = useState("");
@@ -148,6 +172,7 @@ function OrderCard({
         {order.drop === "kapi" ? "Kapı teslim" : drop?.name ?? "Nötr nokta"} · {order.slot}
       </p>
       {order.note && <p className="mt-1 text-sm">Not: {order.note}</p>}
+      {order.photos.length > 0 && <PhotoStrip photos={order.photos} size="sm" />}
       <p className="mt-2 text-sm tabular-nums">
         {tl(order.total)} · eline {tl(order.total - order.commission)}
         {order.paymentStatus === "captured" ? " · tahsil edildi" : ""}
@@ -185,6 +210,26 @@ function OrderCard({
             {busy ? "…" : LABEL[next]}
           </button>
         )}
+        {canAddPhotos(order.status) && (
+          <PhotoAdd
+            label="İş fotoğrafı"
+            busy={busy}
+            onPick={(file) => {
+              void (async () => {
+                setBusy(true);
+                setErr("");
+                try {
+                  await uploadOrderPhoto(order.id, file);
+                  await onChanged();
+                } catch (e) {
+                  setErr(e instanceof Error ? e.message : "Fotoğraf yüklenemedi.");
+                } finally {
+                  setBusy(false);
+                }
+              })();
+            }}
+          />
+        )}
       </div>
       {order.status === "hazir" && (
         <form
@@ -219,5 +264,33 @@ function OrderCard({
         </form>
       )}
     </li>
+  );
+}
+
+function PortfolioAdd({ providerId, onDone }: { providerId: string; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  return (
+    <div className="text-right">
+      <PhotoAdd
+        label="Ekle"
+        busy={busy}
+        onPick={(file) => {
+          void (async () => {
+            setBusy(true);
+            setErr("");
+            try {
+              await uploadPortfolioPhoto(providerId, file);
+              onDone();
+            } catch (e) {
+              setErr(e instanceof Error ? e.message : "Yüklenemedi.");
+            } finally {
+              setBusy(false);
+            }
+          })();
+        }}
+      />
+      {err && <p className="mt-1 text-[11px] text-[var(--clay)]">{err}</p>}
+    </div>
   );
 }
