@@ -104,7 +104,12 @@ export function LoginGate({
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
           Komşudan
         </p>
-        <p className="mt-1 text-sm text-[var(--muted)]">Çukurambar · bırak, işlensin, al</p>
+        <p className="mt-3 font-[family-name:var(--font-display)] text-xl leading-snug">
+          Önceliğimiz, kendinizi evinizde gibi güvende hissetmeniz.
+        </p>
+        <p className="mt-1.5 text-sm text-[var(--muted)]">
+          Çukurambar. Çamaşır kapıda veya noktada; eve kimse girmez.
+        </p>
 
         <ol className="mt-8 flex gap-2 text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
           {(["Telefon", "SMS", "Kimlik", "Yüz"] as const).map((label, i) => {
@@ -123,7 +128,7 @@ export function LoginGate({
             <>
               <h1 className="font-[family-name:var(--font-display)] text-2xl">Giriş</h1>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                Cep numarasıyla hesap açılır. Sonra kimlik ve cihaz kilidi istenir.
+                Numara, kimlik ve yüz kilidi bunun için. Komşun işler, sen evindeki gibi durursun.
               </p>
               <label className="mt-4 block text-xs text-[var(--muted)]">Cep telefonu</label>
               <input
