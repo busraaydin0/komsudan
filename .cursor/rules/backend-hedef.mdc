@@ -27,6 +27,10 @@ Next.js 16 App Router **JSON API backend** olarak kalır. İleride React Native 
 
 Bir fazı bitirmeden sonrakine geçme. "Tüm backend'i yaz" diye genişletme.
 
+## GitHub
+
+Her adım (faz, kural, özellik, düzeltme) bitince **commit + `git push` origin'e**. İsteme, sorma, unutma. `data/*.db`, upload ve `.env` (secret) git'e girmez. Commit mesajı Türkçe, neden odaklı. Force-push / `--no-verify` yok.
+
 ## Mevcut PWA vs hedef
 
 Pilot hâlâ parça fiyatı ve Türkçe statüler (`onay_bekliyor`…). Hedef şema kg + İngilizce statü (`pending`…). Faz uygularken hedefe kay; PWA'yı kırmadan köprüle veya o fazda açıkça migrate et. Fiyatı client'tan alma.

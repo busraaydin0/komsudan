@@ -62,4 +62,4 @@ zod her girdi; JWT 15 dk + refresh rotation; OTP rate limit; fiyat server; KVKK 
 
 0 migrate+db+iskelet+zod/jwt → 1 OTP/JWT/me → 2 provider+geo → 3 orders CRUD → 4 status+history+photos → 5 notifications → 6 payment basit authorize/capture → 7 review aggregation → 8 disputes+admin → 9 rate limit, pino, Sentry, vitest services.
 
-Her faz bitince curl/vitest; test edilmemiş state machine üzerine özellik ekleme.
+Her faz bitince curl/vitest, sonra **commit + GitHub'a push**. Test edilmemiş state machine üzerine özellik ekleme. Adımı GitHub'sız bırakma.
