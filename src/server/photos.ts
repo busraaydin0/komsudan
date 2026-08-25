@@ -137,13 +137,13 @@ export function addPhoto(orderId: string, buf: Buffer): WorkPhoto {
   return toPhoto(file.id, file.now);
 }
 
-export function addPortfolioPhoto(providerId: string, buf: Buffer): WorkPhoto {
-  const exists = db().prepare("SELECT id FROM providers WHERE id = ?").get(providerId);
-  if (!exists) throw new ApiError(404, "Hizmet veren bulunamadı.");
+export function addPortfolioPhoto(ownerId: string, buf: Buffer): WorkPhoto {
+  const exists = db().prepare("SELECT id FROM users WHERE id = ?").get(ownerId);
+  if (!exists) throw new ApiError(404, "Hesap bulunamadı.");
   const n = (
     db()
       .prepare("SELECT COUNT(*) AS n FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'")
-      .get(providerId) as { n: number }
+      .get(ownerId) as { n: number }
   ).n;
   if (n >= PORTFOLIO_MAX) throw new ApiError(409, `En fazla ${PORTFOLIO_MAX} iş fotoğrafı.`);
   const file = writeFile(buf);
@@ -152,8 +152,18 @@ export function addPortfolioPhoto(providerId: string, buf: Buffer): WorkPhoto {
       `INSERT INTO gallery_photos (id, provider_id, order_id, review_id, kind, mime, ext, created_at)
        VALUES (?, ?, NULL, NULL, 'portfolio', ?, ?, ?)`,
     )
-    .run(file.id, providerId, file.mime, file.ext, file.now);
+    .run(file.id, ownerId, file.mime, file.ext, file.now);
   return toPhoto(file.id, file.now);
+}
+
+export function portfolioForUser(userId: string, limit = 16): WorkPhoto[] {
+  const rows = db()
+    .prepare(
+      `SELECT * FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'
+       ORDER BY created_at DESC LIMIT ?`,
+    )
+    .all(userId, limit) as GalleryRow[];
+  return rows.map((r) => toPhoto(r.id, r.created_at));
 }
 
 export function addReviewPhoto(reviewId: string, buf: Buffer): WorkPhoto {

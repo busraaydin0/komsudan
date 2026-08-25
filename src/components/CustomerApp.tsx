@@ -500,15 +500,10 @@ function ProviderPane({
         {p.neighborhood} · {formatKm(km)} · {p.rating} ({p.reviews} yorum) · bugün {p.remaining} parça yer
       </p>
       <p className="mt-3 text-sm leading-relaxed">{p.bio}</p>
-      {p.workPhotos.length > 0 && (
-        <>
-          <h3 className="mt-4 text-sm font-medium">İşler</h3>
-          <PhotoStrip photos={p.workPhotos} />
-        </>
-      )}
-      {p.recentReviews.length > 0 && (
+      {(p.workPhotos.length > 0 || p.recentReviews.length > 0) && (
         <>
           <h3 className="mt-4 text-sm font-medium">Yorumlar</h3>
+          {p.workPhotos.length > 0 && <PhotoStrip photos={p.workPhotos} />}
           <ReviewList reviews={p.recentReviews} />
         </>
       )}

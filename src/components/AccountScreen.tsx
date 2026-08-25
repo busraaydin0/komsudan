@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import type { Loyalty } from "@/lib/loyalty";
-import type { Account } from "@/lib/types";
+import type { Account, WorkPhoto } from "@/lib/types";
 import { formatPhone } from "@/lib/phone";
-import { logoutSession, patchAccount } from "@/lib/api";
+import { fetchMyPhotos, logoutSession, patchAccount, uploadMyPhoto } from "@/lib/api";
 import { tl } from "@/lib/pricing";
+import { PhotoAdd, PhotoStrip } from "@/components/Photos";
 
 export function AccountScreen({
   account,
@@ -22,12 +23,21 @@ export function AccountScreen({
   const [sms, setSms] = useState(true);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [photos, setPhotos] = useState<WorkPhoto[]>([]);
+  const [photoErr, setPhotoErr] = useState("");
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   useEffect(() => {
     setName(account.name);
     const stored = localStorage.getItem("komsu_sms");
     if (stored === "0") setSms(false);
   }, [account.name]);
+
+  useEffect(() => {
+    void fetchMyPhotos()
+      .then(setPhotos)
+      .catch(() => setPhotos([]));
+  }, []);
 
   const nextNeed = loyalty && loyalty.nextAt != null ? Math.max(0, loyalty.nextAt - loyalty.delivered) : 0;
 
@@ -43,6 +53,19 @@ export function AccountScreen({
       setMsg(e instanceof Error ? e.message : "Kaydedilemedi.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function addPhoto(file: File) {
+    setPhotoBusy(true);
+    setPhotoErr("");
+    try {
+      const res = await uploadMyPhoto(file);
+      setPhotos(res.photos);
+    } catch (e) {
+      setPhotoErr(e instanceof Error ? e.message : "Fotoğraf yüklenemedi.");
+    } finally {
+      setPhotoBusy(false);
     }
   }
 
@@ -103,6 +126,26 @@ export function AccountScreen({
             </div>
           </section>
         )}
+
+        <section className="rounded-3xl bg-[var(--card)] p-5 ring-1 ring-[var(--line)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-[family-name:var(--font-display)] text-xl">Profilim</h2>
+              <p className="mt-1 text-sm">{account.name || "Ad soyad"}</p>
+              <p className="text-xs text-[var(--muted)]">{formatPhone(account.phone)}</p>
+            </div>
+            <PhotoAdd label="Fotoğraf ekle" busy={photoBusy} onPick={(file) => void addPhoto(file)} />
+          </div>
+          <p className="mt-3 text-xs text-[var(--muted)]">
+            İş karelerin burada. Hizmet veren kartında yorumların yanında görünür.
+          </p>
+          {photos.length ? (
+            <PhotoStrip photos={photos} />
+          ) : (
+            <p className="mt-3 text-sm text-[var(--muted)]">Henüz fotoğraf yok.</p>
+          )}
+          {photoErr && <p className="mt-2 text-xs text-[var(--clay)]">{photoErr}</p>}
+        </section>
 
         <section className="rounded-3xl bg-[var(--card)] p-5 ring-1 ring-[var(--line)]">
           <h2 className="font-[family-name:var(--font-display)] text-xl">Ayarlar</h2>

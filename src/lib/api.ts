@@ -159,6 +159,20 @@ export async function logoutSession() {
   await readJson<{ ok: boolean }>(await fetch("/api/auth/session", { method: "DELETE" }));
 }
 
+export async function fetchMyPhotos() {
+  const data = await readJson<{ data: { photos: WorkPhoto[] } }>(await fetch("/api/me/photos"));
+  return data.data.photos;
+}
+
+export async function uploadMyPhoto(file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = await readJson<{ data: { photo: WorkPhoto; photos: WorkPhoto[] } }>(
+    await fetch("/api/me/photos", { method: "POST", body }),
+  );
+  return data.data;
+}
+
 export async function uploadOrderPhoto(orderId: string, file: File) {
   const body = new FormData();
   body.append("file", file);
