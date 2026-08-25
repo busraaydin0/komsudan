@@ -9,4 +9,4 @@ npm install
 npm run dev
 ```
 
-`/` müşteri haritası · `/hizmet` hizmet veren masası. Siparişler bu tarayıcıda tutulur; ödeme simülasyon.
+`/` harita · `/?tab=siparis` sipariş · `/?tab=hizmet` hizmet veren. `/hizmet` aynı sekmeye yönlendirir. Siparişler sunucuda tutulur; ödeme simülasyon.

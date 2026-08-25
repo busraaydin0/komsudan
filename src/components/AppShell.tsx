@@ -8,7 +8,8 @@ import { TabBar, type AppTab } from "@/components/TabBar";
 function readTab(): AppTab {
   if (typeof window === "undefined") return "harita";
   const q = new URLSearchParams(window.location.search).get("tab");
-  if (q === "siparis" || q === "masa" || q === "harita") return q;
+  if (q === "masa") return "hizmet";
+  if (q === "siparis" || q === "hizmet" || q === "harita") return q;
   return "harita";
 }
 
@@ -35,9 +36,9 @@ export function AppShell() {
   return (
     <div className="relative h-dvh overflow-hidden bg-[var(--paper)]">
       <div
-        className={tab === "masa" ? "absolute inset-0 hidden" : "h-full"}
-        aria-hidden={tab === "masa"}
-        inert={tab === "masa" ? true : undefined}
+        className={tab === "hizmet" ? "absolute inset-0 hidden" : "h-full"}
+        aria-hidden={tab === "hizmet"}
+        inert={tab === "hizmet" ? true : undefined}
       >
         <CustomerApp
           pane={tab === "siparis" ? "orders" : "map"}
@@ -47,7 +48,7 @@ export function AppShell() {
           onBackToMap={() => go("harita")}
         />
       </div>
-      {tab === "masa" && (
+      {tab === "hizmet" && (
         <div className="relative z-10 h-full overflow-y-auto">
           <ProviderDesk />
         </div>

@@ -41,9 +41,9 @@ export function ProviderDesk() {
         <div>
           <p className="flex items-center gap-1.5 font-[family-name:var(--font-display)] text-2xl">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
-            Komşudan masa
+            Hizmet veren
           </p>
-          <p className="text-xs text-[var(--muted)]">Hizmet veren · Çukurambar pilotu</p>
+          <p className="text-xs text-[var(--muted)]">Çukurambar pilotu</p>
         </div>
       </header>
 

@@ -2,12 +2,12 @@
 
 import { useOrders } from "@/lib/api";
 
-export type AppTab = "harita" | "siparis" | "masa";
+export type AppTab = "harita" | "siparis" | "hizmet";
 
 const ITEMS: { id: AppTab; label: string }[] = [
   { id: "harita", label: "Harita" },
   { id: "siparis", label: "Siparişim" },
-  { id: "masa", label: "Masa" },
+  { id: "hizmet", label: "Hizmet" },
 ];
 
 export function TabBar({ tab, onTab }: { tab: AppTab; onTab: (t: AppTab) => void }) {
@@ -23,7 +23,7 @@ export function TabBar({ tab, onTab }: { tab: AppTab; onTab: (t: AppTab) => void
       <ul className="grid grid-cols-3">
         {ITEMS.map((item) => {
           const on = tab === item.id;
-          const badge = item.id === "siparis" ? openOrder : item.id === "masa" ? openDesk : false;
+          const badge = item.id === "siparis" ? openOrder : item.id === "hizmet" ? openDesk : false;
           return (
             <li key={item.id}>
               <button

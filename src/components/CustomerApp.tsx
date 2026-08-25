@@ -751,8 +751,8 @@ function Track({
       </ol>
       <p className="mt-2 text-xs text-[var(--muted)]">
         {order.status === "hazir"
-          ? "Komşu masasında kodu girince iş biter ve para geçer."
-          : "Durumu hizmet veren panelinden ilerlet. Canlı sunucudan güncellenir."}
+          ? "Hizmet veren kodu girince iş biter ve para geçer."
+          : "Durumu Hizmet sekmesinden ilerlet. Canlı sunucudan güncellenir."}
       </p>
     </div>
   );
