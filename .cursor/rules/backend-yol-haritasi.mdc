@@ -1,0 +1,65 @@
+---
+description: Tam Katla backend yol haritası — şema SQL, endpoint tablosu, güvenlik listesi, faz 0–9. Auth, OTP, JWT, sipariş, ödeme, iyzico, geo, migration.
+alwaysApply: false
+---
+
+# Katla — Backend mühendislik yol haritası
+
+Kaynak belge. Uygulama sırasında özet kurallarla çelişirse bu hedef geçerlidir; mevcut PWA'yı faz faz köprüle.
+
+**Stack:** Next.js 16 App Router + React 19 + TypeScript + SQLite (better-sqlite3) + Tailwind 4. Kod `src/` altında.
+
+**Tüketici:** PWA şimdi; sonra RN/Flutter → saf JSON API.
+
+## Deployment
+
+`better-sqlite3` senkron, tek dosya. Serverless (Vercel) yok. `next start` ile tek Node process (VPS, Railway, Fly, Render). İleride Turso veya PostgreSQL; SQL izole `src/lib/db/`.
+
+## Klasör (hedef)
+
+```
+src/app/api/auth/otp/request|verify  refresh  me
+src/app/api/providers  [id]  [id]/packages  me/profile|availability|drop-points
+src/app/api/orders  [id]  [id]/status|photos|review
+src/app/api/payments/webhook  notifications
+src/lib/db/client.ts migrate.ts
+src/lib/auth/jwt.ts otp.ts middleware.ts
+src/lib/services/orderService.ts providerService.ts pricingService.ts
+src/lib/geo/distance.ts
+src/lib/validation/*.schema.ts  (zod)
+db/migrations/0001_init.sql …
+scripts/seed.ts
+```
+
+## Şema özeti
+
+- `users`: phone unique, role customer|provider|admin. Parola yok.
+- `otp_codes`: code_hash, attempts, expires_at.
+- `refresh_tokens`: token_hash, expires_at, revoked_at.
+- `provider_profiles`: lat/lng, has_dryer, verification_status, commission_rate 0.10, rating_avg/count, completed_orders.
+- `service_packages`: price_per_kg, min_order_amount, express_*.
+- `drop_points`, `availability_slots` (day_of_week 0=Pazar, door|point|both).
+- `orders`: status pending…disputed, delivery_mode, scheduled_window_*, estimated/actual weight, **price_per_kg_snapshot**, estimated/final_price.
+- `order_status_history`, `order_photos` (dropoff|pickup|damage), `payments` (authorized|captured|refunded|failed + provider_reference), `reviews` (order unique, 1–5), `disputes`, `notifications`.
+
+İndeks: orders customer/provider/status, provider_profiles(lat,lng).
+
+## State machine
+
+pending→accepted→dropped_off→washing→ironing→ready→completed; pending→rejected; accepted/dropped_off→cancelled; completed→disputed. Client status'una güvenme. Rol kısıtı service'te.
+
+## API envelope
+
+`{ data }` / `{ error: { code, message } }`.
+
+Geo: SQL bbox + `haversineKm` JS.
+
+## Güvenlik
+
+zod her girdi; JWT 15 dk + refresh rotation; OTP rate limit; fiyat server; KVKK min veri, TC hash'siz yok; env secrets; mutasyon requireAuth.
+
+## Fazlar
+
+0 migrate+db+iskelet+zod/jwt → 1 OTP/JWT/me → 2 provider+geo → 3 orders CRUD → 4 status+history+photos → 5 notifications → 6 payment basit authorize/capture → 7 review aggregation → 8 disputes+admin → 9 rate limit, pino, Sentry, vitest services.
+
+Her faz bitince curl/vitest; test edilmemiş state machine üzerine özellik ekleme.

@@ -1,0 +1,32 @@
+---
+description: Katla backend hedef mimarisi, deployment ve faz sırası
+alwaysApply: true
+---
+
+# Backend hedefi (yol haritası)
+
+Next.js 16 App Router **JSON API backend** olarak kalır. İleride React Native / Flutter bunu tüketecek. PWA şu an pilot arayüz; backend fazlarını ona göre evrilt, tek seferde yeniden yazma.
+
+## Deployment
+
+- Hedef: **kalıcı Node process** (`next start`). Vercel/serverless değil.
+- `better-sqlite3` tek dosyaya yazar; serverless'ta veri kaybolur / instance'lar ayrışır.
+- Ölçeklenince Turso (libSQL) veya PostgreSQL. Geçiş kolay olsun diye SQL **sadece** `src/lib/db/` içinde.
+
+## Katmanlar (`src/` öneki korunur)
+
+- `src/app/api/**/route.ts` — HTTP parse, auth, zod, envelope. İş kuralı yok.
+- `src/lib/services/` — sipariş state machine, fiyat, sağlayıcı, ödeme.
+- `src/lib/db/` — singleton client, migration, sorgular.
+- `src/lib/auth/` — JWT, OTP, `requireAuth(role?)`.
+- `db/migrations/0001_….sql` — numaralı, git'te.
+
+## Fazlar (sırayla, tek tek)
+
+0 DB + iskelet + zod/jwt → 1 Auth OTP/JWT `/me` → 2 Provider/paket/drop/availability + geo → 3 Sipariş çekirdeği → 4 Durum + history + foto → 5 Bildirim → 6 Ödeme authorize/capture → 7 Review → 8 Dispute/admin → 9 Rate limit, log, test.
+
+Bir fazı bitirmeden sonrakine geçme. "Tüm backend'i yaz" diye genişletme.
+
+## Mevcut PWA vs hedef
+
+Pilot hâlâ parça fiyatı ve Türkçe statüler (`onay_bekliyor`…). Hedef şema kg + İngilizce statü (`pending`…). Faz uygularken hedefe kay; PWA'yı kırmadan köprüle veya o fazda açıkça migrate et. Fiyatı client'tan alma.

@@ -1,0 +1,35 @@
+---
+description: API envelope, auth, zod ve route handler kuralları
+globs: src/app/api/**/*.ts
+alwaysApply: false
+---
+
+# API sözleşmesi
+
+Route handler sadece HTTP. İş mantığı `src/lib/services`. SQL yok.
+
+## Envelope
+
+```ts
+{ data: T } // başarı
+{ error: { code: string, message: string } } // hata
+```
+
+## Auth
+
+- Telefon + OTP. Parola yok.
+- Access JWT kısa ömür (~15 dk). Refresh rotation; eski token `revoked_at`.
+- Mutasyon: `requireAuth(role?)` olmadan açma.
+- OTP rate limit: aynı numaraya dakikada 1, saatte 5 (SMS bomba).
+- Sırlar yalnızca env (`JWT_SECRET`, iyzico). Kod içine gömme.
+
+## Validate
+
+Girdi **zod** ile. Raw `req.body` ile iş yapma.
+
+## Kimlik uçları (hedef)
+
+`POST /api/auth/otp/request|verify`, `POST /api/auth/refresh`, `GET|PATCH /api/me`.
+Provider: `GET /api/providers?lat&lng&radius`, `GET /api/providers/[id]`, `PATCH /api/providers/me/*`.
+Sipariş: `GET|POST /api/orders`, `GET /api/orders/[id]`, `PATCH /api/orders/[id]/status`.
+Foto, review, `POST /api/payments/webhook`.

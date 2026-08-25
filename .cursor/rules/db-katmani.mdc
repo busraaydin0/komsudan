@@ -1,0 +1,31 @@
+---
+description: SQLite erişimi, migration ve şema kararları
+globs: src/lib/db/**/*.ts,db/migrations/**/*.sql,scripts/**/*.ts
+alwaysApply: false
+---
+
+# DB katmanı
+
+`better-sqlite3` singleton: `src/lib/db/client.ts`. Migration: `src/lib/db/migrate.ts` + `db/migrations/`. Service içine ham SQL yazma.
+
+## Tablolar (hedef)
+
+`users` (phone unique, role customer|provider|admin), `otp_codes`, `refresh_tokens`, `provider_profiles` (lat/lng, commission_rate, rating), `service_packages`, `drop_points`, `availability_slots`, `orders`, `order_status_history`, `order_photos`, `payments`, `reviews`, `disputes`, `notifications`.
+
+## Snapshot ve audit
+
+- `orders.price_per_kg_snapshot` — sipariş anı fiyatı donar; sağlayıcı fiyatı geçmişi bozmaz.
+- Durum sadece `orders.status`; kim/ne zaman `order_status_history`.
+- `payments.provider_reference` — iyzico id; split payment v2.
+
+## İndeks
+
+`orders(customer_id)`, `orders(provider_id)`, `orders(status)`, `provider_profiles(lat, lng)`.
+
+## Geo
+
+SQL bounding-box (`idx_provider_location`), kesin sıra Haversine (`src/lib/geo/distance.ts`). PostGIS yok.
+
+## KVKK
+
+Telefon/konum minimum. TC asla düz saklama. `.db` ve upload git'e girmez.

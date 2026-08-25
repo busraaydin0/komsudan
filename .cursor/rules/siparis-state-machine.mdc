@@ -1,0 +1,47 @@
+---
+description: Sipariş state machine, rol ve fiyat kuralları
+globs: src/lib/services/**/*.ts,src/lib/status.ts,src/app/api/orders/**/*.ts
+alwaysApply: false
+---
+
+# Sipariş kuralları
+
+Client'a güvenme. Geçiş yalnızca `ALLOWED_TRANSITIONS` + rol.
+
+## Hedef makine
+
+```
+pending → accepted → dropped_off → washing → ironing → ready → completed
+   ↓           ↓
+rejected   cancelled (bazı aşamalardan)
+completed → disputed (süre içinde)
+```
+
+```ts
+const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pending: ["accepted", "rejected"],
+  accepted: ["dropped_off", "cancelled"],
+  dropped_off: ["washing", "cancelled"],
+  washing: ["ironing"],
+  ironing: ["ready"],
+  ready: ["completed"],
+  completed: ["disputed"],
+  rejected: [],
+  cancelled: [],
+  disputed: [],
+};
+```
+
+`ironing` yalnızca ütü paketinde. Geçersiz geçiş: `INVALID_TRANSITION`.
+
+## Rol (hedef)
+
+- `accepted` / `rejected`: provider
+- `dropped_off` → `ready`: provider
+- `ready` → `completed`: müşteri onayı veya kod; kararı fazda sabitle, client status yazmasın
+- Review: yalnızca `completed` sonrası, sipariş başına bir
+
+## Fiyat ve ödeme
+
+Tutar backend'de paketten hesaplanır. Client tutarına güvenme.
+MVP: create'te authorize, `completed`'te capture, iptalde void/refund. Komisyon backend'de; hizmet verene haftalık manuel. iyzico Marketplace v2.
