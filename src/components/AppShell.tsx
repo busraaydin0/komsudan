@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { AccountScreen } from "@/components/AccountScreen";
 import { CustomerApp } from "@/components/CustomerApp";
 import { LoginGate } from "@/components/LoginGate";
+import { PermissionPrompt } from "@/components/PermissionPrompt";
 import { ProviderDesk } from "@/components/ProviderDesk";
 import { TabBar, type AppTab } from "@/components/TabBar";
 import { useSession } from "@/lib/api";
+import { permissionAsked } from "@/lib/permissions";
 
 function readTab(): AppTab {
   if (typeof window === "undefined") return "harita";
@@ -18,6 +20,7 @@ function readTab(): AppTab {
 
 export function AppShell() {
   const [tab, setTab] = useState<AppTab | null>(null);
+  const [askPerms, setAskPerms] = useState(false);
   const { account, loyalty, ready, reload } = useSession();
 
   useEffect(() => {
@@ -26,6 +29,11 @@ export function AppShell() {
       void navigator.serviceWorker.register("/sw.js");
     }
   }, []);
+
+  useEffect(() => {
+    if (!ready || !account?.identityVerified || !account.passkeyEnabled) return;
+    if (!permissionAsked()) setAskPerms(true);
+  }, [ready, account]);
 
   function go(next: AppTab) {
     setTab(next);
@@ -39,13 +47,16 @@ export function AppShell() {
 
   const locked = !account || !account.identityVerified || !account.passkeyEnabled;
   if (locked) {
-    return <LoginGate account={account} onReady={reload} />;
+    return (
+      <LoginGate account={account} onReady={reload} />
+    );
   }
 
   const hideMap = tab === "hizmet" || tab === "hesap";
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[var(--paper)]">
+      {askPerms && <PermissionPrompt onDone={() => setAskPerms(false)} />}
       <div
         className={hideMap ? "absolute inset-0 hidden" : "h-full"}
         aria-hidden={hideMap}

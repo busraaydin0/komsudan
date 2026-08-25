@@ -7,6 +7,7 @@ import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFor, tl } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
 import { postOrder, postReview, useCatalog, useOrders } from "@/lib/api";
+import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
 import { trackSteps } from "@/lib/status";
 import { PhotoStrip, ReviewComposer, ReviewList } from "@/components/Photos";
 import type {
@@ -87,20 +88,20 @@ export function CustomerApp({
     : { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 };
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setUser(PILOT.center);
-      return;
+    function apply(loc: LngLat | null) {
+      if (!loc) {
+        setUser((prev) => prev ?? PILOT.center);
+        return;
+      }
+      const dist = kmBetween(loc, PILOT.center);
+      setFar(dist > PILOT.radiusKm);
+      setUser(dist > PILOT.radiusKm ? PILOT.center : loc);
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const loc = { lng: pos.coords.longitude, lat: pos.coords.latitude };
-        const dist = kmBetween(loc, PILOT.center);
-        setFar(dist > PILOT.radiusKm);
-        setUser(dist > PILOT.radiusKm ? PILOT.center : loc);
-      },
-      () => setUser(PILOT.center),
-      { enableHighAccuracy: true, timeout: 5000 },
-    );
+
+    apply(null);
+    const unsub = subscribeLocation(apply);
+    void readLocationIfGranted().then(apply);
+    return unsub;
   }, []);
 
   useEffect(() => {

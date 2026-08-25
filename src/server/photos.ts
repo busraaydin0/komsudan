@@ -166,6 +166,17 @@ export function portfolioForUser(userId: string, limit = 16): WorkPhoto[] {
   return rows.map((r) => toPhoto(r.id, r.created_at));
 }
 
+export function deletePortfolioForUser(userId: string) {
+  const rows = db()
+    .prepare(`SELECT id, ext FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'`)
+    .all(userId) as { id: string; ext: string }[];
+  for (const row of rows) {
+    const file = path.join(uploadsDir(), `${row.id}.${row.ext}`);
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  }
+  db().prepare(`DELETE FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'`).run(userId);
+}
+
 export function addReviewPhoto(reviewId: string, buf: Buffer): WorkPhoto {
   const review = db()
     .prepare("SELECT id, provider_id FROM reviews WHERE id = ?")

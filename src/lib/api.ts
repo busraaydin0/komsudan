@@ -159,6 +159,10 @@ export async function logoutSession() {
   await readJson<{ ok: boolean }>(await fetch("/api/auth/session", { method: "DELETE" }));
 }
 
+export async function deleteMyAccount() {
+  await readJson<{ data?: { ok: boolean }; ok?: boolean }>(await fetch("/api/me", { method: "DELETE" }));
+}
+
 export async function fetchMyPhotos() {
   const data = await readJson<{ data: { photos: WorkPhoto[] } }>(await fetch("/api/me/photos"));
   return data.data.photos;

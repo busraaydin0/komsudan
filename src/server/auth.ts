@@ -5,6 +5,7 @@ import { getAuth, requireAuth } from "@/lib/auth/middleware";
 import { toAccount } from "@/lib/auth/types";
 import type { Account } from "@/lib/types";
 import * as authService from "@/lib/services/authService";
+import { deletePortfolioForUser } from "@/server/photos";
 
 export { SESSION_COOKIE } from "@/lib/auth/cookies";
 export { normalizePhone } from "@/lib/phone";
@@ -69,5 +70,13 @@ export async function logout() {
     refreshToken,
     userId: user?.id,
   });
+  await clearAuthCookies();
+}
+
+export async function deleteMyAccount() {
+  const user = await requireAuth();
+  authService.assertDeletable(user);
+  deletePortfolioForUser(user.id);
+  authService.deleteAccount(user);
   await clearAuthCookies();
 }

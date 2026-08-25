@@ -5,6 +5,7 @@ import { publicUser } from "@/lib/auth/types";
 import { updateProfile } from "@/lib/services/authService";
 import { deliveredCount } from "@/lib/db/auth";
 import { loyaltyFromDelivered } from "@/lib/loyalty";
+import { deleteMyAccount } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,15 @@ export async function PATCH(req: Request) {
       user: publicUser(next),
       loyalty: loyaltyFromDelivered(deliveredCount(next.id)),
     });
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function DELETE() {
+  try {
+    await deleteMyAccount();
+    return ok({ ok: true });
   } catch (e) {
     return fail(e);
   }

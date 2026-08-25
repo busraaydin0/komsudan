@@ -3,14 +3,17 @@
 import { useState } from "react";
 import type { Account } from "@/lib/types";
 import { patchAccount, postPasskey, requestOtp, verifyOtp } from "@/lib/api";
+import { permissionAsked } from "@/lib/permissions";
+import { PermissionPrompt } from "@/components/PermissionPrompt";
 import { pilotPasskeyId, registerPasskey } from "@/lib/passkey";
 
-type Step = "phone" | "otp" | "identity" | "passkey";
+type Step = "phone" | "otp" | "identity" | "passkey" | "permissions";
 
 function nextStep(account: Account | null): Step | "done" {
   if (!account) return "phone";
   if (!account.identityVerified) return "identity";
   if (!account.passkeyEnabled) return "passkey";
+  if (!permissionAsked()) return "permissions";
   return "done";
 }
 
@@ -89,7 +92,8 @@ export function LoginGate({
           ? await registerPasskey(me.id, me.phone, name || me.name)
           : pilotPasskeyId(me.id);
       await postPasskey(id);
-      await onReady();
+      if (!permissionAsked()) setStep("permissions");
+      else await onReady();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Cihaz kilidi alınamadı.");
     } finally {
@@ -112,8 +116,8 @@ export function LoginGate({
         </p>
 
         <ol className="mt-8 flex gap-2 text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
-          {(["Telefon", "SMS", "Kimlik", "Yüz"] as const).map((label, i) => {
-            const order: Step[] = ["phone", "otp", "identity", "passkey"];
+          {(["Telefon", "SMS", "Kimlik", "Yüz", "İzin"] as const).map((label, i) => {
+            const order: Step[] = ["phone", "otp", "identity", "passkey", "permissions"];
             const on = order.indexOf(step) >= i;
             return (
               <li key={label} className={on ? "text-[var(--teal)]" : undefined}>
@@ -238,6 +242,10 @@ export function LoginGate({
                 Bu cihazda Face ID yok — pilot onay
               </button>
             </>
+          )}
+
+          {step === "permissions" && (
+            <PermissionPrompt variant="inline" onDone={() => void onReady()} />
           )}
 
           {err && <p className="mt-3 text-sm text-[var(--clay)]">{err}</p>}

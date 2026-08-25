@@ -1,11 +1,16 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { ApiError } from "@/server/rules";
+import { db } from "@/lib/db/client";
+import { getProfile } from "@/lib/db/providers";
 import {
   attachOrphanOrders,
   bumpOtpAttempts,
   countOtpSince,
   consumeOtp,
+  deleteOtpsForPhone,
+  deleteRefreshTokens,
   deleteSession,
+  deleteUserRow,
   deleteUserSessions,
   findRefresh,
   getUserById,
@@ -17,9 +22,11 @@ import {
   insertUser,
   latestOtp,
   markIdentityVerified,
+  anonymizeReviewsForUser,
   revokeRefresh,
   revokeUserRefresh,
   setPasskey,
+  unlinkUserOrders,
   updateUserName,
   type UserRow,
 } from "@/lib/db/auth";
@@ -169,4 +176,25 @@ export function assertPasskey(user: AuthUser, credentialId: string): AuthUser {
     throw new ApiError(400, "Yüz veya parmak izi bu hesaba ait değil.", "VALIDATION_ERROR");
   }
   return user;
+}
+
+export function assertDeletable(user: AuthUser) {
+  if (user.role === "provider" || user.role === "admin" || getProfile(user.id)) {
+    throw new ApiError(409, "Pilot hizmet veren hesabı silinmez.", "ACCOUNT_LOCKED");
+  }
+}
+
+export function deleteAccount(user: AuthUser) {
+  assertDeletable(user);
+  db().transaction(() => {
+    anonymizeReviewsForUser(user.id);
+    unlinkUserOrders(user.id);
+    db()
+      .prepare(`DELETE FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'`)
+      .run(user.id);
+    deleteUserSessions(user.id);
+    deleteRefreshTokens(user.id);
+    deleteOtpsForPhone(user.phone);
+    deleteUserRow(user.id);
+  })();
 }

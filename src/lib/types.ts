@@ -106,4 +106,5 @@ export type Account = {
   name: string;
   identityVerified: boolean;
   passkeyEnabled: boolean;
+  role: "customer" | "provider" | "admin";
 };

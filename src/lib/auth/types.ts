@@ -31,6 +31,7 @@ export function toAccount(user: AuthUser): Account {
     name: user.name,
     identityVerified: user.identityVerified,
     passkeyEnabled: user.passkeyEnabled,
+    role: user.role,
   };
 }
 

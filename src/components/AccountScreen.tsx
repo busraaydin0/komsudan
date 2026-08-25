@@ -1,12 +1,62 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Loyalty } from "@/lib/loyalty";
 import type { Account, WorkPhoto } from "@/lib/types";
 import { formatPhone } from "@/lib/phone";
-import { fetchMyPhotos, logoutSession, patchAccount, uploadMyPhoto } from "@/lib/api";
+import { deleteMyAccount, fetchMyPhotos, logoutSession, patchAccount, uploadMyPhoto } from "@/lib/api";
+import {
+  cameraState,
+  clearPermissionAsked,
+  locationState,
+  notificationState,
+  permLabel,
+  requestCamera,
+  requestLocation,
+  requestNotifications,
+  type PermState,
+} from "@/lib/permissions";
 import { tl } from "@/lib/pricing";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
+
+function PermRow({
+  title,
+  hint,
+  state,
+  busy,
+  onAsk,
+}: {
+  title: string;
+  hint: string;
+  state: PermState;
+  busy: boolean;
+  onAsk: () => void;
+}) {
+  const open = state === "granted";
+  return (
+    <li className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+      <div>
+        <p className="text-sm">{title}</p>
+        <p className="text-xs text-[var(--muted)]">{hint}</p>
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <span className={`text-sm ${open ? "text-[var(--teal)]" : "text-[var(--muted)]"}`}>
+          {permLabel(state)}
+        </span>
+        {state !== "granted" && state !== "unsupported" && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onAsk}
+            className="text-xs text-[var(--clay)]"
+          >
+            İzin ver
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
 
 export function AccountScreen({
   account,
@@ -26,6 +76,22 @@ export function AccountScreen({
   const [photos, setPhotos] = useState<WorkPhoto[]>([]);
   const [photoErr, setPhotoErr] = useState("");
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [geo, setGeo] = useState<PermState>("prompt");
+  const [push, setPush] = useState<PermState>("prompt");
+  const [cam, setCam] = useState<PermState>("prompt");
+  const [permBusy, setPermBusy] = useState<"geo" | "push" | "cam" | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteErr, setDeleteErr] = useState("");
+
+  const locked = account.role === "provider" || account.role === "admin";
+
+  const refreshPerms = useCallback(async () => {
+    const [g, n, c] = await Promise.all([locationState(), notificationState(), cameraState()]);
+    setGeo(g);
+    setPush(n);
+    setCam(c);
+  }, []);
 
   useEffect(() => {
     setName(account.name);
@@ -38,6 +104,10 @@ export function AccountScreen({
       .then(setPhotos)
       .catch(() => setPhotos([]));
   }, []);
+
+  useEffect(() => {
+    void refreshPerms();
+  }, [refreshPerms]);
 
   const nextNeed = loyalty && loyalty.nextAt != null ? Math.max(0, loyalty.nextAt - loyalty.delivered) : 0;
 
@@ -69,9 +139,34 @@ export function AccountScreen({
     }
   }
 
+  async function ask(kind: "geo" | "push" | "cam") {
+    setPermBusy(kind);
+    try {
+      if (kind === "geo") await requestLocation();
+      if (kind === "push") await requestNotifications();
+      if (kind === "cam") await requestCamera();
+      await refreshPerms();
+    } finally {
+      setPermBusy(null);
+    }
+  }
+
   async function out() {
     await logoutSession();
     onLogout();
+  }
+
+  async function removeAccount() {
+    setDeleteBusy(true);
+    setDeleteErr("");
+    try {
+      await deleteMyAccount();
+      clearPermissionAsked();
+      onLogout();
+    } catch (e) {
+      setDeleteErr(e instanceof Error ? e.message : "Hesap silinemedi.");
+      setDeleteBusy(false);
+    }
   }
 
   return (
@@ -84,7 +179,7 @@ export function AccountScreen({
         <p className="text-xs text-[var(--muted)]">{formatPhone(account.phone)}</p>
       </header>
 
-      <main className="mx-auto max-w-lg space-y-4 px-5 pt-5 pb-[calc(var(--tabbar)+1.5rem)]">
+      <main className="mx-auto max-w-lg space-y-4 px-5 pt-5 pb-[calc(var(--tabbar)+2.75rem)]">
         {loyalty && (
           <section className="k-rise overflow-hidden rounded-3xl bg-[var(--teal)] p-5 text-[var(--paper)] shadow-[var(--shadow-card)]">
             <p className="text-[11px] font-medium tracking-[0.18em] uppercase opacity-80">Sadakat</p>
@@ -148,6 +243,36 @@ export function AccountScreen({
         </section>
 
         <section className="rounded-3xl bg-[var(--card)] p-5 ring-1 ring-[var(--line)]">
+          <h2 className="font-[family-name:var(--font-display)] text-xl">İzinler</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Kapalıysa tarayıcı veya telefon ayarından yeniden açılır.
+          </p>
+          <ul className="mt-3 divide-y divide-[var(--line)]">
+            <PermRow
+              title="Konum"
+              hint="Haritada yakındaki komşular"
+              state={geo}
+              busy={permBusy === "geo"}
+              onAsk={() => void ask("geo")}
+            />
+            <PermRow
+              title="Bildirim"
+              hint="Sipariş durumu"
+              state={push}
+              busy={permBusy === "push"}
+              onAsk={() => void ask("push")}
+            />
+            <PermRow
+              title="Kamera"
+              hint="İş fotoğrafı"
+              state={cam}
+              busy={permBusy === "cam"}
+              onAsk={() => void ask("cam")}
+            />
+          </ul>
+        </section>
+
+        <section className="rounded-3xl bg-[var(--card)] p-5 ring-1 ring-[var(--line)]">
           <h2 className="font-[family-name:var(--font-display)] text-xl">Ayarlar</h2>
           <label className="mt-3 block text-xs text-[var(--muted)]">Ad soyad</label>
           <input
@@ -187,6 +312,45 @@ export function AccountScreen({
         >
           Çıkış yap
         </button>
+
+        <section className="scroll-mb-[var(--tabbar)] rounded-3xl bg-[var(--card)] p-5 ring-1 ring-[var(--line)]">
+          <h2 className="font-[family-name:var(--font-display)] text-xl">Hesabı kapat</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Telefonun, oturumun ve profilin silinir. Geçmiş siparişler hizmet verende kalır; adın
+            kalkar. Bu geri alınmaz.
+          </p>
+          {locked ? (
+            <p className="mt-3 text-sm text-[var(--muted)]">Pilot hizmet veren hesabı silinmez.</p>
+          ) : confirmDelete ? (
+            <div className="mt-4 space-y-2">
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => void removeAccount()}
+                className="k-press w-full rounded-full bg-[var(--load-full)] py-2.5 text-sm font-medium text-white"
+              >
+                {deleteBusy ? "Siliniyor…" : "Evet, hesabımı sil"}
+              </button>
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => setConfirmDelete(false)}
+                className="w-full py-2 text-xs text-[var(--muted)]"
+              >
+                Vazgeç
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="mt-4 w-full py-2 text-sm text-[var(--load-full)]"
+            >
+              Hesabımı sil
+            </button>
+          )}
+          {deleteErr && <p className="mt-2 text-xs text-[var(--clay)]">{deleteErr}</p>}
+        </section>
       </main>
     </div>
   );

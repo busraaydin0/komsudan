@@ -195,3 +195,32 @@ export function deleteSession(token: string) {
 export function deleteUserSessions(userId: string) {
   db().prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
 }
+
+export function deleteRefreshTokens(userId: string) {
+  db().prepare("DELETE FROM refresh_tokens WHERE user_id = ?").run(userId);
+}
+
+export function deleteOtpsForPhone(phone: string) {
+  db().prepare("DELETE FROM otp_codes WHERE phone = ?").run(phone);
+  const tables = db().prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'otps'").get() as
+    | { name: string }
+    | undefined;
+  if (tables) db().prepare("DELETE FROM otps WHERE phone = ?").run(phone);
+}
+
+export function anonymizeReviewsForUser(userId: string) {
+  db()
+    .prepare(
+      `UPDATE reviews SET author = 'Silinmiş hesap'
+       WHERE order_id IN (SELECT id FROM orders WHERE user_id = ?)`,
+    )
+    .run(userId);
+}
+
+export function unlinkUserOrders(userId: string) {
+  db().prepare("UPDATE orders SET user_id = NULL WHERE user_id = ?").run(userId);
+}
+
+export function deleteUserRow(userId: string) {
+  db().prepare("DELETE FROM users WHERE id = ?").run(userId);
+}
