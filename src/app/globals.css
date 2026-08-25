@@ -1,0 +1,101 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+:root {
+  --paper: #f3ece1;
+  --ink: #1c1712;
+  --muted: #6b5e52;
+  --line: #e0d4c4;
+  --card: #fbf7f0;
+  --teal: #1a6b63;
+  --clay: #c45c26;
+  --background: var(--paper);
+  --foreground: var(--ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), "Source Sans 3", sans-serif;
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+  background: color-mix(in srgb, var(--card) 80%, transparent) !important;
+}
+
+.katla-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  filter: drop-shadow(0 6px 10px rgba(28, 23, 18, 0.22));
+}
+
+.katla-pin .dot {
+  min-width: 2.15rem;
+  border-radius: 999px;
+  background: #1a6b63;
+  color: #f4eee4;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.7rem;
+  padding: 0 0.45rem;
+}
+
+.katla-pin .stem {
+  width: 2px;
+  height: 10px;
+  background: #1a6b63;
+  margin-top: -1px;
+}
+
+.katla-pin.is-on .dot {
+  background: #c45c26;
+  transform: scale(1.08);
+}
+
+.katla-pin.is-on .stem {
+  background: #c45c26;
+}
+
+.katla-drop {
+  width: 14px;
+  height: 14px;
+  border: 2px dashed #c45c26;
+  background: #fbf7f0;
+  border-radius: 3px;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(28, 23, 18, 0.15);
+}
+
+.katla-drop.is-on {
+  background: #c45c26;
+  border-style: solid;
+}
+
+.katla-me {
+  width: 16px;
+  height: 16px;
+}
+
+.katla-me span {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #1a6b63;
+  box-shadow: 0 0 0 6px rgba(26, 107, 99, 0.22);
+}
