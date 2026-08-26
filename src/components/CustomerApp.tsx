@@ -6,9 +6,9 @@ import { PILOT, trustLabel } from "@/lib/data";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
-import { postOrder, postReview, useCatalog, useOrders } from "@/lib/api";
+import { postOrder, postReview, patchOrder, useCatalog, useOrders } from "@/lib/api";
 import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
-import { trackSteps } from "@/lib/status";
+import { canCancel, trackSteps } from "@/lib/status";
 import { PhotoStrip, ReviewComposer, ReviewList } from "@/components/Photos";
 import { Avatar } from "@/components/Avatar";
 import type {
@@ -906,8 +906,36 @@ function Track({
           ? "Hizmet veren kodu girince iş biter ve para geçer."
           : order.status === "teslim_edildi"
             ? "Teslim bitti. İstersen yorum ve fotoğraf bırak."
-            : "Durumu Hizmet sekmesinden ilerlet. Canlı sunucudan güncellenir."}
+            : order.status === "onay_bekliyor"
+              ? "Komşu kabul etmeden iptal edebilirsin. Tutanak çözülür, para çekilmez."
+              : "Durumu Hizmet sekmesinden ilerlet. Canlı sunucudan güncellenir."}
       </p>
+      {canCancel(order.status) && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            void (async () => {
+              if (!window.confirm("Sipariş iptal edilsin mi? Ön otorizasyon çözülür, para çekilmez.")) {
+                return;
+              }
+              setBusy(true);
+              setErr("");
+              try {
+                await patchOrder(order.id, "reject");
+                onReload();
+              } catch (e) {
+                setErr(e instanceof Error ? e.message : "İptal alınamadı.");
+              } finally {
+                setBusy(false);
+              }
+            })();
+          }}
+          className="k-press mt-4 w-full rounded-full py-2.5 text-sm text-[var(--clay)] ring-1 ring-[var(--line)]"
+        >
+          {busy ? "…" : "Siparişi iptal et"}
+        </button>
+      )}
       {order.status === "teslim_edildi" && order.review && (
         <div className="mt-4">
           <h3 className="text-sm font-medium">Yorumun</h3>

@@ -77,7 +77,7 @@ export function nextStatus(current: OrderStatus, packageId: PackageId): OrderSta
 }
 
 export function canCancel(status: OrderStatus) {
-  return status === "onay_bekliyor" || status === "teslim_alindi";
+  return status === "onay_bekliyor";
 }
 
 export function canAddPhotos(status: OrderStatus) {
