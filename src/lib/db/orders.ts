@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { db } from "./client";
 
 export type OrderRow = {
@@ -28,6 +29,7 @@ export type OrderRow = {
   delivery_mode: string | null;
   scheduled_window_start: string | null;
   scheduled_window_end: string | null;
+  lifecycle: string | null;
 };
 
 export type InsertOrderInput = {
@@ -51,6 +53,7 @@ export type InsertOrderInput = {
   estimated_price: number;
   delivery_mode: string;
   scheduled_window_start: string;
+  lifecycle: string;
 };
 
 export function getRemaining(providerId: string) {
@@ -101,22 +104,67 @@ export function insertOrderRow(input: InsertOrderInput) {
         slot, note, total, commission, status, created_at, updated_at,
         pickup_code, code_attempts, paid_at, payment_status, user_id,
         price_per_kg_snapshot, estimated_weight, actual_weight, estimated_price, final_price,
-        delivery_mode, scheduled_window_start, scheduled_window_end
+        delivery_mode, scheduled_window_start, scheduled_window_end, lifecycle
       ) VALUES (
         @id, @provider_id, @package_id, @pieces, @express, @drop_method, @drop_point_id,
         @slot, @note, @total, @commission, @status, @created_at, @updated_at,
         NULL, 0, NULL, 'authorized', @user_id,
         @price_per_kg_snapshot, @estimated_weight, NULL, @estimated_price, NULL,
-        @delivery_mode, @scheduled_window_start, NULL
+        @delivery_mode, @scheduled_window_start, NULL, @lifecycle
       )`,
     )
     .run(input);
 }
 
-export function insertOrderEvent(orderId: string, fromStatus: string | null, toStatus: string, at: string) {
+export type HistoryRow = {
+  id: string;
+  order_id: string;
+  from_status: string | null;
+  to_status: string;
+  from_lifecycle: string | null;
+  to_lifecycle: string;
+  actor_id: string | null;
+  actor_role: string | null;
+  note: string | null;
+  created_at: string;
+};
+
+export function recordTransition(input: {
+  orderId: string;
+  fromStatus: string | null;
+  toStatus: string;
+  fromLifecycle: string | null;
+  toLifecycle: string;
+  actorId: string | null;
+  actorRole: string | null;
+  note?: string | null;
+  at: string;
+}) {
   db()
-    .prepare("INSERT INTO order_events (order_id, from_status, to_status, at) VALUES (?, ?, ?, ?)")
-    .run(orderId, fromStatus, toStatus, at);
+    .prepare(
+      `INSERT INTO order_status_history (
+        id, order_id, from_status, to_status, from_lifecycle, to_lifecycle,
+        actor_id, actor_role, note, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      `h-${randomUUID()}`,
+      input.orderId,
+      input.fromStatus,
+      input.toStatus,
+      input.fromLifecycle,
+      input.toLifecycle,
+      input.actorId,
+      input.actorRole,
+      input.note ?? null,
+      input.at,
+    );
+}
+
+export function listHistoryRows(orderId: string): HistoryRow[] {
+  return db()
+    .prepare("SELECT * FROM order_status_history WHERE order_id = ? ORDER BY created_at ASC, id ASC")
+    .all(orderId) as HistoryRow[];
 }
 
 export function setPickupCode(id: string, code: string) {
@@ -136,6 +184,7 @@ export function rotatePickupCode(id: string, code: string, updatedAt: string) {
 export function updateOrderStatus(input: {
   id: string;
   status: string;
+  lifecycle: string;
   updatedAt: string;
   pickupCode?: string | null;
   resetAttempts?: boolean;
@@ -146,29 +195,31 @@ export function updateOrderStatus(input: {
   if (input.pickupCode !== undefined && input.resetAttempts && input.paymentStatus === "captured") {
     db()
       .prepare(
-        `UPDATE orders SET status = ?, payment_status = 'captured', paid_at = ?, pickup_code = NULL,
+        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'captured', paid_at = ?, pickup_code = NULL,
          code_attempts = 0, final_price = ?, updated_at = ? WHERE id = ?`,
       )
-      .run(input.status, input.paidAt, input.finalPrice ?? null, input.updatedAt, input.id);
+      .run(input.status, input.lifecycle, input.paidAt, input.finalPrice ?? null, input.updatedAt, input.id);
     return;
   }
   if (input.paymentStatus === "voided") {
     db()
       .prepare(
-        `UPDATE orders SET status = ?, payment_status = 'voided', pickup_code = NULL, updated_at = ? WHERE id = ?`,
+        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'voided', pickup_code = NULL, updated_at = ? WHERE id = ?`,
       )
-      .run(input.status, input.updatedAt, input.id);
+      .run(input.status, input.lifecycle, input.updatedAt, input.id);
     return;
   }
   if (input.pickupCode) {
     db()
       .prepare(
-        "UPDATE orders SET status = ?, pickup_code = ?, code_attempts = 0, updated_at = ? WHERE id = ?",
+        "UPDATE orders SET status = ?, lifecycle = ?, pickup_code = ?, code_attempts = 0, updated_at = ? WHERE id = ?",
       )
-      .run(input.status, input.pickupCode, input.updatedAt, input.id);
+      .run(input.status, input.lifecycle, input.pickupCode, input.updatedAt, input.id);
     return;
   }
-  db().prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?").run(input.status, input.updatedAt, input.id);
+  db()
+    .prepare("UPDATE orders SET status = ?, lifecycle = ?, updated_at = ? WHERE id = ?")
+    .run(input.status, input.lifecycle, input.updatedAt, input.id);
 }
 
 export function runOrderTx<T>(fn: () => T): T {

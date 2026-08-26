@@ -21,9 +21,22 @@ export type ServicePackage = {
   pricePerPiece: number;
 };
 
+export type OrderPhotoKind = "dropoff" | "pickup" | "damage";
+
 export type WorkPhoto = {
   id: string;
   url: string;
+  createdAt: string;
+  kind?: OrderPhotoKind | string;
+};
+
+export type OrderStatusEvent = {
+  id: string;
+  from: ApiLifecycle | null;
+  to: ApiLifecycle;
+  actorId: string | null;
+  actorRole: string | null;
+  note: string | null;
   createdAt: string;
 };
 

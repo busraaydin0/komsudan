@@ -2,10 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { canAddPhotos } from "@/lib/status";
-import type { OrderStatus, WorkPhoto } from "@/lib/types";
+import type { OrderPhotoKind, OrderStatus, WorkPhoto } from "@/lib/types";
 import { db, uploadsDir } from "./db";
 import { ApiError } from "./rules";
 import { setUserAvatar } from "@/lib/db/auth";
+import { countOrderPhotos, insertOrderPhoto, listOrderPhotoRows } from "@/lib/db/orderPhotos";
 
 export const PHOTO_MAX = 4;
 export const PORTFOLIO_MAX = 16;
@@ -13,7 +14,6 @@ export const PHOTO_BYTES = 2.5 * 1024 * 1024;
 
 type OrderPhotoRow = {
   id: string;
-  order_id: string;
   provider_id: string;
   mime: string;
   ext: string;
@@ -31,8 +31,8 @@ type GalleryRow = {
   created_at: string;
 };
 
-function toPhoto(id: string, createdAt: string): WorkPhoto {
-  return { id, url: `/api/photos/${id}`, createdAt };
+function toPhoto(id: string, createdAt: string, kind?: string): WorkPhoto {
+  return { id, url: `/api/photos/${id}`, createdAt, kind };
 }
 
 function sniff(buf: Buffer): { mime: string; ext: string } | null {
@@ -66,31 +66,38 @@ function unlinkPhotoFile(id: string, ext: string) {
   if (fs.existsSync(file)) fs.unlinkSync(file);
 }
 
-export async function bufferFromUpload(req: Request) {
+export function storeImage(buf: Buffer) {
+  return writeFile(buf);
+}
+
+export async function parsePhotoUpload(req: Request) {
   const ct = req.headers.get("content-type") ?? "";
   if (ct.includes("multipart/form-data")) {
     const form = await req.formData();
     const f = form.get("file");
-    if (!(f instanceof File) || f.size === 0) throw new ApiError(400, "Fotoğraf seç.");
-    return Buffer.from(await f.arrayBuffer());
+    if (!(f instanceof File) || f.size === 0) throw new ApiError(400, "Fotoğraf seç.", "VALIDATION_ERROR");
+    const kindRaw = String(form.get("kind") ?? "").trim();
+    return { buf: Buffer.from(await f.arrayBuffer()), kind: kindRaw || undefined };
   }
   const buf = Buffer.from(await req.arrayBuffer());
-  if (!buf.length) throw new ApiError(400, "Fotoğraf seç.");
-  return buf;
+  if (!buf.length) throw new ApiError(400, "Fotoğraf seç.", "VALIDATION_ERROR");
+  return { buf, kind: undefined as string | undefined };
+}
+
+export async function bufferFromUpload(req: Request) {
+  return (await parsePhotoUpload(req)).buf;
 }
 
 export function photosForOrder(orderId: string): WorkPhoto[] {
-  const orderRows = db()
-    .prepare("SELECT * FROM order_photos WHERE order_id = ? ORDER BY created_at ASC")
-    .all(orderId) as OrderPhotoRow[];
+  const orderRows = listOrderPhotoRows(orderId);
   const extra = db()
     .prepare(
       "SELECT * FROM gallery_photos WHERE order_id = ? AND kind = 'order' ORDER BY created_at ASC",
     )
     .all(orderId) as GalleryRow[];
   return [
-    ...orderRows.map((r) => toPhoto(r.id, r.created_at)),
-    ...extra.map((r) => toPhoto(r.id, r.created_at)),
+    ...orderRows.map((r) => toPhoto(r.id, r.created_at, r.kind)),
+    ...extra.map((r) => toPhoto(r.id, r.created_at, r.kind)),
   ];
 }
 
@@ -123,7 +130,7 @@ export function workPhotosForProvider(providerId: string, limit = 12): WorkPhoto
   return out;
 }
 
-export function addPhoto(orderId: string, buf: Buffer): WorkPhoto {
+export function addPhoto(orderId: string, buf: Buffer, kind: OrderPhotoKind = "dropoff"): WorkPhoto {
   const order = db()
     .prepare("SELECT id, provider_id, status FROM orders WHERE id = ?")
     .get(orderId) as { id: string; provider_id: string; status: string } | undefined;
@@ -131,16 +138,25 @@ export function addPhoto(orderId: string, buf: Buffer): WorkPhoto {
   if (!canAddPhotos(order.status as OrderStatus)) {
     throw new ApiError(409, "Bu aşamada fotoğraf eklenmez.");
   }
-  const n = photosForOrder(orderId).length;
-  if (n >= PHOTO_MAX) throw new ApiError(409, `En fazla ${PHOTO_MAX} fotoğraf.`);
+  const extra = (
+    db()
+      .prepare("SELECT COUNT(*) AS n FROM gallery_photos WHERE order_id = ? AND kind = 'order'")
+      .get(orderId) as { n: number }
+  ).n;
+  if (countOrderPhotos(orderId) + extra >= PHOTO_MAX) {
+    throw new ApiError(409, `En fazla ${PHOTO_MAX} fotoğraf.`);
+  }
   const file = writeFile(buf);
-  db()
-    .prepare(
-      `INSERT INTO order_photos (id, order_id, provider_id, mime, ext, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    )
-    .run(file.id, orderId, order.provider_id, file.mime, file.ext, file.now);
-  return toPhoto(file.id, file.now);
+  insertOrderPhoto({
+    id: file.id,
+    order_id: orderId,
+    provider_id: order.provider_id,
+    mime: file.mime,
+    ext: file.ext,
+    created_at: file.now,
+    kind,
+  });
+  return toPhoto(file.id, file.now, kind);
 }
 
 export function addPortfolioPhoto(ownerId: string, buf: Buffer): WorkPhoto {

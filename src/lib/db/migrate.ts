@@ -9,6 +9,58 @@ function addColumn(db: Database.Database, table: string, name: string, ddl: stri
   if (!cols.has(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
 }
 
+function backfillHistory(db: Database.Database) {
+  const tables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'order_status_history'")
+    .get() as { name: string } | undefined;
+  if (!tables) return;
+  db.exec(`
+    INSERT INTO order_status_history (
+      id, order_id, from_status, to_status, from_lifecycle, to_lifecycle,
+      actor_id, actor_role, note, created_at
+    )
+    SELECT
+      'ev-' || e.id,
+      e.order_id,
+      e.from_status,
+      e.to_status,
+      CASE e.from_status
+        WHEN 'onay_bekliyor' THEN 'pending'
+        WHEN 'teslim_alindi' THEN 'accepted'
+        WHEN 'yikaniyor' THEN 'washing'
+        WHEN 'utuleniyor' THEN 'ironing'
+        WHEN 'hazir' THEN 'ready'
+        WHEN 'teslim_edildi' THEN 'completed'
+        WHEN 'iptal' THEN 'cancelled'
+        ELSE NULL
+      END,
+      CASE e.to_status
+        WHEN 'onay_bekliyor' THEN 'pending'
+        WHEN 'teslim_alindi' THEN 'accepted'
+        WHEN 'yikaniyor' THEN 'washing'
+        WHEN 'utuleniyor' THEN 'ironing'
+        WHEN 'hazir' THEN 'ready'
+        WHEN 'teslim_edildi' THEN 'completed'
+        WHEN 'iptal' THEN 'cancelled'
+        ELSE 'pending'
+      END,
+      NULL,
+      NULL,
+      NULL,
+      e.at
+    FROM order_events e
+    WHERE NOT EXISTS (
+      SELECT 1 FROM order_status_history h WHERE h.id = 'ev-' || e.id
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM order_status_history h
+      WHERE h.order_id = e.order_id
+        AND h.created_at = e.at
+        AND h.to_status = e.to_status
+    );
+  `);
+}
+
 function ensureColumns(db: Database.Database) {
   addColumn(db, "orders", "pickup_code", "pickup_code TEXT");
   addColumn(db, "orders", "code_attempts", "code_attempts INTEGER NOT NULL DEFAULT 0");
@@ -23,6 +75,8 @@ function ensureColumns(db: Database.Database) {
   addColumn(db, "orders", "delivery_mode", "delivery_mode TEXT");
   addColumn(db, "orders", "scheduled_window_start", "scheduled_window_start TEXT");
   addColumn(db, "orders", "scheduled_window_end", "scheduled_window_end TEXT");
+  addColumn(db, "orders", "lifecycle", "lifecycle TEXT");
+  addColumn(db, "order_photos", "kind", "kind TEXT NOT NULL DEFAULT 'dropoff'");
   addColumn(db, "users", "role", "role TEXT NOT NULL DEFAULT 'customer'");
   addColumn(db, "users", "full_name", "full_name TEXT NOT NULL DEFAULT ''");
   addColumn(db, "users", "avatar_url", "avatar_url TEXT");
@@ -49,8 +103,19 @@ function ensureColumns(db: Database.Database) {
       WHERE scheduled_window_start IS NULL;
     UPDATE orders SET final_price = total
       WHERE status = 'teslim_edildi' AND final_price IS NULL;
+    UPDATE orders SET lifecycle = CASE status
+      WHEN 'onay_bekliyor' THEN 'pending'
+      WHEN 'teslim_alindi' THEN 'accepted'
+      WHEN 'yikaniyor' THEN 'washing'
+      WHEN 'utuleniyor' THEN 'ironing'
+      WHEN 'hazir' THEN 'ready'
+      WHEN 'teslim_edildi' THEN 'completed'
+      WHEN 'iptal' THEN 'cancelled'
+      ELSE lifecycle
+    END WHERE lifecycle IS NULL;
     CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(user_id);
   `);
+  backfillHistory(db);
 }
 
 export function migrate(db: Database.Database) {

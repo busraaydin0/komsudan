@@ -1,5 +1,18 @@
 import type { ApiLifecycle, OrderStatus, PackageId } from "./types";
 
+export const LIFECYCLES: ApiLifecycle[] = [
+  "pending",
+  "accepted",
+  "dropped_off",
+  "washing",
+  "ironing",
+  "ready",
+  "completed",
+  "rejected",
+  "cancelled",
+  "disputed",
+];
+
 export const LIFECYCLE_FROM_PILOT: Record<OrderStatus, ApiLifecycle> = {
   onay_bekliyor: "pending",
   teslim_alindi: "accepted",
@@ -10,8 +23,48 @@ export const LIFECYCLE_FROM_PILOT: Record<OrderStatus, ApiLifecycle> = {
   iptal: "cancelled",
 };
 
+export const ALLOWED_TRANSITIONS: Record<ApiLifecycle, ApiLifecycle[]> = {
+  pending: ["accepted", "rejected", "dropped_off"],
+  accepted: ["dropped_off", "washing", "cancelled"],
+  dropped_off: ["washing", "cancelled"],
+  washing: ["ironing", "ready"],
+  ironing: ["ready"],
+  ready: ["completed"],
+  completed: [],
+  rejected: [],
+  cancelled: [],
+  disputed: [],
+};
+
+export function isLifecycle(value: string | null | undefined): value is ApiLifecycle {
+  return Boolean(value && (LIFECYCLES as string[]).includes(value));
+}
+
 export function toLifecycle(status: OrderStatus): ApiLifecycle {
   return LIFECYCLE_FROM_PILOT[status];
+}
+
+export function lifecycleOf(status: OrderStatus, stored?: string | null): ApiLifecycle {
+  if (isLifecycle(stored)) return stored;
+  return toLifecycle(status);
+}
+
+export function pilotFromLifecycle(next: ApiLifecycle): OrderStatus {
+  if (next === "pending") return "onay_bekliyor";
+  if (next === "accepted" || next === "dropped_off") return "teslim_alindi";
+  if (next === "washing") return "yikaniyor";
+  if (next === "ironing") return "utuleniyor";
+  if (next === "ready") return "hazir";
+  if (next === "completed") return "teslim_edildi";
+  return "iptal";
+}
+
+export function canTransition(from: ApiLifecycle, to: ApiLifecycle, packageId: PackageId) {
+  if (!ALLOWED_TRANSITIONS[from].includes(to)) return false;
+  if (to === "ironing" && packageId !== "tam") return false;
+  if (from === "washing" && to === "ready" && packageId === "tam") return false;
+  if (from === "washing" && to === "ironing" && packageId !== "tam") return false;
+  return true;
 }
 
 export function nextStatus(current: OrderStatus, packageId: PackageId): OrderStatus | null {

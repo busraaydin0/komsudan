@@ -20,3 +20,20 @@ export const patchOrderSchema = z.object({
   action: z.enum(["accept", "reject", "advance", "deliver"]),
   code: z.string().optional(),
 });
+
+export const patchStatusSchema = z.object({
+  status: z.enum([
+    "pending",
+    "accepted",
+    "dropped_off",
+    "washing",
+    "ironing",
+    "ready",
+    "completed",
+    "rejected",
+    "cancelled",
+    "disputed",
+  ]),
+  code: z.string().optional(),
+  note: z.string().max(200).optional(),
+});

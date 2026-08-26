@@ -2,7 +2,7 @@ import { fail, ok } from "@/server/http";
 import { requireAuth } from "@/lib/auth/middleware";
 import { parseBody } from "@/lib/validation/parse";
 import { patchOrderSchema } from "@/lib/validation/order.schema";
-import { applyOrderAction, getOrderFor } from "@/lib/services/orderService";
+import { applyOrderAction, getOrderFor, listOrderHistory } from "@/lib/services/orderService";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export async function GET(req: Request, ctx: Ctx) {
   try {
     const user = await requireAuth(req);
     const { id } = await ctx.params;
-    return ok({ order: getOrderFor(user, id) });
+    return ok({ order: getOrderFor(user, id), history: listOrderHistory(user, id) });
   } catch (e) {
     return fail(e);
   }

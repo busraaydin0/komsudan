@@ -1,12 +1,25 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { estimateFor, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { loyaltyRate } from "@/lib/loyalty";
-import { canCancel, nextStatus, PICKUP_CODE_LEN, PICKUP_CODE_TRIES, toLifecycle } from "@/lib/status";
+import {
+  canAddPhotos,
+  canCancel,
+  canTransition,
+  isLifecycle,
+  lifecycleOf,
+  nextStatus,
+  PICKUP_CODE_LEN,
+  PICKUP_CODE_TRIES,
+  pilotFromLifecycle,
+} from "@/lib/status";
 import type {
+  ApiLifecycle,
   CreateOrderInput,
   DropMethod,
   Order,
+  OrderPhotoKind,
   OrderStatus,
+  OrderStatusEvent,
   PackageId,
   PaymentStatus,
 } from "@/lib/types";
@@ -18,11 +31,12 @@ import {
   dropPointExists,
   getOrderRow,
   getRemaining,
-  insertOrderEvent,
   insertOrderRow,
+  listHistoryRows,
   listOrderRowsAll,
   listOrderRowsForCustomer,
   listOrderRowsForProvider,
+  recordTransition,
   rotatePickupCode,
   runOrderTx,
   setPickupCode,
@@ -30,7 +44,7 @@ import {
   type OrderRow,
 } from "@/lib/db/orders";
 import { getProvider } from "@/server/catalog";
-import { photosForOrder } from "@/server/photos";
+import { addPhoto, photosForOrder } from "@/server/photos";
 import { reviewForOrder } from "@/server/reviews";
 import { ApiError } from "@/server/rules";
 
@@ -82,7 +96,7 @@ function toOrder(row: OrderRow): Order {
     paymentStatus: (row.payment_status as PaymentStatus) || "authorized",
     paidAt: row.paid_at,
     customerId: row.user_id,
-    lifecycle: toLifecycle(status),
+    lifecycle: lifecycleOf(status, row.lifecycle),
     deliveryMode: (row.delivery_mode as "door" | "point" | null) ?? deliveryMode(drop),
     estimatedWeight: row.estimated_weight ?? row.pieces,
     pricePerKgSnapshot: row.price_per_kg_snapshot ?? 0,
@@ -198,8 +212,134 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
       estimated_price: quote.total,
       delivery_mode: deliveryMode(input.drop),
       scheduled_window_start: input.slot,
+      lifecycle: "pending",
     });
-    insertOrderEvent(id, null, "onay_bekliyor", now);
+    recordTransition({
+      orderId: id,
+      fromStatus: null,
+      toStatus: "onay_bekliyor",
+      fromLifecycle: null,
+      toLifecycle: "pending",
+      actorId: userId,
+      actorRole: "customer",
+      at: now,
+    });
+  });
+
+  return getOrder(id)!;
+}
+
+function currentLifecycle(row: OrderRow): ApiLifecycle {
+  return lifecycleOf(row.status as OrderStatus, row.lifecycle);
+}
+
+function assertCanMove(from: ApiLifecycle, to: ApiLifecycle, packageId: PackageId) {
+  if (canTransition(from, to, packageId)) return;
+  if (to === "ironing" && packageId !== "tam") {
+    throw new ApiError(409, "Ütü bu pakette yok.", "INVALID_TRANSITION");
+  }
+  if (from === "washing" && to === "ready" && packageId === "tam") {
+    throw new ApiError(409, "Önce ütü adımı var.", "INVALID_TRANSITION");
+  }
+  throw new ApiError(409, "Bu duruma geçilemez.", "INVALID_TRANSITION");
+}
+
+function assertStatusRole(user: AuthUser, row: OrderRow, next: ApiLifecycle) {
+  if (user.role === "admin") return;
+  if (next === "completed") {
+    if (row.user_id === user.id || row.provider_id === user.id) return;
+    throw new ApiError(403, "Teslimi yalnızca taraflar onaylar.", "FORBIDDEN");
+  }
+  if (canMutateOrder(user, row)) return;
+  throw new ApiError(403, "Bu siparişi yalnızca hizmet veren ilerletebilir.", "FORBIDDEN");
+}
+
+function verifyPickupCode(row: OrderRow, code: string | undefined, now: string) {
+  const entered = digits(code ?? "");
+  const expected = row.pickup_code ?? "";
+  if (entered.length !== PICKUP_CODE_LEN || entered !== expected) {
+    const attempts = (row.code_attempts ?? 0) + 1;
+    if (attempts >= PICKUP_CODE_TRIES) {
+      rotatePickupCode(row.id, genCode(), now);
+      throw new ApiError(
+        409,
+        "Beş hatalı deneme. Yeni kod müşteriye gitti (SMS simülasyonu).",
+        "INVALID_CODE",
+      );
+    }
+    bumpCodeAttempts(row.id, attempts, now);
+    throw new ApiError(409, `Kod uyuşmadı. Kalan deneme: ${PICKUP_CODE_TRIES - attempts}.`, "INVALID_CODE");
+  }
+}
+
+export function applyStatus(
+  id: string,
+  user: AuthUser,
+  next: ApiLifecycle,
+  code?: string,
+  note?: string,
+): Order {
+  const row = getOrderRow(id);
+  if (!row || !canSeeOrder(user, row)) {
+    throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
+  }
+  const from = currentLifecycle(row);
+  const pack = row.package_id as PackageId;
+  assertCanMove(from, next, pack);
+  assertStatusRole(user, row, next);
+
+  const now = new Date().toISOString();
+  if (next === "completed") verifyPickupCode(row, code, now);
+
+  const nextPilot = pilotFromLifecycle(next);
+  const issuedCode = next === "ready" ? genCode() : null;
+  const capture = next === "completed";
+  const voidPay = next === "rejected" || next === "cancelled";
+
+  runOrderTx(() => {
+    if (issuedCode) {
+      updateOrderStatus({
+        id,
+        status: nextPilot,
+        lifecycle: next,
+        updatedAt: now,
+        pickupCode: issuedCode,
+      });
+    } else if (capture) {
+      updateOrderStatus({
+        id,
+        status: nextPilot,
+        lifecycle: next,
+        updatedAt: now,
+        pickupCode: null,
+        resetAttempts: true,
+        paymentStatus: "captured",
+        paidAt: now,
+        finalPrice: row.total,
+      });
+    } else if (voidPay) {
+      updateOrderStatus({
+        id,
+        status: nextPilot,
+        lifecycle: next,
+        updatedAt: now,
+        paymentStatus: "voided",
+      });
+    } else {
+      updateOrderStatus({ id, status: nextPilot, lifecycle: next, updatedAt: now });
+    }
+    recordTransition({
+      orderId: id,
+      fromStatus: row.status,
+      toStatus: nextPilot,
+      fromLifecycle: from,
+      toLifecycle: next,
+      actorId: user.id,
+      actorRole: user.role,
+      note: note?.trim().slice(0, 200) || null,
+      at: now,
+    });
+    if (voidPay) addRemaining(row.provider_id, row.pieces);
   });
 
   return getOrder(id)!;
@@ -213,76 +353,75 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
   }
 
   const order = toOrder(row);
-  const now = new Date().toISOString();
-  let next: OrderStatus;
-  let capture = false;
-  let voidPay = false;
-  let issuedCode: string | null = null;
+  let next: ApiLifecycle;
 
   if (action === "accept") {
     if (order.status !== "onay_bekliyor") {
       throw new ApiError(409, "Bu sipariş kabul edilemez.", "INVALID_TRANSITION");
     }
-    next = "teslim_alindi";
+    next = "accepted";
   } else if (action === "reject") {
     if (!canCancel(order.status)) {
       throw new ApiError(409, "Bu aşamada iptal yok.", "INVALID_TRANSITION");
     }
-    next = "iptal";
-    voidPay = true;
+    next = currentLifecycle(row) === "pending" ? "rejected" : "cancelled";
   } else if (action === "deliver") {
     if (order.status !== "hazir") {
       throw new ApiError(409, "Kod ancak hazır siparişte geçer.", "INVALID_TRANSITION");
     }
-    const entered = digits(code ?? "");
-    const expected = row.pickup_code ?? "";
-    if (entered.length !== PICKUP_CODE_LEN || entered !== expected) {
-      const attempts = (row.code_attempts ?? 0) + 1;
-      if (attempts >= PICKUP_CODE_TRIES) {
-        rotatePickupCode(id, genCode(), now);
-        throw new ApiError(
-          409,
-          "Beş hatalı deneme. Yeni kod müşteriye gitti (SMS simülasyonu).",
-          "INVALID_CODE",
-        );
-      }
-      bumpCodeAttempts(id, attempts, now);
-      throw new ApiError(409, `Kod uyuşmadı. Kalan deneme: ${PICKUP_CODE_TRIES - attempts}.`, "INVALID_CODE");
-    }
-    next = "teslim_edildi";
-    capture = true;
+    next = "completed";
   } else {
     const n = nextStatus(order.status, order.packageId);
     if (!n) throw new ApiError(409, "Daha ileri durum yok.", "INVALID_TRANSITION");
     if (n === "teslim_edildi") {
       throw new ApiError(409, "Teslim için müşterinin kodunu gir.", "INVALID_TRANSITION");
     }
-    next = n;
-    if (next === "hazir") issuedCode = genCode();
+    next = lifecycleOf(n);
   }
 
-  runOrderTx(() => {
-    if (issuedCode) {
-      updateOrderStatus({ id, status: next, updatedAt: now, pickupCode: issuedCode });
-    } else if (capture) {
-      updateOrderStatus({
-        id,
-        status: next,
-        updatedAt: now,
-        pickupCode: null,
-        resetAttempts: true,
-        paymentStatus: "captured",
-        paidAt: now,
-        finalPrice: order.total,
-      });
-    } else if (voidPay) {
-      updateOrderStatus({ id, status: next, updatedAt: now, paymentStatus: "voided" });
-    } else {
-      updateOrderStatus({ id, status: next, updatedAt: now });
-    }
-    insertOrderEvent(id, order.status, next, now);
-    if (next === "iptal") addRemaining(order.providerId, order.pieces);
-  });
+  return applyStatus(id, user, next, code);
+}
 
-  return getOrder(id)!;
+const PHOTO_KINDS: OrderPhotoKind[] = ["dropoff", "pickup", "damage"];
+
+function parsePhotoKind(raw?: string): OrderPhotoKind {
+  if (!raw) return "dropoff";
+  if (PHOTO_KINDS.includes(raw as OrderPhotoKind)) return raw as OrderPhotoKind;
+  throw new ApiError(400, "Fotoğraf türü dropoff, pickup veya damage olmalı.", "VALIDATION_ERROR");
+}
+
+export function listOrderHistory(user: AuthUser, id: string): OrderStatusEvent[] {
+  getOrderFor(user, id);
+  return listHistoryRows(id).map((row) => ({
+    id: row.id,
+    from: row.from_lifecycle && isLifecycle(row.from_lifecycle)
+      ? row.from_lifecycle
+      : row.from_status
+        ? lifecycleOf(row.from_status as OrderStatus, row.from_lifecycle)
+        : null,
+    to: lifecycleOf(row.to_status as OrderStatus, row.to_lifecycle),
+    actorId: row.actor_id,
+    actorRole: row.actor_role,
+    note: row.note,
+    createdAt: row.created_at,
+  }));
+}
+
+export function listOrderPhotosFor(user: AuthUser, id: string) {
+  getOrderFor(user, id);
+  return photosForOrder(id);
+}
+
+export function addOrderPhoto(user: AuthUser, id: string, buf: Buffer, kindRaw?: string) {
+  const row = getOrderRow(id);
+  if (!row || !canSeeOrder(user, row)) {
+    throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
+  }
+  if (!canMutateOrder(user, row)) {
+    throw new ApiError(403, "Fotoğrafı hizmet veren ekler.", "FORBIDDEN");
+  }
+  if (!canAddPhotos(row.status as OrderStatus)) {
+    throw new ApiError(409, "Bu aşamada fotoğraf eklenmez.", "INVALID_TRANSITION");
+  }
+  return addPhoto(id, buf, parsePhotoKind(kindRaw));
 }

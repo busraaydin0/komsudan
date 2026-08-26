@@ -204,10 +204,12 @@ export async function uploadMyAvatar(file: File) {
 export async function uploadOrderPhoto(orderId: string, file: File) {
   const body = new FormData();
   body.append("file", file);
-  const data = await readJson<{ photo: WorkPhoto; order: Order }>(
-    await fetch(`/api/orders/${orderId}/photos`, { method: "POST", body }),
+  const data = unwrap(
+    await readJson<{ data?: { photo: WorkPhoto }; photo?: WorkPhoto }>(
+      await fetch(`/api/orders/${orderId}/photos`, { method: "POST", body }),
+    ),
   );
-  return data;
+  return data.photo!;
 }
 
 export async function uploadPortfolioPhoto(providerId: string, file: File) {
