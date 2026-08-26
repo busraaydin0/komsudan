@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Loyalty } from "@/lib/loyalty";
 import type { Account, WorkPhoto } from "@/lib/types";
 import { formatPhone } from "@/lib/phone";
-import { deleteMyAccount, fetchMyPhotos, logoutSession, patchAccount, uploadMyPhoto } from "@/lib/api";
+import { deleteMyAccount, deleteMyPhoto, fetchMyPhotos, logoutSession, patchAccount, uploadMyPhoto } from "@/lib/api";
 import {
   cameraState,
   clearPermissionAsked,
@@ -76,6 +76,7 @@ export function AccountScreen({
   const [photos, setPhotos] = useState<WorkPhoto[]>([]);
   const [photoErr, setPhotoErr] = useState("");
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [geo, setGeo] = useState<PermState>("prompt");
   const [push, setPush] = useState<PermState>("prompt");
   const [cam, setCam] = useState<PermState>("prompt");
@@ -136,6 +137,18 @@ export function AccountScreen({
       setPhotoErr(e instanceof Error ? e.message : "Fotoğraf yüklenemedi.");
     } finally {
       setPhotoBusy(false);
+    }
+  }
+
+  async function removePhoto(id: string) {
+    setRemovingId(id);
+    setPhotoErr("");
+    try {
+      setPhotos(await deleteMyPhoto(id));
+    } catch (e) {
+      setPhotoErr(e instanceof Error ? e.message : "Fotoğraf silinemedi.");
+    } finally {
+      setRemovingId(null);
     }
   }
 
@@ -232,10 +245,10 @@ export function AccountScreen({
             <PhotoAdd label="Fotoğraf ekle" busy={photoBusy} onPick={(file) => void addPhoto(file)} />
           </div>
           <p className="mt-3 text-xs text-[var(--muted)]">
-            İş karelerin burada. Hizmet veren kartında yorumların yanında görünür.
+            İş karelerin burada. Hizmet veren kartında yorumların yanında görünür. Silmek için ×.
           </p>
           {photos.length ? (
-            <PhotoStrip photos={photos} />
+            <PhotoStrip photos={photos} onRemove={(id) => void removePhoto(id)} removingId={removingId} />
           ) : (
             <p className="mt-3 text-sm text-[var(--muted)]">Henüz fotoğraf yok.</p>
           )}

@@ -3,19 +3,42 @@
 import { useState } from "react";
 import type { Review, WorkPhoto } from "@/lib/types";
 
-export function PhotoStrip({ photos, size = "md" }: { photos: WorkPhoto[]; size?: "sm" | "md" }) {
+export function PhotoStrip({
+  photos,
+  size = "md",
+  onRemove,
+  removingId,
+}: {
+  photos: WorkPhoto[];
+  size?: "sm" | "md";
+  onRemove?: (id: string) => void;
+  removingId?: string | null;
+}) {
   if (!photos.length) return null;
   const dim = size === "sm" ? "h-16 w-16" : "h-24 w-24";
   return (
-    <ul className="mt-3 flex gap-2 overflow-x-auto pb-1">
+    <ul className="mt-3 flex gap-2 overflow-x-auto pt-1 pr-1 pb-1">
       {photos.map((p) => (
-        <li key={p.id} className="shrink-0">
+        <li key={p.id} className="relative shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={p.url}
             alt=""
-            className={`${dim} rounded-2xl object-cover ring-1 ring-[var(--line)]`}
+            className={`${dim} rounded-2xl object-cover ring-1 ring-[var(--line)] ${
+              removingId === p.id ? "opacity-40" : ""
+            }`}
           />
+          {onRemove && (
+            <button
+              type="button"
+              aria-label="Fotoğrafı sil"
+              disabled={Boolean(removingId)}
+              onClick={() => onRemove(p.id)}
+              className="k-press absolute -top-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-[var(--ink)] text-xs leading-none text-[var(--paper)]"
+            >
+              ×
+            </button>
+          )}
         </li>
       ))}
     </ul>

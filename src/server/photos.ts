@@ -60,6 +60,11 @@ function writeFile(buf: Buffer) {
   return { id, ...kind, now: new Date().toISOString() };
 }
 
+function unlinkPhotoFile(id: string, ext: string) {
+  const file = path.join(uploadsDir(), `${id}.${ext}`);
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
 export async function bufferFromUpload(req: Request) {
   const ct = req.headers.get("content-type") ?? "";
   if (ct.includes("multipart/form-data")) {
@@ -170,11 +175,19 @@ export function deletePortfolioForUser(userId: string) {
   const rows = db()
     .prepare(`SELECT id, ext FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'`)
     .all(userId) as { id: string; ext: string }[];
-  for (const row of rows) {
-    const file = path.join(uploadsDir(), `${row.id}.${row.ext}`);
-    if (fs.existsSync(file)) fs.unlinkSync(file);
-  }
+  for (const row of rows) unlinkPhotoFile(row.id, row.ext);
   db().prepare(`DELETE FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'`).run(userId);
+}
+
+export function deletePortfolioPhoto(userId: string, photoId: string) {
+  const row = db()
+    .prepare(
+      `SELECT id, ext FROM gallery_photos WHERE id = ? AND provider_id = ? AND kind = 'portfolio'`,
+    )
+    .get(photoId, userId) as { id: string; ext: string } | undefined;
+  if (!row) throw new ApiError(404, "Fotoğraf yok.", "NOT_FOUND");
+  unlinkPhotoFile(row.id, row.ext);
+  db().prepare("DELETE FROM gallery_photos WHERE id = ?").run(row.id);
 }
 
 export function addReviewPhoto(reviewId: string, buf: Buffer): WorkPhoto {
