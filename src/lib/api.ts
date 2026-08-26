@@ -24,6 +24,10 @@ async function readJson<T>(res: Response): Promise<T> {
   return data;
 }
 
+function unwrap<T>(data: { data?: T } & Partial<T>): T {
+  return (data.data ?? data) as T;
+}
+
 export function useCatalog() {
   const [catalog, setCatalog] = useState<Catalog>({ providers: [], dropPoints: [] });
   const [ready, setReady] = useState(false);
@@ -49,8 +53,8 @@ export function useOrders() {
 
   const reload = useCallback(async () => {
     try {
-      const data = await readJson<{ orders: Order[] }>(await fetch("/api/orders"));
-      setOrders(data.orders);
+      const data = unwrap(await readJson<{ data?: { orders: Order[] }; orders?: Order[] }>(await fetch("/api/orders")));
+      setOrders(data.orders ?? []);
       setReady(true);
     } catch {
       setOrders([]);
@@ -68,14 +72,16 @@ export function useOrders() {
 }
 
 export async function postOrder(input: CreateOrderInput) {
-  const data = await readJson<{ order: Order }>(
-    await fetch("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    }),
+  const data = unwrap(
+    await readJson<{ data?: { order: Order }; order?: Order }>(
+      await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+    ),
   );
-  return data.order;
+  return data.order!;
 }
 
 export async function patchOrder(
@@ -83,14 +89,16 @@ export async function patchOrder(
   action: "accept" | "reject" | "advance" | "deliver",
   code?: string,
 ) {
-  const data = await readJson<{ order: Order }>(
-    await fetch(`/api/orders/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, code }),
-    }),
+  const data = unwrap(
+    await readJson<{ data?: { order: Order }; order?: Order }>(
+      await fetch(`/api/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, code }),
+      }),
+    ),
   );
-  return data.order;
+  return data.order!;
 }
 
 export function useSession() {

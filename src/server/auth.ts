@@ -23,8 +23,8 @@ export async function requireAccount(): Promise<Account> {
   return toAccount(await requireAuth());
 }
 
-export async function requireReadyAccount(): Promise<Account> {
-  const user = await requireAuth();
+export async function requireReadyAccount(request?: Request): Promise<Account> {
+  const user = await requireAuth(request);
   if (!user.name.trim() || !user.identityVerified || !user.passkeyEnabled) {
     throw new ApiError(403, "Kimlik ve cihaz kilidi tamamlanmadan sipariş yok.", "FORBIDDEN");
   }

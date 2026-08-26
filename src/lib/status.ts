@@ -1,4 +1,18 @@
-import type { OrderStatus, PackageId } from "./types";
+import type { ApiLifecycle, OrderStatus, PackageId } from "./types";
+
+export const LIFECYCLE_FROM_PILOT: Record<OrderStatus, ApiLifecycle> = {
+  onay_bekliyor: "pending",
+  teslim_alindi: "accepted",
+  yikaniyor: "washing",
+  utuleniyor: "ironing",
+  hazir: "ready",
+  teslim_edildi: "completed",
+  iptal: "cancelled",
+};
+
+export function toLifecycle(status: OrderStatus): ApiLifecycle {
+  return LIFECYCLE_FROM_PILOT[status];
+}
 
 export function nextStatus(current: OrderStatus, packageId: PackageId): OrderStatus | null {
   if (current === "onay_bekliyor") return "teslim_alindi";
