@@ -113,8 +113,13 @@ export function canSeeOrder(user: AuthUser, row: OrderRow) {
   return false;
 }
 
+/** Şimdilik kapalı: PWA masasında siparişi gören (müşteri dahil) kabul/ilerletsin. */
+const REQUIRE_PROVIDER_TO_MUTATE = false;
+
 function canMutateOrder(user: AuthUser, row: OrderRow) {
   if (user.role === "admin") return true;
+  if (!canSeeOrder(user, row)) return false;
+  if (!REQUIRE_PROVIDER_TO_MUTATE) return true;
   return user.role === "provider" && row.provider_id === user.id;
 }
 
