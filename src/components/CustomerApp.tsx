@@ -10,6 +10,7 @@ import { postOrder, postReview, useCatalog, useOrders } from "@/lib/api";
 import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
 import { trackSteps } from "@/lib/status";
 import { PhotoStrip, ReviewComposer, ReviewList } from "@/components/Photos";
+import { Avatar } from "@/components/Avatar";
 import type {
   DropMethod,
   DropPoint,
@@ -38,6 +39,7 @@ type Props = {
   mapActive?: boolean;
   loyaltyRate?: number;
   loyaltyLabel?: string;
+  meAvatar?: string | null;
   onOpenOrders?: () => void;
   onPlacedOrder?: () => void;
   onBackToMap?: () => void;
@@ -48,6 +50,7 @@ export function CustomerApp({
   mapActive = true,
   loyaltyRate = 0,
   loyaltyLabel = "Komşu",
+  meAvatar,
   onOpenOrders,
   onPlacedOrder,
   onBackToMap,
@@ -177,6 +180,7 @@ export function CustomerApp({
         selectedId={selectedId}
         dropId={drop === "nokta" ? dropId : null}
         user={user}
+        meAvatar={meAvatar}
         providers={providers}
         dropPoints={dropPoints}
         visible={mapActive}
@@ -461,9 +465,10 @@ function List({
                 <button
                   type="button"
                   onClick={() => onPick(p.id)}
-                  className="k-card flex w-full items-start justify-between rounded-2xl bg-[var(--paper)] px-3 py-3 text-left ring-1 ring-[var(--line)]"
+                  className="k-card flex w-full items-center gap-3 rounded-2xl bg-[var(--paper)] px-3 py-3 text-left ring-1 ring-[var(--line)]"
                 >
-                  <span className="min-w-0">
+                  <Avatar name={p.name} url={p.avatarUrl} />
+                  <span className="min-w-0 flex-1">
                     <span className="block font-medium">{p.name}</span>
                     <span className="mt-0.5 block text-xs text-[var(--muted)]">
                       {p.neighborhood} · {formatKm(km)} · {trustLabel(p.trust)}
@@ -523,17 +528,26 @@ function ProviderPane({
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
         ← Liste
       </button>
-      <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">{p.name}</h2>
-      <p className="text-sm text-[var(--muted)]">
-        {p.neighborhood} · {formatKm(km)} · {p.rating} ({p.reviews} yorum) ·{" "}
-        <span
-          className={
-            tone === "full" ? "text-[var(--load-full)]" : tone === "low" ? "text-[var(--load-low)]" : ""
-          }
-        >
-          {p.remaining <= 0 ? "bugün dolu" : `bugün ${p.remaining} parça yer`}
-        </span>
-      </p>
+      <div className="mt-2 flex items-start gap-3">
+        <Avatar name={p.name} url={p.avatarUrl} size="lg" />
+        <div className="min-w-0">
+          <h2 className="font-[family-name:var(--font-display)] text-2xl">{p.name}</h2>
+          <p className="text-sm text-[var(--muted)]">
+            {p.neighborhood} · {formatKm(km)} · {p.rating} ({p.reviews} yorum) ·{" "}
+            <span
+              className={
+                tone === "full"
+                  ? "text-[var(--load-full)]"
+                  : tone === "low"
+                    ? "text-[var(--load-low)]"
+                    : ""
+              }
+            >
+              {p.remaining <= 0 ? "bugün dolu" : `bugün ${p.remaining} parça yer`}
+            </span>
+          </p>
+        </div>
+      </div>
       <p className="mt-3 text-sm leading-relaxed">{p.bio}</p>
       {(p.workPhotos.length > 0 || p.recentReviews.length > 0) && (
         <>

@@ -9,6 +9,7 @@ export type AuthUser = {
   role: UserRole;
   identityVerified: boolean;
   passkeyEnabled: boolean;
+  avatarUrl: string | null;
 };
 
 export function toAuthUser(row: UserRow): AuthUser {
@@ -21,6 +22,7 @@ export function toAuthUser(row: UserRow): AuthUser {
     role: row.role === "provider" || row.role === "admin" ? row.role : "customer",
     identityVerified: Boolean(row.identity_verified),
     passkeyEnabled: Boolean(row.passkey_id),
+    avatarUrl: row.avatar_url || null,
   };
 }
 
@@ -32,6 +34,7 @@ export function toAccount(user: AuthUser): Account {
     identityVerified: user.identityVerified,
     passkeyEnabled: user.passkeyEnabled,
     role: user.role,
+    avatarUrl: user.avatarUrl,
   };
 }
 
@@ -43,5 +46,6 @@ export function publicUser(user: AuthUser) {
     role: user.role,
     identityVerified: user.identityVerified,
     passkeyEnabled: user.passkeyEnabled,
+    avatarUrl: user.avatarUrl,
   };
 }

@@ -5,6 +5,7 @@ import { canAddPhotos } from "@/lib/status";
 import type { OrderStatus, WorkPhoto } from "@/lib/types";
 import { db, uploadsDir } from "./db";
 import { ApiError } from "./rules";
+import { setUserAvatar } from "@/lib/db/auth";
 
 export const PHOTO_MAX = 4;
 export const PORTFOLIO_MAX = 16;
@@ -173,10 +174,14 @@ export function portfolioForUser(userId: string, limit = 16): WorkPhoto[] {
 
 export function deletePortfolioForUser(userId: string) {
   const rows = db()
-    .prepare(`SELECT id, ext FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'`)
+    .prepare(
+      `SELECT id, ext FROM gallery_photos WHERE provider_id = ? AND kind IN ('portfolio', 'avatar')`,
+    )
     .all(userId) as { id: string; ext: string }[];
   for (const row of rows) unlinkPhotoFile(row.id, row.ext);
-  db().prepare(`DELETE FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'`).run(userId);
+  db()
+    .prepare(`DELETE FROM gallery_photos WHERE provider_id = ? AND kind IN ('portfolio', 'avatar')`)
+    .run(userId);
 }
 
 export function deletePortfolioPhoto(userId: string, photoId: string) {
@@ -188,6 +193,26 @@ export function deletePortfolioPhoto(userId: string, photoId: string) {
   if (!row) throw new ApiError(404, "Fotoğraf yok.", "NOT_FOUND");
   unlinkPhotoFile(row.id, row.ext);
   db().prepare("DELETE FROM gallery_photos WHERE id = ?").run(row.id);
+}
+
+export function setAvatarPhoto(userId: string, buf: Buffer) {
+  const exists = db().prepare("SELECT id FROM users WHERE id = ?").get(userId);
+  if (!exists) throw new ApiError(404, "Hesap bulunamadı.");
+  const old = db()
+    .prepare(`SELECT id, ext FROM gallery_photos WHERE provider_id = ? AND kind = 'avatar'`)
+    .all(userId) as { id: string; ext: string }[];
+  for (const row of old) unlinkPhotoFile(row.id, row.ext);
+  db().prepare(`DELETE FROM gallery_photos WHERE provider_id = ? AND kind = 'avatar'`).run(userId);
+  const file = writeFile(buf);
+  db()
+    .prepare(
+      `INSERT INTO gallery_photos (id, provider_id, order_id, review_id, kind, mime, ext, created_at)
+       VALUES (?, ?, NULL, NULL, 'avatar', ?, ?, ?)`,
+    )
+    .run(file.id, userId, file.mime, file.ext, file.now);
+  const url = `/api/photos/${file.id}`;
+  setUserAvatar(userId, url);
+  return url;
 }
 
 export function addReviewPhoto(reviewId: string, buf: Buffer): WorkPhoto {

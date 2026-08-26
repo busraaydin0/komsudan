@@ -187,7 +187,7 @@ export const PROVIDERS: Provider[] = [
     workPhotos: [],
     recentReviews: [],
   },
-];
+].map((p) => ({ ...p, avatarUrl: `/avatars/${p.id}.jpg` })) as Provider[];
 
 export const SEED_REVIEWS: Review[] = [
   {

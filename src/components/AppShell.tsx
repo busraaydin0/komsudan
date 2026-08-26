@@ -67,6 +67,7 @@ export function AppShell() {
           mapActive={tab === "harita"}
           loyaltyRate={loyalty?.rate ?? 0}
           loyaltyLabel={loyalty?.label ?? "Komşu"}
+          meAvatar={account.avatarUrl}
           onOpenOrders={() => go("siparis")}
           onPlacedOrder={() => go("siparis")}
           onBackToMap={() => go("harita")}

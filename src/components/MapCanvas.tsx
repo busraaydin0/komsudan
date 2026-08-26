@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Map, Marker, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import { PILOT } from "@/lib/data";
+import { initials } from "@/lib/avatar";
 import { seatTone } from "@/lib/seat";
 import type { DropPoint, LngLat, MapMode, Provider } from "@/lib/types";
 
@@ -33,6 +34,7 @@ type Props = {
   selectedId: string | null;
   dropId: string | null;
   user: LngLat | null;
+  meAvatar?: string | null;
   providers: Provider[];
   dropPoints: DropPoint[];
   onSelect: (id: string) => void;
@@ -51,7 +53,7 @@ let cameraGen = 0;
 
 function pinKey(providers: Provider[], dropPoints: DropPoint[]) {
   return [
-    ...providers.map((p) => `${p.id}:${p.loc.lng}:${p.loc.lat}:${p.rating}`),
+    ...providers.map((p) => `${p.id}:${p.loc.lng}:${p.loc.lat}:${p.avatarUrl ?? ""}`),
     ...dropPoints.map((d) => `${d.id}:${d.loc.lng}:${d.loc.lat}`),
   ].join("|");
 }
@@ -61,6 +63,7 @@ export function MapCanvas({
   selectedId,
   dropId,
   user,
+  meAvatar,
   providers,
   dropPoints,
   onSelect,
@@ -143,7 +146,23 @@ export function MapCanvas({
       el.dataset.id = p.id;
       el.dataset.load = seatTone(p.remaining, p.capacity);
       el.style.setProperty("--pin-delay", `${i * 40}ms`);
-      el.innerHTML = `<span class="dot">${p.rating.toFixed(1)}</span><span class="stem"></span>`;
+      el.setAttribute("aria-label", p.name);
+      const face = document.createElement("span");
+      face.className = "face";
+      if (p.avatarUrl) {
+        const img = document.createElement("img");
+        img.src = p.avatarUrl;
+        img.alt = "";
+        face.appendChild(img);
+      } else {
+        face.textContent = initials(p.name);
+      }
+      const rate = document.createElement("span");
+      rate.className = "rate";
+      rate.textContent = p.rating.toFixed(1);
+      const stem = document.createElement("span");
+      stem.className = "stem";
+      el.append(face, rate, stem);
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         onSelectRef.current(p.id);
@@ -242,15 +261,37 @@ export function MapCanvas({
     if (!inPilot) return;
     if (!userMarker.current) {
       const el = document.createElement("div");
-      el.className = "katla-me";
-      el.innerHTML = `<span></span>`;
+      el.className = meAvatar ? "katla-me has-face" : "katla-me";
+      if (meAvatar) {
+        const img = document.createElement("img");
+        img.src = meAvatar;
+        img.alt = "";
+        el.appendChild(img);
+      } else {
+        el.innerHTML = `<span></span>`;
+      }
       userMarker.current = new Marker({ element: el, anchor: "center" })
         .setLngLat([user.lng, user.lat])
         .addTo(map);
     } else {
       userMarker.current.setLngLat([user.lng, user.lat]);
+      const el = userMarker.current.getElement();
+      const has = Boolean(meAvatar);
+      el.classList.toggle("has-face", has);
+      if (has) {
+        let img = el.querySelector("img");
+        if (!img) {
+          el.innerHTML = "";
+          img = document.createElement("img");
+          img.alt = "";
+          el.appendChild(img);
+        }
+        img.src = meAvatar!;
+      } else if (!el.querySelector("span")) {
+        el.innerHTML = `<span></span>`;
+      }
     }
-  }, [user]);
+  }, [user, meAvatar]);
 
   return (
     <div className="absolute inset-0">

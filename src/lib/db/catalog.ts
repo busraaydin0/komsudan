@@ -6,6 +6,7 @@ export function toProvider(row: { id: string; payload: string; remaining: number
     ...p,
     remaining: row.remaining,
     workPhotos: p.workPhotos ?? [],
+    avatarUrl: p.avatarUrl ?? null,
     recentReviews: p.recentReviews ?? [],
   };
 }

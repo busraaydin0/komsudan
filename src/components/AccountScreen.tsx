@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Loyalty } from "@/lib/loyalty";
 import type { Account, WorkPhoto } from "@/lib/types";
 import { formatPhone } from "@/lib/phone";
-import { deleteMyAccount, deleteMyPhoto, fetchMyPhotos, logoutSession, patchAccount, uploadMyPhoto } from "@/lib/api";
+import { deleteMyAccount, deleteMyPhoto, fetchMyPhotos, logoutSession, patchAccount, uploadMyAvatar, uploadMyPhoto } from "@/lib/api";
 import {
   cameraState,
   clearPermissionAsked,
@@ -18,6 +18,7 @@ import {
 } from "@/lib/permissions";
 import { tl } from "@/lib/pricing";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
+import { Avatar } from "@/components/Avatar";
 
 function PermRow({
   title,
@@ -76,6 +77,8 @@ export function AccountScreen({
   const [photos, setPhotos] = useState<WorkPhoto[]>([]);
   const [photoErr, setPhotoErr] = useState("");
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(account.avatarUrl);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [geo, setGeo] = useState<PermState>("prompt");
   const [push, setPush] = useState<PermState>("prompt");
@@ -96,9 +99,10 @@ export function AccountScreen({
 
   useEffect(() => {
     setName(account.name);
+    setAvatarUrl(account.avatarUrl);
     const stored = localStorage.getItem("komsu_sms");
     if (stored === "0") setSms(false);
-  }, [account.name]);
+  }, [account.name, account.avatarUrl]);
 
   useEffect(() => {
     void fetchMyPhotos()
@@ -137,6 +141,20 @@ export function AccountScreen({
       setPhotoErr(e instanceof Error ? e.message : "Fotoğraf yüklenemedi.");
     } finally {
       setPhotoBusy(false);
+    }
+  }
+
+  async function changeAvatar(file: File) {
+    setAvatarBusy(true);
+    setPhotoErr("");
+    try {
+      const url = await uploadMyAvatar(file);
+      setAvatarUrl(url);
+      await onRefresh();
+    } catch (e) {
+      setPhotoErr(e instanceof Error ? e.message : "Profil fotoğrafı yüklenemedi.");
+    } finally {
+      setAvatarBusy(false);
     }
   }
 
@@ -237,15 +255,38 @@ export function AccountScreen({
 
         <section className="rounded-3xl bg-[var(--card)] p-5 ring-1 ring-[var(--line)]">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="font-[family-name:var(--font-display)] text-xl">Profilim</h2>
-              <p className="mt-1 text-sm">{account.name || "Ad soyad"}</p>
-              <p className="text-xs text-[var(--muted)]">{formatPhone(account.phone)}</p>
+            <div className="flex min-w-0 items-start gap-3">
+              <label className="relative shrink-0 cursor-pointer" aria-label="Profil fotoğrafını değiştir">
+                <Avatar
+                  name={account.name || "K"}
+                  url={avatarUrl}
+                  size="lg"
+                  className={avatarBusy ? "opacity-50" : ""}
+                />
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="user"
+                  className="sr-only"
+                  disabled={avatarBusy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void changeAvatar(file);
+                  }}
+                />
+              </label>
+              <div className="min-w-0 pt-0.5">
+                <h2 className="font-[family-name:var(--font-display)] text-xl">Profilim</h2>
+                <p className="mt-1 text-sm">{account.name || "Ad soyad"}</p>
+                <p className="text-xs text-[var(--muted)]">{formatPhone(account.phone)}</p>
+              </div>
             </div>
-            <PhotoAdd label="Fotoğraf ekle" busy={photoBusy} onPick={(file) => void addPhoto(file)} />
+            <PhotoAdd label="İş karesi" busy={photoBusy} onPick={(file) => void addPhoto(file)} />
           </div>
           <p className="mt-3 text-xs text-[var(--muted)]">
-            İş karelerin burada. Hizmet veren kartında yorumların yanında görünür. Silmek için ×.
+            Yüzün haritada ve listede görünür. İş karelerin hizmet veren kartında yorumların yanında.
+            Silmek için ×.
           </p>
           {photos.length ? (
             <PhotoStrip photos={photos} onRemove={(id) => void removePhoto(id)} removingId={removingId} />

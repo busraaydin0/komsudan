@@ -32,7 +32,7 @@ function deliveryMode(drops: Array<"kapi" | "nokta">): "door" | "point" | "both"
 function seedProviderDirectory() {
   for (const [i, p] of PROVIDERS.entries()) {
     const phone = SEED_PHONES[p.id] ?? `532119${String(i + 1).padStart(4, "0")}`;
-    upsertProviderUser({ id: p.id, phone, fullName: p.name });
+    upsertProviderUser({ id: p.id, phone, fullName: p.name, avatarUrl: p.avatarUrl });
     upsertProfile({
       userId: p.id,
       bio: p.bio,
@@ -43,6 +43,7 @@ function seedProviderDirectory() {
       isFounder: p.trust === "kurucu",
       ratingAvg: p.rating,
       ratingCount: p.reviews,
+      avatarUrl: p.avatarUrl,
     });
     for (const pack of p.packages) {
       upsertPackage({

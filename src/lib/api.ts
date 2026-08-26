@@ -184,6 +184,15 @@ export async function deleteMyPhoto(id: string) {
   return data.data.photos;
 }
 
+export async function uploadMyAvatar(file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = await readJson<{ data: { avatarUrl: string } }>(
+    await fetch("/api/me/avatar", { method: "POST", body }),
+  );
+  return data.data.avatarUrl;
+}
+
 export async function uploadOrderPhoto(orderId: string, file: File) {
   const body = new FormData();
   body.append("file", file);

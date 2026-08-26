@@ -11,6 +11,7 @@ export type UserRow = {
   role: UserRole;
   identity_verified: number;
   passkey_id: string | null;
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -33,7 +34,7 @@ export type RefreshRow = {
   created_at: string;
 };
 
-const USER_SELECT = `id, phone, name, full_name, role, identity_verified, passkey_id, created_at, updated_at`;
+const USER_SELECT = `id, phone, name, full_name, role, identity_verified, passkey_id, avatar_url, created_at, updated_at`;
 
 export function hashToken(value: string) {
   return createHash("sha256").update(value).digest("hex");
@@ -82,6 +83,13 @@ export function markIdentityVerified(id: string, name: string) {
 export function setPasskey(id: string, credentialId: string) {
   const now = new Date().toISOString();
   db().prepare("UPDATE users SET passkey_id = ?, updated_at = ? WHERE id = ?").run(credentialId, now, id);
+  return getUserById(id)!;
+}
+
+export function setUserAvatar(id: string, url: string | null) {
+  const now = new Date().toISOString();
+  db().prepare("UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?").run(url, now, id);
+  db().prepare("UPDATE provider_profiles SET avatar_url = ?, updated_at = ? WHERE user_id = ?").run(url, now, id);
   return getUserById(id)!;
 }
 
@@ -181,7 +189,7 @@ export function insertSession(token: string, userId: string, expiresAt: string) 
 export function getUserBySession(token: string): UserRow | undefined {
   return db()
     .prepare(
-      `SELECT u.id, u.phone, u.name, u.full_name, u.role, u.identity_verified, u.passkey_id, u.created_at, u.updated_at
+      `SELECT u.id, u.phone, u.name, u.full_name, u.role, u.identity_verified, u.passkey_id, u.avatar_url, u.created_at, u.updated_at
        FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token = ? AND s.expires_at > ?`,
     )

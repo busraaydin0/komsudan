@@ -60,17 +60,22 @@ export function upsertProviderUser(input: {
   id: string;
   phone: string;
   fullName: string;
+  avatarUrl?: string | null;
 }) {
   const now = new Date().toISOString();
   db()
     .prepare(
-      `INSERT INTO users (id, phone, name, full_name, role, identity_verified, passkey_id, created_at, updated_at)
-       VALUES (@id, @phone, @fullName, @fullName, 'provider', 1, NULL, @now, @now)
+      `INSERT INTO users (id, phone, name, full_name, role, identity_verified, passkey_id, avatar_url, created_at, updated_at)
+       VALUES (@id, @phone, @fullName, @fullName, 'provider', 1, NULL, @avatarUrl, @now, @now)
        ON CONFLICT(id) DO UPDATE SET
          role = 'provider',
-         identity_verified = 1`,
+         identity_verified = 1,
+         avatar_url = CASE
+           WHEN users.avatar_url IS NULL OR users.avatar_url = '' THEN excluded.avatar_url
+           ELSE users.avatar_url
+         END`,
     )
-    .run({ ...input, now });
+    .run({ ...input, avatarUrl: input.avatarUrl ?? null, now });
 }
 
 export function upsertProfile(input: {
@@ -83,6 +88,7 @@ export function upsertProfile(input: {
   isFounder: boolean;
   ratingAvg: number;
   ratingCount: number;
+  avatarUrl?: string | null;
 }) {
   const now = new Date().toISOString();
   db()
@@ -92,16 +98,22 @@ export function upsertProfile(input: {
          verification_status, status, commission_rate, rating_avg, rating_count,
          completed_orders, updated_at
        ) VALUES (
-         @userId, @bio, NULL, @lat, @lng, @neighborhood, @hasDryer, @isFounder,
+         @userId, @bio, @avatarUrl, @lat, @lng, @neighborhood, @hasDryer, @isFounder,
          'verified', 'active', 0.10, @ratingAvg, @ratingCount, 0, @now
        )
        ON CONFLICT(user_id) DO UPDATE SET
          rating_avg = excluded.rating_avg,
          rating_count = excluded.rating_count,
-         is_founder = excluded.is_founder`,
+         is_founder = excluded.is_founder,
+         avatar_url = CASE
+           WHEN provider_profiles.avatar_url IS NULL OR provider_profiles.avatar_url = ''
+           THEN excluded.avatar_url
+           ELSE provider_profiles.avatar_url
+         END`,
     )
     .run({
       ...input,
+      avatarUrl: input.avatarUrl ?? null,
       hasDryer: input.hasDryer ? 1 : 0,
       isFounder: input.isFounder ? 1 : 0,
       now,
@@ -116,6 +128,16 @@ export function getProfile(userId: string): ProfileRow | undefined {
        WHERE p.user_id = ?`,
     )
     .get(userId) as ProfileRow | undefined;
+}
+
+export function listAvatarUrls() {
+  const rows = db()
+    .prepare(
+      `SELECT user_id, avatar_url FROM provider_profiles
+       WHERE avatar_url IS NOT NULL AND avatar_url != ''`,
+    )
+    .all() as { user_id: string; avatar_url: string }[];
+  return Object.fromEntries(rows.map((row) => [row.user_id, row.avatar_url]));
 }
 
 export function listProfilesInBox(box: { south: number; north: number; west: number; east: number }) {

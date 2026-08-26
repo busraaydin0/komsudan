@@ -17,6 +17,7 @@ function ensureColumns(db: Database.Database) {
   addColumn(db, "orders", "user_id", "user_id TEXT");
   addColumn(db, "users", "role", "role TEXT NOT NULL DEFAULT 'customer'");
   addColumn(db, "users", "full_name", "full_name TEXT NOT NULL DEFAULT ''");
+  addColumn(db, "users", "avatar_url", "avatar_url TEXT");
   addColumn(db, "otp_codes", "consumed_at", "consumed_at TEXT");
   db.exec(`
     UPDATE users SET full_name = name WHERE (full_name = '' OR full_name IS NULL) AND name != '';

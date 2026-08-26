@@ -54,6 +54,7 @@ export type Provider = {
   drops: DropMethod[];
   slots: string[];
   bio: string;
+  avatarUrl?: string | null;
   workPhotos: WorkPhoto[];
   recentReviews: Review[];
 };
@@ -107,4 +108,5 @@ export type Account = {
   identityVerified: boolean;
   passkeyEnabled: boolean;
   role: "customer" | "provider" | "admin";
+  avatarUrl?: string | null;
 };

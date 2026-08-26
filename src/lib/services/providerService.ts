@@ -61,6 +61,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     id: row.user_id,
     fullName: row.full_name,
     bio: row.bio ?? "",
+    avatarUrl: row.avatar_url,
     neighborhood: row.neighborhood ?? "",
     lat: row.lat,
     lng: row.lng,
