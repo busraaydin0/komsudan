@@ -4,6 +4,14 @@ import type { PackageId, Provider } from "./types";
 export const MIN_ORDER = 100;
 export const COMMISSION = 0.1;
 export const EXPRESS_BUMP = 0.25;
+export const PIECES_MIN = 1;
+export const PIECES_MAX = 80;
+
+export function clampPieces(n: number, remaining?: number) {
+  const cap = remaining && remaining > 0 ? Math.min(PIECES_MAX, remaining) : PIECES_MAX;
+  if (!Number.isFinite(n)) return PIECES_MIN;
+  return Math.min(cap, Math.max(PIECES_MIN, Math.round(n)));
+}
 
 export function estimate(pieces: number, packageId: PackageId, express: boolean, loyaltyRate = 0) {
   const base = PACKAGES.find((p) => p.id === packageId)?.pricePerPiece ?? 0;

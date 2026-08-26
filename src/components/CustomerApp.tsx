@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { PILOT, trustLabel } from "@/lib/data";
 import { formatKm, kmBetween } from "@/lib/geo";
-import { estimateFor, tl } from "@/lib/pricing";
+import { estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
 import { postOrder, postReview, useCatalog, useOrders } from "@/lib/api";
 import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
@@ -328,14 +328,17 @@ export function CustomerApp({
                   setSheet("list");
                   setSelectedId(null);
                 }}
-                onNext={() => setSheet("checkout")}
+                onNext={() => {
+                  setPieces((n) => clampPieces(n, selected.remaining));
+                  setSheet("checkout");
+                }}
               />
             )}
             {sheet === "checkout" && selected && (
               <Checkout
                 p={selected}
                 pieces={pieces}
-                onPieces={setPieces}
+                onPieces={(n) => setPieces(clampPieces(n, selected.remaining))}
                 express={express}
                 onExpress={setExpress}
                 drop={drop}
@@ -630,6 +633,23 @@ function Checkout({
   onBack: () => void;
   onPlace: () => void;
 }) {
+  const cap = Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
+  const [draft, setDraft] = useState(String(pieces));
+
+  useEffect(() => {
+    setDraft(String(pieces));
+  }, [pieces]);
+
+  function typePieces(raw: string) {
+    const digits = raw.replace(/\D/g, "").slice(0, 2);
+    setDraft(digits);
+    if (digits) onPieces(clampPieces(Number(digits), p.remaining));
+  }
+
+  function commitPieces() {
+    onPieces(clampPieces(Number(draft) || PIECES_MIN, p.remaining));
+  }
+
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
@@ -637,10 +657,40 @@ function Checkout({
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Kaç parça?</h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        Gömlek, pantolon, tişört birer parça. Nevresim / yorgan iki sayılır.
+        Gömlek, pantolon, tişört birer parça. Nevresim / yorgan iki sayılır. Sen yaz, 1–{cap}.
       </p>
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          aria-label="Bir parça azalt"
+          disabled={pieces <= PIECES_MIN}
+          onClick={() => onPieces(pieces - 1)}
+          className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
+        >
+          −
+        </button>
+        <input
+          inputMode="numeric"
+          pattern="[0-9]*"
+          aria-label="Parça sayısı"
+          value={draft}
+          onChange={(e) => typePieces(e.target.value)}
+          onBlur={commitPieces}
+          className="h-11 w-20 rounded-2xl bg-[var(--paper)] text-center font-[family-name:var(--font-display)] text-2xl tabular-nums ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
+        />
+        <button
+          type="button"
+          aria-label="Bir parça ekle"
+          disabled={pieces >= cap}
+          onClick={() => onPieces(pieces + 1)}
+          className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
+        >
+          +
+        </button>
+        <span className="text-sm text-[var(--muted)]">parça</span>
+      </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {PIECES.map((n) => (
+        {PIECES.filter((n) => n <= cap).map((n) => (
           <button
             key={n}
             type="button"
@@ -651,10 +701,13 @@ function Checkout({
                 : "ring-[var(--line)]"
             }`}
           >
-            {n} parça
+            {n}
           </button>
         ))}
       </div>
+      {p.remaining > 0 && p.remaining < PIECES_MAX && (
+        <p className="mt-2 text-xs text-[var(--muted)]">Bugün en fazla {p.remaining} parça yer var.</p>
+      )}
       {p.express && (
         <label className="mt-4 flex items-center gap-2 text-sm">
           <input

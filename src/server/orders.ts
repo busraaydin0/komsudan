@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { estimateFor } from "@/lib/pricing";
+import { estimateFor, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { loyaltyRate } from "@/lib/loyalty";
 import { PICKUP_CODE_LEN, PICKUP_CODE_TRIES } from "@/lib/status";
 import type {
@@ -95,8 +95,8 @@ export function getOrder(id: string): Order | undefined {
 
 export function createOrder(input: CreateOrderInput, userId: string): Order {
   const pieces = Math.round(input.pieces);
-  if (!Number.isFinite(pieces) || pieces < 1 || pieces > 80) {
-    throw new ApiError(400, "Parça sayısı 1–80 olmalı.");
+  if (!Number.isFinite(pieces) || pieces < PIECES_MIN || pieces > PIECES_MAX) {
+    throw new ApiError(400, `Parça sayısı ${PIECES_MIN}–${PIECES_MAX} olmalı.`);
   }
 
   const provider = getProvider(input.providerId);
