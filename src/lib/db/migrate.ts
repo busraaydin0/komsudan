@@ -202,6 +202,15 @@ function ensureColumns(db: Database.Database) {
       is_active = 1,
       sort_order = 3
     WHERE id = 'dikis';
+    INSERT OR IGNORE INTO service_categories (id, name, fulfillment_mode, pricing_model)
+    VALUES ('tamir', 'Tamir', 'delivery', 'fixed');
+    UPDATE service_categories SET
+      name = 'Tamir',
+      icon = 'wrench',
+      blurb = 'Elektronik, ev eşyası, mobilya — atölyede yap, teslim al',
+      is_active = 1,
+      sort_order = 4
+    WHERE id = 'tamir';
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS provider_services (
@@ -226,6 +235,36 @@ function ensureColumns(db: Database.Database) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_services_provider ON provider_services(provider_id);
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_repairs (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL REFERENCES provider_profiles(user_id),
+      name TEXT NOT NULL,
+      description TEXT,
+      kind TEXT NOT NULL DEFAULT 'diger',
+      item TEXT,
+      job TEXT NOT NULL DEFAULT 'onarim',
+      photo_url TEXT,
+      price INTEGER NOT NULL DEFAULT 0,
+      price_type TEXT NOT NULL DEFAULT 'sabit',
+      price_unit TEXT NOT NULL DEFAULT 'adet',
+      parts TEXT NOT NULL DEFAULT 'either',
+      lead_days INTEGER,
+      max_per_week INTEGER,
+      delivery_adres INTEGER NOT NULL DEFAULT 1,
+      delivery_nokta INTEGER NOT NULL DEFAULT 1,
+      delivery_yakin INTEGER NOT NULL DEFAULT 0,
+      work_radius_km INTEGER,
+      inspect_required INTEGER NOT NULL DEFAULT 0,
+      quote_from TEXT NOT NULL DEFAULT 'seen',
+      warranty_days INTEGER,
+      notes TEXT,
+      work_hours TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_repairs_provider ON provider_repairs(provider_id);
   `);
   addColumn(db, "orders", "product_id", "product_id TEXT");
   addColumn(db, "orders", "product_name", "product_name TEXT");

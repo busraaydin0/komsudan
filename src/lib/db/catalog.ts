@@ -1,6 +1,7 @@
 import type { DropPoint, Provider } from "@/lib/types";
 import { listProducts, toPublicProduct } from "./products";
 import { listServices, toPublicService } from "./services";
+import { listRepairs, toPublicRepair } from "./repairs";
 
 export function toProvider(row: {
   id: string;
@@ -12,6 +13,7 @@ export function toProvider(row: {
   const categoryId = row.category_id ?? p.categoryId ?? "camasir";
   const products = listProducts(p.id).map(toPublicProduct);
   const services = listServices(p.id).map(toPublicService);
+  const repairs = listRepairs(p.id).map(toPublicRepair);
   return {
     ...p,
     remaining: row.remaining,
@@ -21,6 +23,7 @@ export function toProvider(row: {
     categoryId,
     products: products.length > 0 ? products : (p.products ?? []),
     services: services.length > 0 ? services : (p.services ?? []),
+    repairs: repairs.length > 0 ? repairs : (p.repairs ?? []),
   };
 }
 

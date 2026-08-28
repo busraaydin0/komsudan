@@ -9,6 +9,7 @@ import { setUserAvatar } from "@/lib/db/auth";
 import { countOrderPhotos, insertOrderPhoto, listOrderPhotoRows } from "@/lib/db/orderPhotos";
 import { getProduct, setProductPhotoUrl } from "@/lib/db/products";
 import { getService, setServicePhotoUrl } from "@/lib/db/services";
+import { getRepair, setRepairPhotoUrl } from "@/lib/db/repairs";
 
 export const PHOTO_MAX = 4;
 export const PORTFOLIO_MAX = 16;
@@ -264,6 +265,23 @@ export function setServicePhoto(userId: string, serviceId: string, buf: Buffer):
     .run(file.id, userId, file.mime, file.ext, file.now);
   const url = `/api/photos/${file.id}`;
   setServicePhotoUrl(serviceId, userId, url);
+  return url;
+}
+
+export function setRepairPhoto(userId: string, repairId: string, buf: Buffer): string {
+  const repair = getRepair(repairId);
+  if (!repair || repair.provider_id !== userId) {
+    throw new ApiError(404, "Hizmet bulunamadı.");
+  }
+  const file = writeFile(buf);
+  db()
+    .prepare(
+      `INSERT INTO gallery_photos (id, provider_id, order_id, review_id, kind, mime, ext, created_at)
+       VALUES (?, ?, NULL, NULL, 'repair', ?, ?, ?)`,
+    )
+    .run(file.id, userId, file.mime, file.ext, file.now);
+  const url = `/api/photos/${file.id}`;
+  setRepairPhotoUrl(repairId, userId, url);
   return url;
 }
 

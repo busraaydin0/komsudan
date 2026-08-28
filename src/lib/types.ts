@@ -31,6 +31,39 @@ export type SewingPriceUnit = "adet" | "cift" | "metre" | "kg" | "parca" | "saat
 export type SewingMaterial = "customer" | "provider" | "either";
 export type SewingDelivery = { adres: boolean; nokta: boolean; yakin: boolean };
 
+export type RepairKind = "elektronik" | "ev" | "mobilya" | "bisiklet" | "oyuncak" | "aksesuar" | "diger";
+export type RepairJob = "onarim" | "parca" | "montaj" | "bakim" | "temizlik" | "diger";
+export type RepairPriceType = "sabit" | "baslangic" | "inceleme";
+export type RepairPriceUnit = "adet" | "parca" | "urun" | "saat" | "is";
+export type RepairParts = "included" | "extra" | "customer" | "either";
+export type RepairQuoteFrom = "photo" | "seen";
+export type RepairDelivery = { adres: boolean; nokta: boolean; yakin: boolean };
+
+/** Tamir hizmet kartı. Sabit/başlangıç fiyatta sunucu çarpar; inceleme sonrası 0 ise sipariş yok. */
+export type ProviderRepair = {
+  id: string;
+  name: string;
+  description?: string | null;
+  kind?: RepairKind;
+  item?: string | null;
+  job?: RepairJob;
+  photoUrl?: string | null;
+  price: number;
+  priceType?: RepairPriceType;
+  priceUnit?: RepairPriceUnit;
+  parts?: RepairParts;
+  leadDays?: number | null;
+  maxPerWeek?: number | null;
+  delivery: RepairDelivery;
+  workRadiusKm?: number | null;
+  inspectRequired?: boolean;
+  quoteFrom?: RepairQuoteFrom;
+  warrantyDays?: number | null;
+  notes?: string | null;
+  workHours?: string | null;
+  isActive?: boolean;
+};
+
 /** Dikiş & tadilat hizmet kartı. Fiyat seçilen birim başı; siparişte sunucu çarpar. */
 export type ProviderService = {
   id: string;
@@ -121,6 +154,7 @@ export type Provider = {
   categoryId?: string;
   products?: ProviderProduct[];
   services?: ProviderService[];
+  repairs?: ProviderRepair[];
 };
 
 export type DropPoint = {
@@ -159,7 +193,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis";
+  packageId: PackageId | "davet" | "dikis" | "tamir";
   pieces: number;
   express: boolean;
   drop: DropMethod;

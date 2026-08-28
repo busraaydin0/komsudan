@@ -34,6 +34,15 @@ import {
   updateService,
   type ServiceWrite,
 } from "@/lib/db/services";
+import {
+  countRepairs,
+  deactivateRepair,
+  insertRepair,
+  listRepairs,
+  toPublicRepair,
+  updateRepair,
+  type RepairWrite,
+} from "@/lib/db/repairs";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -104,6 +113,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     packages: listPackages(row.user_id).map(toPackage),
     products: listProducts(row.user_id).map(toProduct),
     services: listServices(row.user_id).map(toPublicService),
+    repairs: listRepairs(row.user_id).map(toPublicRepair),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -179,7 +189,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -440,10 +450,25 @@ export function ensureDikisOffer(
   });
 }
 
+export function ensureTamirOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Tamir. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "tamir",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -457,6 +482,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "dikis") {
     return ensureDikisOffer(user, input);
+  }
+  if (categoryId === "tamir") {
+    return ensureTamirOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -618,6 +646,68 @@ export function patchMyService(user: AuthUser, serviceId: string, input: Service
 export function removeMyService(user: AuthUser, serviceId: string) {
   requireProvider(user);
   if (!deactivateService(serviceId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_REPAIRS = 12;
+
+function assertRepairWrite(input: RepairWrite) {
+  const type = input.priceType ?? "sabit";
+  if (type !== "inceleme" && input.price < 1) {
+    throw new ApiError(400, "Sabit veya başlangıç fiyatı 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
+  }
+  const d = input.delivery;
+  if (d && !d.adres && !d.nokta && !d.yakin) {
+    throw new ApiError(400, "En az bir teslim yöntemi seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyRepairs(user: AuthUser) {
+  requireProvider(user);
+  return listRepairs(user.id, false).map(toPublicRepair);
+}
+
+export function addMyRepair(user: AuthUser, input: RepairWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "tamir") {
+    throw new ApiError(400, "Tamir kartı yalnızca Tamir alanında.", "VALIDATION_ERROR");
+  }
+  assertRepairWrite(input);
+  if (countRepairs(user.id, false) >= MAX_REPAIRS) {
+    throw new ApiError(400, `En fazla ${MAX_REPAIRS} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicRepair(
+    insertRepair(user.id, {
+      ...input,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      item: input.item?.trim() || null,
+      notes: input.notes?.trim() || null,
+      workHours: input.workHours?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyRepair(user: AuthUser, repairId: string, input: RepairWrite) {
+  requireProvider(user);
+  assertRepairWrite(input);
+  const row = updateRepair(repairId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    item: input.item?.trim() || null,
+    notes: input.notes?.trim() || null,
+    workHours: input.workHours?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicRepair(row);
+}
+
+export function removeMyRepair(user: AuthUser, repairId: string) {
+  requireProvider(user);
+  if (!deactivateRepair(repairId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };
