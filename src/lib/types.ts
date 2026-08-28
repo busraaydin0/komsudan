@@ -80,6 +80,45 @@ export type CourierCarry = {
 };
 export type CourierConfirm = { kod: boolean; app: boolean };
 
+export type GardenJobs = {
+  cim: boolean;
+  budama: boolean;
+  ot: boolean;
+  yaprak: boolean;
+  dikim: boolean;
+  saksi: boolean;
+  tasima: boolean;
+  sulama: boolean;
+  duzen: boolean;
+  diger: boolean;
+};
+export type GardenArea = { kucuk: boolean; orta: boolean; buyuk: boolean };
+export type GardenPriceType = "sabit" | "alan" | "durum";
+export type GardenEquipment = "provider" | "customer" | "none";
+export type GardenAvail = "hemen" | "randevu" | "gun";
+
+/** Bahçe & bitki kartı. Sabit fiyatta sunucu çarpar; alan/durum listedeki tutar başlangıç. */
+export type ProviderGarden = {
+  id: string;
+  name: string;
+  description?: string | null;
+  photoUrl?: string | null;
+  jobs: GardenJobs;
+  areas: GardenArea;
+  price: number;
+  priceType?: GardenPriceType;
+  durationMin?: number | null;
+  equipment?: GardenEquipment;
+  location?: string | null;
+  maxKm: number;
+  avail?: GardenAvail;
+  workHours?: string | null;
+  canDo?: string | null;
+  cannotDo?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+};
+
 /** Yakın mesafe kurye kartı. Sabit fiyatta sunucu çarpar; mesafeye göre listedeki tutar başlangıç. */
 export type ProviderCourier = {
   id: string;
@@ -269,6 +308,7 @@ export type Provider = {
   techs?: ProviderTech[];
   washes?: ProviderWash[];
   couriers?: ProviderCourier[];
+  gardens?: ProviderGarden[];
 };
 
 export type DropPoint = {
@@ -307,7 +347,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye";
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce";
   pieces: number;
   express: boolean;
   drop: DropMethod;

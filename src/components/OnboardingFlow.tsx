@@ -124,6 +124,7 @@ export function OnboardingFlow({
         offerCat === "teknoloji" ||
         offerCat === "araba" ||
         offerCat === "kurye" ||
+        offerCat === "bahce" ||
         offerCat === "davet"
           ? offerCat
           : "davet",
@@ -257,7 +258,7 @@ export function OnboardingFlow({
                 <RoleCard
                   on={seek}
                   title="Hizmet arıyorum"
-                  hint="Çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye — komşudan al"
+                  hint="Çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye, bahçe — komşudan al"
                   onClick={() => {
                     setSeek((v) => !v);
                     setErr("");
@@ -266,7 +267,7 @@ export function OnboardingFlow({
                 <RoleCard
                   on={offer}
                   title="Hizmet vermek istiyorum"
-                  hint="Çamaşır, davet, dikiş, tamir, teknoloji, araba veya kurye — alanı sonra seçersin"
+                  hint="Çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye veya bahçe — alanı sonra seçersin"
                   onClick={() => {
                     setOffer((v) => !v);
                     setLaundryAdded(false);
@@ -304,7 +305,7 @@ export function OnboardingFlow({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ara: çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye…"
+                placeholder="Ara: çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye, bahçe…"
                 className="mt-4 w-full rounded-2xl bg-[var(--paper)] px-3 py-3 text-base ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
               />
               {seek && (
@@ -380,6 +381,11 @@ export function OnboardingFlow({
                   {offerCat === "kurye" && (
                     <p className="mt-3 text-xs text-[var(--muted)]">
                       Hizmetlerini Hizmet sekmesinden ekleyeceksin: ulaşım, paket, mesafe, teslim, müsaitlik.
+                    </p>
+                  )}
+                  {offerCat === "bahce" && (
+                    <p className="mt-3 text-xs text-[var(--muted)]">
+                      Hizmetlerini Hizmet sekmesinden ekleyeceksin: tür, alan, fiyat tipi, ekipman, mesafe.
                     </p>
                   )}
                 </>
@@ -470,7 +476,9 @@ function CategoryPick({
               }`}
             >
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--card)] text-lg" aria-hidden>
-                {c.icon === "scooter"
+                {c.icon === "seedling"
+                  ? "🌱"
+                  : c.icon === "scooter"
                   ? "🛵"
                   : c.icon === "car"
                   ? "🚗"

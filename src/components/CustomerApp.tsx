@@ -67,6 +67,19 @@ import {
   dropsForCourier,
   COURIER_UNIT,
 } from "@/lib/courier";
+import {
+  dropsForGarden,
+  gardenAreaList,
+  gardenAvailLabel,
+  gardenCanOrder,
+  gardenDropLabel,
+  gardenDurationLabel,
+  gardenEquipmentLabel,
+  gardenJobList,
+  gardenPriceTypeLabel,
+  gardenQtyBounds,
+  GARDEN_UNIT,
+} from "@/lib/garden";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFood, estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
@@ -89,6 +102,7 @@ import type {
   ProviderTech,
   ProviderWash,
   ProviderCourier,
+  ProviderGarden,
 } from "@/lib/types";
 
 const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), {
@@ -124,6 +138,10 @@ function isAraba(p: Pick<Provider, "categoryId">) {
 
 function isKurye(p: Pick<Provider, "categoryId">) {
   return p.categoryId === "kurye";
+}
+
+function isBahce(p: Pick<Provider, "categoryId">) {
+  return p.categoryId === "bahce";
 }
 
 function laundryInFilter(ids?: string[]) {
@@ -166,6 +184,10 @@ function listPrice(p: Provider): number | null {
   }
   if (isKurye(p)) {
     const prices = (p.couriers ?? []).filter((x) => x.price > 0).map((x) => x.price);
+    return prices.length ? Math.min(...prices) : null;
+  }
+  if (isBahce(p)) {
+    const prices = (p.gardens ?? []).filter((x) => x.price > 0).map((x) => x.price);
     return prices.length ? Math.min(...prices) : null;
   }
   return p.packages.find((x) => x.id === "tam")?.pricePerPiece ?? p.packages.at(-1)?.pricePerPiece ?? null;
@@ -267,12 +289,14 @@ export function CustomerApp({
   const teknoloji = selected ? isTeknoloji(selected) : false;
   const araba = selected ? isAraba(selected) : false;
   const kurye = selected ? isKurye(selected) : false;
+  const bahce = selected ? isBahce(selected) : false;
   const product = selected?.products?.find((x) => x.id === productId) ?? selected?.products?.[0];
   const service = selected?.services?.find((x) => x.id === productId) ?? selected?.services?.[0];
   const repair = selected?.repairs?.find((x) => x.id === productId) ?? selected?.repairs?.[0];
   const tech = selected?.techs?.find((x) => x.id === productId) ?? selected?.techs?.[0];
   const wash = selected?.washes?.find((x) => x.id === productId) ?? selected?.washes?.[0];
   const courier = selected?.couriers?.find((x) => x.id === productId) ?? selected?.couriers?.[0];
+  const garden = selected?.gardens?.find((x) => x.id === productId) ?? selected?.gardens?.[0];
   const quote = selected
     ? davet && product
       ? estimateFood(guests, product.pricePerPerson, loyaltyRate)
@@ -294,7 +318,11 @@ export function CustomerApp({
                       ? estimateFood(guests, courier.price, loyaltyRate)
                       : kurye
                         ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
-                        : estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
+                        : bahce && garden && gardenCanOrder(garden)
+                          ? estimateFood(guests, garden.price, loyaltyRate)
+                          : bahce
+                            ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
+                            : estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
     : { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 };
 
   useEffect(() => {
@@ -356,6 +384,9 @@ export function CustomerApp({
       } else if (isKurye(selected)) {
         const first = selected.couriers?.[0]?.id ?? null;
         setProductId(selected.couriers?.some((x) => x.id === productId) ? productId : first);
+      } else if (isBahce(selected)) {
+        const first = selected.gardens?.[0]?.id ?? null;
+        setProductId(selected.gardens?.some((x) => x.id === productId) ? productId : first);
       } else {
         setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
       }
@@ -409,6 +440,7 @@ export function CustomerApp({
       const teknolojiOrder = isTeknoloji(selected);
       const arabaOrder = isAraba(selected);
       const kuryeOrder = isKurye(selected);
+      const bahceOrder = isBahce(selected);
       if (davetOrder && !allergy.trim()) {
         setErr("Alerji durumunu yaz. Yoksa “yok” de.");
         setPlacing(false);
@@ -430,6 +462,11 @@ export function CustomerApp({
         return;
       }
       if (kuryeOrder && !courierCanOrder(courier)) {
+        setErr("Bu hizmet için fiyat yok.");
+        setPlacing(false);
+        return;
+      }
+      if (bahceOrder && !gardenCanOrder(garden)) {
         setErr("Bu hizmet için fiyat yok.");
         setPlacing(false);
         return;
@@ -490,6 +527,16 @@ export function CustomerApp({
                 ? {
                     providerId: selected.id,
                     productId: courier?.id,
+                    guestCount: guests,
+                    drop,
+                    dropPointId: drop === "nokta" ? dropId : null,
+                    slot,
+                    note,
+                  }
+              : bahceOrder
+                ? {
+                    providerId: selected.id,
+                    productId: garden?.id,
                     guestCount: guests,
                     drop,
                     dropPointId: drop === "nokta" ? dropId : null,
@@ -645,7 +692,9 @@ export function CustomerApp({
                           ? "Araç yıkanır yerinde; getir, al. Eve kimse girmez."
                           : categoryIds?.length === 1 && categoryIds[0] === "kurye"
                             ? "Paket alınır, yakında bırakılır. Eve kimse girmez."
-                            : "Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak."}
+                            : categoryIds?.length === 1 && categoryIds[0] === "bahce"
+                              ? "İş bahçede yapılır; çim, budama, saksı. Eve kimse girmez."
+                              : "Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak."}
               </p>
               <button
                 type="button"
@@ -768,6 +817,13 @@ export function CustomerApp({
                     setGuests((n) => Math.min(max, Math.max(min, n)));
                     const allowed = dropsForCourier(card, selected.drops);
                     setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
+                  } else if (isBahce(selected)) {
+                    const card =
+                      selected.gardens?.find((x) => x.id === productId) ?? selected.gardens?.[0];
+                    const { min, max } = gardenQtyBounds(card, selected.remaining);
+                    setGuests((n) => Math.min(max, Math.max(min, n)));
+                    const allowed = dropsForGarden(card, selected.drops);
+                    setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
                   } else {
                     setPieces((n) => clampPieces(n, selected.remaining));
                   }
@@ -790,8 +846,11 @@ export function CustomerApp({
                 tech={tech}
                 wash={wash}
                 courier={courier}
+                garden={garden}
                 productName={
-                  kurye
+                  bahce
+                    ? garden?.name
+                    : kurye
                     ? courier?.name
                     : araba
                       ? wash?.name
@@ -995,6 +1054,10 @@ function List({
                                   ? (p.couriers ?? []).length
                                     ? ` · ${(p.couriers ?? []).map((x) => x.name).join(", ")}`
                                     : " · hizmet yok"
+                                  : isBahce(p)
+                                    ? (p.gardens ?? []).length
+                                      ? ` · ${(p.gardens ?? []).map((x) => x.name).join(", ")}`
+                                      : " · hizmet yok"
                                 : dryingListLabel(p)
                               ? ` · ${dryingListLabel(p)}`
                               : ""}
@@ -1020,14 +1083,14 @@ function List({
                           ? ((isTamir(p) ? p.repairs : p.techs) ?? []).length
                             ? "inceleme"
                             : "hizmet yok"
-                          : isAraba(p) || isDikis(p) || isKurye(p)
+                          : isAraba(p) || isDikis(p) || isKurye(p) || isBahce(p)
                             ? "hizmet yok"
                             : "menü yok"
                         : isDavet(p)
                           ? `${tl(price)}/kişi`
                           : isAraba(p)
                             ? `${tl(price)}/araç`
-                            : isKurye(p)
+                            : isKurye(p) || isBahce(p)
                               ? `${tl(price)}'den`
                             : isDikis(p) || isTamir(p) || isTeknoloji(p)
                             ? `${tl(price)}'den`
@@ -1070,7 +1133,8 @@ function ProviderPane({
   const teknoloji = isTeknoloji(p);
   const araba = isAraba(p);
   const kurye = isKurye(p);
-  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye;
+  const bahce = isBahce(p);
+  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye || bahce;
   const items = davet
     ? (p.products ?? [])
     : dikis
@@ -1083,6 +1147,8 @@ function ProviderPane({
             ? (p.washes ?? [])
             : kurye
               ? (p.couriers ?? [])
+              : bahce
+                ? (p.gardens ?? [])
             : p.packages;
   const canNext = unitCatalog ? items.length > 0 : p.packages.length > 0;
   return (
@@ -1109,7 +1175,7 @@ function ProviderPane({
                 ? "bugün dolu"
                 : davet
                   ? `bugün ${p.remaining} kişilik yer`
-                  : dikis || tamir || teknoloji || araba || kurye
+                  : dikis || tamir || teknoloji || araba || kurye || bahce
                     ? `bugün ${p.remaining} yer`
                     : `bugün ${p.remaining} parça yer`}
             </span>
@@ -1339,6 +1405,39 @@ function ProviderPane({
                   </span>
                 </button>
               ))
+          : bahce
+            ? (p.gardens ?? []).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onProduct(item.id)}
+                  className={`k-chip flex w-full gap-3 rounded-2xl px-3 py-3 text-left ring-1 ${
+                    productId === item.id
+                      ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
+                      : "bg-[var(--paper)] ring-[var(--line)]"
+                  }`}
+                >
+                  {item.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                  ) : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex justify-between font-medium">
+                      {item.name}
+                      <span className="tabular-nums">
+                        {item.priceType === "sabit" ? `${tl(item.price)}/iş` : `${tl(item.price)}'den`}
+                      </span>
+                    </span>
+                    {(item.description || gardenJobList(item.jobs).length) && (
+                      <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                        {[gardenJobList(item.jobs).slice(0, 3).join(", ") || null, item.description]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              ))
           : p.packages.map((pack) => (
               <button
                 key={pack.id}
@@ -1375,6 +1474,9 @@ function ProviderPane({
         {kurye && (p.couriers ?? []).length === 0 && (
           <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
         )}
+        {bahce && (p.gardens ?? []).length === 0 && (
+          <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
+        )}
       </div>
       <button
         type="button"
@@ -1402,6 +1504,7 @@ function Checkout({
   tech,
   wash,
   courier,
+  garden,
   productName,
   express,
   onExpress,
@@ -1434,6 +1537,7 @@ function Checkout({
   tech?: ProviderTech;
   wash?: ProviderWash;
   courier?: ProviderCourier;
+  garden?: ProviderGarden;
   productName?: string;
   express: boolean;
   onExpress: (v: boolean) => void;
@@ -1459,8 +1563,11 @@ function Checkout({
   const teknoloji = isTeknoloji(p);
   const araba = isAraba(p);
   const kurye = isKurye(p);
-  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye;
-  const unit = kurye
+  const bahce = isBahce(p);
+  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye || bahce;
+  const unit = bahce
+    ? GARDEN_UNIT
+    : kurye
     ? COURIER_UNIT
     : araba
     ? WASH_UNIT
@@ -1471,7 +1578,9 @@ function Checkout({
         : dikis
           ? sewingUnitMeta(service?.priceUnit)
           : foodUnitMeta(product?.priceUnit);
-  const bounds = kurye
+  const bounds = bahce
+    ? gardenQtyBounds(garden, p.remaining)
+    : kurye
     ? courierQtyBounds(courier, p.remaining)
     : araba
     ? washQtyBounds(wash, p.remaining)
@@ -1484,7 +1593,9 @@ function Checkout({
           : foodQtyBounds(product, p.remaining);
   const cap = unitPriced ? bounds.max : Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
   const minCount = unitPriced ? bounds.min : PIECES_MIN;
-  const foodDrops = kurye
+  const foodDrops = bahce
+    ? dropsForGarden(garden, p.drops)
+    : kurye
     ? dropsForCourier(courier, p.drops)
     : araba
     ? dropsForWash(wash, p.drops)
@@ -1522,7 +1633,9 @@ function Checkout({
   }
 
   const count = unitPriced ? guests : pieces;
-  const unitPrice = kurye
+  const unitPrice = bahce
+    ? (garden?.price ?? 0)
+    : kurye
     ? (courier?.price ?? 0)
     : araba
     ? (wash?.price ?? 0)
@@ -1537,25 +1650,28 @@ function Checkout({
     (!tamir || repairCanOrder(repair)) &&
     (!teknoloji || techCanOrder(tech)) &&
     (!araba || washCanOrder(wash)) &&
-    (!kurye || courierCanOrder(courier));
+    (!kurye || courierCanOrder(courier)) &&
+    (!bahce || gardenCanOrder(garden));
   const qtyTitle =
     unit.id === "kisi" ? "Kaç kişilik?" : unit.id === "kg" ? "Kaç kg?" : `Kaç ${unit.qty}?`;
 
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
-        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye ? "← Hizmet" : "← Paket"}
+        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce ? "← Hizmet" : "← Paket"}
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">
         {unitPriced ? qtyTitle : "Kaç parça?"}
       </h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
         {unitPriced
-          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye ? "Seçili hizmet" : "Seçili yemek")} · ${
+          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye || bahce ? "Seçili hizmet" : "Seçili yemek")} · ${
               (tamir || teknoloji) && !canPlace
                 ? "fiyat inceleme sonrası."
                 : kurye && courier?.priceType === "mesafe"
                   ? `${tl(unitPrice)}'den, mesafeye göre.`
+                : bahce && garden?.priceType && garden.priceType !== "sabit"
+                  ? `${tl(unitPrice)}'den, ${gardenPriceTypeLabel(garden.priceType).toLowerCase()}.`
                 : `${tl(unitPrice)}/${unit.label.toLowerCase()}.`
             } ${bounds.min}–${cap} ${unit.qty}.`
           : `Gömlek, pantolon, tişört birer parça. Nevresim / yorgan iki sayılır. Sen yaz, 1–${cap}.`}
@@ -1750,6 +1866,42 @@ function Checkout({
       {kurye && courierPriceTypeLabel(courier?.priceType) ? (
         <p className="mt-2 text-xs text-[var(--muted)]">{courierPriceTypeLabel(courier?.priceType)}</p>
       ) : null}
+      {bahce && gardenDurationLabel(garden?.durationMin) ? (
+        <p className="mt-3 text-xs text-[var(--muted)]">Tahmini süre: {gardenDurationLabel(garden?.durationMin)}.</p>
+      ) : null}
+      {bahce && gardenJobList(garden?.jobs).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{gardenJobList(garden?.jobs).join(", ")}</p>
+      ) : null}
+      {bahce && gardenAreaList(garden?.areas).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{gardenAreaList(garden?.areas).join(", ")}</p>
+      ) : null}
+      {bahce && gardenEquipmentLabel(garden?.equipment) ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{gardenEquipmentLabel(garden?.equipment)}</p>
+      ) : null}
+      {bahce && garden?.location ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Konum: {garden.location}</p>
+      ) : null}
+      {bahce && garden?.maxKm ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{garden.maxKm} km&apos;ye kadar</p>
+      ) : null}
+      {bahce && gardenAvailLabel(garden?.avail) ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{gardenAvailLabel(garden?.avail)}</p>
+      ) : null}
+      {bahce && garden?.canDo ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Yapar: {garden.canDo}</p>
+      ) : null}
+      {bahce && garden?.cannotDo ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Yapmaz: {garden.cannotDo}</p>
+      ) : null}
+      {bahce && garden?.workHours ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Çalışma saatleri: {garden.workHours}</p>
+      ) : null}
+      {bahce && garden?.notes ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{garden.notes}</p>
+      ) : null}
+      {bahce && gardenPriceTypeLabel(garden?.priceType) ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{gardenPriceTypeLabel(garden?.priceType)}</p>
+      ) : null}
       {davet && product?.allergens && (
         <p className="mt-2 text-xs text-[var(--muted)]">İçerik / alerjen: {product.allergens}</p>
       )}
@@ -1786,7 +1938,9 @@ function Checkout({
               drop === d ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
             }`}
           >
-            {kurye
+            {bahce
+              ? gardenDropLabel(d)
+              : kurye
               ? courierDropLabel(d)
               : araba
               ? washDropLabel(d)
@@ -1840,7 +1994,9 @@ function Checkout({
         value={note}
         onChange={(e) => onNote(e.target.value)}
         placeholder={
-          kurye
+          bahce
+            ? "Musluk, otopark, kapı kodu…"
+            : kurye
             ? "Alıcı, kapı kodu, paket içeriği…"
             : araba
             ? "Plaka, araç tipi, kapı kodu…"
@@ -1912,7 +2068,8 @@ function Track({
   const tech = order.packageId === "teknoloji";
   const wash = order.packageId === "araba";
   const courier = order.packageId === "kurye";
-  const catalog = food || sewing || repair || tech || wash || courier;
+  const garden = order.packageId === "bahce";
+  const catalog = food || sewing || repair || tech || wash || courier || garden;
   const steps = trackSteps(order.packageId, catalog);
   const idx = steps.indexOf(order.status);
   const [busy, setBusy] = useState(false);
@@ -1927,7 +2084,7 @@ function Track({
         {provider?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : sewing || repair || tech || wash || courier
+          : sewing || repair || tech || wash || courier || garden
             ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
             : `${order.pieces} parça`}{" "}
         · {tl(order.total)}

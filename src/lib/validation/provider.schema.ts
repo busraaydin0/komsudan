@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -336,6 +336,57 @@ export const courierCreateSchema = z
   });
 
 export const courierPatchSchema = courierCreateSchema;
+
+const gardenJobsSchema = z.object({
+  cim: z.boolean(),
+  budama: z.boolean(),
+  ot: z.boolean(),
+  yaprak: z.boolean(),
+  dikim: z.boolean(),
+  saksi: z.boolean(),
+  tasima: z.boolean(),
+  sulama: z.boolean(),
+  duzen: z.boolean(),
+  diger: z.boolean(),
+});
+const gardenAreaSchema = z.object({
+  kucuk: z.boolean(),
+  orta: z.boolean(),
+  buyuk: z.boolean(),
+});
+
+export const gardenCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    description: z.string().trim().max(400).optional().nullable(),
+    jobs: gardenJobsSchema.optional(),
+    areas: gardenAreaSchema.optional(),
+    price: z.number({ error: "Fiyat gerekli." }).int().min(1, "Fiyat 1–50.000 ₺.").max(50_000, "Fiyat 1–50.000 ₺."),
+    priceType: z.enum(["sabit", "alan", "durum"]).optional(),
+    durationMin: z.number().int().min(0).max(1440).optional().nullable(),
+    equipment: z.enum(["provider", "customer", "none"]).optional(),
+    location: z.string().trim().max(120).optional().nullable(),
+    maxKm: z.number().int().min(1, "Mesafe 1–50 km.").max(50, "Mesafe 1–50 km.").optional(),
+    avail: z.enum(["hemen", "randevu", "gun"]).optional(),
+    workHours: z.string().trim().max(80).optional().nullable(),
+    canDo: z.string().trim().max(400).optional().nullable(),
+    cannotDo: z.string().trim().max(400).optional().nullable(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.jobs) {
+      const j = val.jobs;
+      if (!j.cim && !j.budama && !j.ot && !j.yaprak && !j.dikim && !j.saksi && !j.tasima && !j.sulama && !j.duzen && !j.diger) {
+        ctx.addIssue({ code: "custom", message: "En az bir hizmet türü seç.", path: ["jobs"] });
+      }
+    }
+    if (val.areas && !val.areas.kucuk && !val.areas.orta && !val.areas.buyuk) {
+      ctx.addIssue({ code: "custom", message: "En az bir alan / iş boyutu seç.", path: ["areas"] });
+    }
+  });
+
+export const gardenPatchSchema = gardenCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

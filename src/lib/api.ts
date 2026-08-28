@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCourier, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCourier, ProviderGarden, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -372,7 +372,7 @@ export async function patchMyProviderProfile(body: {
 }
 
 export async function postMyOffer(body: {
-  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye";
+  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce";
   dryingType?: "makine" | "ip" | "ikisi";
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
@@ -846,5 +846,85 @@ export async function uploadMyCourierPhoto(id: string, file: File) {
 export async function deleteMyCourier(id: string) {
   await readJson(
     await fetch(`/api/providers/me/couriers/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}
+
+export async function postMyGarden(body: {
+  name: string;
+  description?: string | null;
+  jobs?: {
+    cim: boolean;
+    budama: boolean;
+    ot: boolean;
+    yaprak: boolean;
+    dikim: boolean;
+    saksi: boolean;
+    tasima: boolean;
+    sulama: boolean;
+    duzen: boolean;
+    diger: boolean;
+  };
+  areas?: { kucuk: boolean; orta: boolean; buyuk: boolean };
+  price: number;
+  priceType?: "sabit" | "alan" | "durum";
+  durationMin?: number | null;
+  equipment?: "provider" | "customer" | "none";
+  location?: string | null;
+  maxKm?: number;
+  avail?: "hemen" | "randevu" | "gun";
+  workHours?: string | null;
+  canDo?: string | null;
+  cannotDo?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { garden: ProviderGarden }; garden?: ProviderGarden }>(
+      await fetch("/api/providers/me/gardens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.garden!;
+}
+
+export async function fetchMyGardens() {
+  const data = unwrap(
+    await readJson<{ data?: { gardens: ProviderGarden[] }; gardens?: ProviderGarden[] }>(
+      await fetch("/api/providers/me/gardens"),
+    ),
+  );
+  return data.gardens ?? [];
+}
+
+export async function patchMyGarden(id: string, body: Parameters<typeof postMyGarden>[0]) {
+  const data = unwrap(
+    await readJson<{ data?: { garden: ProviderGarden }; garden?: ProviderGarden }>(
+      await fetch(`/api/providers/me/gardens/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.garden!;
+}
+
+export async function uploadMyGardenPhoto(id: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = unwrap(
+    await readJson<{ data?: { photoUrl: string; garden: ProviderGarden }; photoUrl?: string; garden?: ProviderGarden }>(
+      await fetch(`/api/providers/me/gardens/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
+    ),
+  );
+  return data;
+}
+
+export async function deleteMyGarden(id: string) {
+  await readJson(
+    await fetch(`/api/providers/me/gardens/${encodeURIComponent(id)}`, { method: "DELETE" }),
   );
 }

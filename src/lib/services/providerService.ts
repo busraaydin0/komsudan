@@ -70,6 +70,15 @@ import {
   updateCourier,
   type CourierWrite,
 } from "@/lib/db/couriers";
+import {
+  countGardens,
+  deactivateGarden,
+  insertGarden,
+  listGardens,
+  toPublicGarden,
+  updateGarden,
+  type GardenWrite,
+} from "@/lib/db/gardens";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -144,6 +153,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     techs: listTechs(row.user_id).map(toPublicTech),
     washes: listWashes(row.user_id).map(toPublicWash),
     couriers: listCouriers(row.user_id).map(toPublicCourier),
+    gardens: listGardens(row.user_id).map(toPublicGarden),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -219,7 +229,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -540,10 +550,25 @@ export function ensureKuryeOffer(
   });
 }
 
+export function ensureBahceOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Bahçe ve bitki. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "bahce",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -569,6 +594,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "kurye") {
     return ensureKuryeOffer(user, input);
+  }
+  if (categoryId === "bahce") {
+    return ensureBahceOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -1001,6 +1029,87 @@ export function patchMyCourier(user: AuthUser, courierId: string, input: Courier
 export function removeMyCourier(user: AuthUser, courierId: string) {
   requireProvider(user);
   if (!deactivateCourier(courierId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_GARDENS = 12;
+
+function assertGardenWrite(input: GardenWrite) {
+  if (input.price < 1) {
+    throw new ApiError(400, "Fiyat 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
+  }
+  const j = input.jobs;
+  if (
+    j &&
+    !j.cim &&
+    !j.budama &&
+    !j.ot &&
+    !j.yaprak &&
+    !j.dikim &&
+    !j.saksi &&
+    !j.tasima &&
+    !j.sulama &&
+    !j.duzen &&
+    !j.diger
+  ) {
+    throw new ApiError(400, "En az bir hizmet türü seç.", "VALIDATION_ERROR");
+  }
+  const a = input.areas;
+  if (a && !a.kucuk && !a.orta && !a.buyuk) {
+    throw new ApiError(400, "En az bir alan / iş boyutu seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyGardens(user: AuthUser) {
+  requireProvider(user);
+  return listGardens(user.id, false).map(toPublicGarden);
+}
+
+export function addMyGarden(user: AuthUser, input: GardenWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "bahce") {
+    throw new ApiError(400, "Bahçe kartı yalnızca Bahçe & Bitki alanında.", "VALIDATION_ERROR");
+  }
+  assertGardenWrite(input);
+  if (countGardens(user.id, false) >= MAX_GARDENS) {
+    throw new ApiError(400, `En fazla ${MAX_GARDENS} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicGarden(
+    insertGarden(user.id, {
+      ...input,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      location: input.location?.trim() || null,
+      notes: input.notes?.trim() || null,
+      workHours: input.workHours?.trim() || null,
+      canDo: input.canDo?.trim() || null,
+      cannotDo: input.cannotDo?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyGarden(user: AuthUser, gardenId: string, input: GardenWrite) {
+  requireProvider(user);
+  assertGardenWrite(input);
+  const row = updateGarden(gardenId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    location: input.location?.trim() || null,
+    notes: input.notes?.trim() || null,
+    workHours: input.workHours?.trim() || null,
+    canDo: input.canDo?.trim() || null,
+    cannotDo: input.cannotDo?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicGarden(row);
+}
+
+export function removeMyGarden(user: AuthUser, gardenId: string) {
+  requireProvider(user);
+  if (!deactivateGarden(gardenId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };
