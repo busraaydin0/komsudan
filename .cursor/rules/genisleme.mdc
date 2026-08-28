@@ -1,5 +1,5 @@
 ---
-description: Çok kategorili genişleme — Faz 6 ödeme, sonra 6.5 kategori. Atlama.
+description: Çok kategorili genişleme — 6.5 kategori, 6.6 keşif, sonra ev yemeği. Atlama.
 alwaysApply: true
 ---
 
@@ -12,8 +12,10 @@ Kaynak: masaüstü `KOMSUDAN-ROADMAP-GENISLEME.md`. Faz atlama.
 
 ## Sıra
 
-6 Ödeme (bitti) → **6.5 kategori soyutlaması (bitti)** → **7 ev yemeği (Tip A)** → 8 home-visit (Tip B) → 9+ review/dispute/log.
+6 Ödeme (bitti) → 6.5 kategori (bitti) → **6.6 onboarding & keşif** → **7 ev yemeği (Tip A)** → 8 home-visit (Tip B) → 9+ review/dispute/log.
 
-Faz 6.5: `camasir` seed, `category_id` backfill, delivery = mevcut çamaşır, `home_visit` iskelet (`CATEGORY_NOT_READY`). Yeni kategori/UI yok.
+Faz 6.6: rol + kategori (arama) + konum; tercih DB’de (`preferred_category_ids`, `onboarding_completed_at`); harita `category_id` ile. Atlanabilir. Yeni kategori yok. State machine’e dokunma.
+
+Faz 7 (sonra): ev yemeği / davet — kısır, pasta, kurabiye gibi çeşitler. Bu fazda seed/UI yok.
 
 PWA’yı kırma. Tutar/status client’tan alma. Route’ta SQL yok.

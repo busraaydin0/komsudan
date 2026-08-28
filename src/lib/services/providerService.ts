@@ -15,12 +15,14 @@ import {
   type ProfileRow,
   type SlotRow,
 } from "@/lib/db/providers";
+import { getCategory } from "@/lib/db/categories";
 import type { AuthUser } from "@/lib/auth/types";
 
 export type NearbyQuery = {
   lat?: number;
   lng?: number;
   radius?: number;
+  categoryIds?: string[];
 };
 
 function toPackage(row: PackageRow) {
@@ -73,6 +75,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     ratingCount: row.rating_count,
     completedOrders: row.completed_orders,
     commissionRate: row.commission_rate,
+    categoryId: row.category_id ?? "camasir",
     packages: listPackages(row.user_id).map(toPackage),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
@@ -99,7 +102,7 @@ export function listNearby(query: NearbyQuery) {
   const lng = query.lng ?? PILOT.center.lng;
   const radius = query.radius ?? PILOT.radiusKm;
   const origin = { lat, lng };
-  const rows = listProfilesInBox(bbox(lat, lng, radius));
+  const rows = listProfilesInBox(bbox(lat, lng, radius), query.categoryIds);
   return rows
     .map((row) => toPublic(row, origin))
     .filter((p) => (p.distanceKm ?? Infinity) <= radius)
@@ -137,8 +140,12 @@ export function patchMyProfile(
     neighborhood?: string;
     hasDryer?: boolean;
     status?: "active" | "paused";
+    categoryId?: string;
   },
 ) {
+  if (patch.categoryId && !getCategory(patch.categoryId)) {
+    throw new ApiError(400, "Kategori bulunamadı.", "VALIDATION_ERROR");
+  }
   requireProvider(user);
   const row = updateProfileFields(user.id, patch);
   if (!row) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");

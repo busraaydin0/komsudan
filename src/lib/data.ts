@@ -16,6 +16,13 @@ export const PILOT = {
   },
 };
 
+/** Manuel konum seçimi (geo yoksa). Pilot mahalleler. */
+export const NEIGHBORHOODS: { name: string; loc: LngLat }[] = [
+  { name: "Çukurambar", loc: { lng: 32.80286, lat: 39.90313 } },
+  { name: "Söğütözü", loc: { lng: 32.7902, lat: 39.9076 } },
+  { name: "Kızılırmak", loc: { lng: 32.8091, lat: 39.9055 } },
+];
+
 export const PACKAGES: ServicePackage[] = [
   { id: "yikama", title: "Sadece yıkama", blurb: "Yıka, kurut, poşetle", pricePerPiece: 9 },
   { id: "katlama", title: "Yıkama + katlama", blurb: "Düzenli katlanmış teslim", pricePerPiece: 13 },

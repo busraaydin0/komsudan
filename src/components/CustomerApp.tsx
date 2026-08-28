@@ -40,6 +40,9 @@ type Props = {
   loyaltyRate?: number;
   loyaltyLabel?: string;
   meAvatar?: string | null;
+  categoryIds?: string[];
+  homeLat?: number | null;
+  homeLng?: number | null;
   onOpenOrders?: () => void;
   onPlacedOrder?: () => void;
   onBackToMap?: () => void;
@@ -51,11 +54,16 @@ export function CustomerApp({
   loyaltyRate = 0,
   loyaltyLabel = "Komşu",
   meAvatar,
+  categoryIds,
+  homeLat,
+  homeLng,
   onOpenOrders,
   onPlacedOrder,
   onBackToMap,
 }: Props) {
-  const { providers, dropPoints, ready, reload: reloadCatalog } = useCatalog();
+  const { providers, dropPoints, ready, reload: reloadCatalog } = useCatalog(
+    categoryIds?.length ? categoryIds : undefined,
+  );
   const { orders, reload: reloadOrders } = useOrders();
   const [mode, setMode] = useState<MapMode>("3d");
   const [user, setUser] = useState<LngLat | null>(null);
@@ -75,7 +83,9 @@ export function CustomerApp({
   const [err, setErr] = useState("");
   const [placing, setPlacing] = useState(false);
 
-  const origin = user ?? PILOT.center;
+  const home =
+    homeLat != null && homeLng != null ? { lat: homeLat, lng: homeLng } : null;
+  const origin = user ?? home ?? PILOT.center;
   const ranked = useMemo(() => {
     return providers
       .filter((p) => (dryerOnly ? p.hasDryer : true))
@@ -93,19 +103,19 @@ export function CustomerApp({
   useEffect(() => {
     function apply(loc: LngLat | null) {
       if (!loc) {
-        setUser((prev) => prev ?? PILOT.center);
+        setUser((prev) => prev ?? home ?? PILOT.center);
         return;
       }
       const dist = kmBetween(loc, PILOT.center);
       setFar(dist > PILOT.radiusKm);
-      setUser(dist > PILOT.radiusKm ? PILOT.center : loc);
+      setUser(dist > PILOT.radiusKm ? (home ?? PILOT.center) : loc);
     }
 
     apply(null);
     const unsub = subscribeLocation(apply);
     void readLocationIfGranted().then(apply);
     return unsub;
-  }, []);
+  }, [homeLat, homeLng]);
 
   useEffect(() => {
     if (pane === "map") {
@@ -244,6 +254,11 @@ export function CustomerApp({
           >
             Kurutucu var
           </button>
+          {categoryIds && categoryIds.length > 0 && (
+            <span className="k-glass inline-flex items-center rounded-full px-2.5 py-1.5 text-xs ring-1 ring-[var(--line)]">
+              Seçili hizmet
+            </span>
+          )}
           <span className="k-glass inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs ring-1 ring-[var(--line)]">
             <span className="inline-grid h-3.5 w-3.5 place-items-center rounded-[3px] bg-[var(--clay)] text-[var(--paper)]" aria-hidden>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none">

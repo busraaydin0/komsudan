@@ -65,12 +65,14 @@ export function AccountScreen({
   onLogout,
   onRefresh,
   onOpenMap,
+  onEditDiscovery,
 }: {
   account: Account;
   loyalty: Loyalty | null;
   onLogout: () => void;
   onRefresh: () => Promise<void> | void;
   onOpenMap?: () => void;
+  onEditDiscovery?: () => void;
 }) {
   const [name, setName] = useState(account.name);
   const [sms, setSms] = useState(true);
@@ -237,6 +239,19 @@ export function AccountScreen({
       </header>
 
       <main className="mx-auto max-w-lg space-y-4 px-5 pt-5 pb-[calc(var(--tabbar)+2.75rem)]">
+        {onEditDiscovery && (
+          <button
+            type="button"
+            onClick={onEditDiscovery}
+            className="k-rise flex w-full items-center justify-between rounded-3xl bg-[var(--card)] px-5 py-4 text-left ring-1 ring-[var(--line)]"
+          >
+            <span>
+              <span className="block text-sm font-medium">Keşif tercihleri</span>
+              <span className="text-xs text-[var(--muted)]">Rol, hizmet alanı, konum</span>
+            </span>
+            <span className="text-xs text-[var(--clay)]">Düzenle</span>
+          </button>
+        )}
         {loyalty && (
           <section className="k-rise overflow-hidden rounded-3xl bg-[var(--teal)] p-5 text-[var(--paper)] shadow-[var(--shadow-card)]">
             <p className="text-[11px] font-medium tracking-[0.18em] uppercase opacity-80">Sadakat</p>

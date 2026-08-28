@@ -143,16 +143,28 @@ export function listAvatarUrls() {
   return Object.fromEntries(rows.map((row) => [row.user_id, row.avatar_url]));
 }
 
-export function listProfilesInBox(box: { south: number; north: number; west: number; east: number }) {
+export function listProfilesInBox(
+  box: { south: number; north: number; west: number; east: number },
+  categoryIds?: string[],
+) {
+  const cats = categoryIds?.filter(Boolean) ?? [];
+  const inList = cats.length
+    ? `AND COALESCE(p.category_id, 'camasir') IN (${cats.map((_, i) => `@c${i}`).join(",")})`
+    : "";
+  const params: Record<string, number | string> = { ...box };
+  cats.forEach((id, i) => {
+    params[`c${i}`] = id;
+  });
   return db()
     .prepare(
       `SELECT ${PROFILE_SELECT}
        FROM provider_profiles p JOIN users u ON u.id = p.user_id
        WHERE p.status = 'active' AND p.verification_status != 'rejected'
          AND p.lat BETWEEN @south AND @north
-         AND p.lng BETWEEN @west AND @east`,
+         AND p.lng BETWEEN @west AND @east
+         ${inList}`,
     )
-    .all(box) as ProfileRow[];
+    .all(params) as ProfileRow[];
 }
 
 export function updateProfileFields(
@@ -164,6 +176,7 @@ export function updateProfileFields(
     neighborhood?: string;
     hasDryer?: boolean;
     status?: "active" | "paused";
+    categoryId?: string;
   },
 ) {
   const current = getProfile(userId);
@@ -173,7 +186,7 @@ export function updateProfileFields(
     .prepare(
       `UPDATE provider_profiles SET
          bio = @bio, lat = @lat, lng = @lng, neighborhood = @neighborhood,
-         has_dryer = @hasDryer, status = @status, updated_at = @now
+         has_dryer = @hasDryer, status = @status, category_id = @categoryId, updated_at = @now
        WHERE user_id = @userId`,
     )
     .run({
@@ -184,6 +197,7 @@ export function updateProfileFields(
       neighborhood: patch.neighborhood ?? current.neighborhood,
       hasDryer: (patch.hasDryer ?? Boolean(current.has_dryer)) ? 1 : 0,
       status: patch.status ?? current.status,
+      categoryId: patch.categoryId ?? current.category_id ?? "camasir",
       now,
     });
   return getProfile(userId);

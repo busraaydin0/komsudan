@@ -18,8 +18,8 @@ function hydrate(p: Provider, avatars: Record<string, string>): Provider {
 
 export function getProvider(id: string): Provider | undefined {
   const row = db()
-    .prepare("SELECT id, payload, remaining FROM providers WHERE id = ?")
-    .get(id) as { id: string; payload: string; remaining: number } | undefined;
+    .prepare("SELECT id, payload, remaining, category_id FROM providers WHERE id = ?")
+    .get(id) as { id: string; payload: string; remaining: number; category_id: string | null } | undefined;
   return row ? hydrate(toProvider(row), listAvatarUrls()) : undefined;
 }
 
@@ -34,13 +34,24 @@ export function getDrop(id: string): DropPoint | undefined {
   return row ? toDrop(row) : undefined;
 }
 
-export function providersLive(): Provider[] {
+export function providersLive(categoryIds?: string[]): Provider[] {
+  const cats = categoryIds?.filter(Boolean) ?? [];
   const avatars = listAvatarUrls();
-  return (
-    db().prepare("SELECT id, payload, remaining FROM providers").all() as {
-      id: string;
-      payload: string;
-      remaining: number;
-    }[]
-  ).map((row) => hydrate(toProvider(row), avatars));
+  const inList = cats.length
+    ? `WHERE COALESCE(category_id, 'camasir') IN (${cats.map((_, i) => `@c${i}`).join(",")})`
+    : "";
+  const params: Record<string, string> = {};
+  cats.forEach((id, i) => {
+    params[`c${i}`] = id;
+  });
+  const stmt = db().prepare(
+    `SELECT id, payload, remaining, category_id FROM providers ${inList}`,
+  );
+  const rows = (cats.length ? stmt.all(params) : stmt.all()) as {
+    id: string;
+    payload: string;
+    remaining: number;
+    category_id: string | null;
+  }[];
+  return rows.map((row) => hydrate(toProvider(row), avatars));
 }

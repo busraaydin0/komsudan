@@ -6,6 +6,7 @@ export const nearbyQuerySchema = z.object({
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
   radius: z.number().positive().max(50).optional(),
+  category_id: z.string().trim().max(400).optional(),
 });
 
 export const profilePatchSchema = z.object({
@@ -15,6 +16,7 @@ export const profilePatchSchema = z.object({
   neighborhood: z.string().max(80).optional(),
   hasDryer: z.boolean().optional(),
   status: z.enum(["active", "paused"]).optional(),
+  categoryId: z.string().trim().min(1).max(80).optional(),
 });
 
 export const slotCreateSchema = z.object({

@@ -168,6 +168,18 @@ function ensureColumns(db: Database.Database) {
   backfillHistory(db);
   backfillPayments(db);
   backfillCategories(db);
+  addColumn(db, "service_categories", "icon", "icon TEXT");
+  addColumn(db, "service_categories", "is_active", "is_active INTEGER NOT NULL DEFAULT 1");
+  addColumn(db, "users", "preferred_category_ids", "preferred_category_ids TEXT");
+  addColumn(db, "users", "preferred_intent", "preferred_intent TEXT");
+  addColumn(db, "users", "onboarding_completed_at", "onboarding_completed_at TEXT");
+  addColumn(db, "users", "home_lat", "home_lat REAL");
+  addColumn(db, "users", "home_lng", "home_lng REAL");
+  addColumn(db, "users", "home_neighborhood", "home_neighborhood TEXT");
+  db.exec(`
+    UPDATE service_categories SET icon = 'laundry' WHERE id = 'camasir' AND (icon IS NULL OR icon = '');
+    UPDATE service_categories SET is_active = 1 WHERE is_active IS NULL;
+  `);
 }
 
 export function migrate(db: Database.Database) {

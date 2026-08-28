@@ -70,6 +70,7 @@ export type Provider = {
   avatarUrl?: string | null;
   workPhotos: WorkPhoto[];
   recentReviews: Review[];
+  categoryId?: string;
 };
 
 export type DropPoint = {
@@ -158,6 +159,8 @@ export type AppNotification = {
   createdAt: string;
 };
 
+export type PreferredIntent = "seek" | "offer" | "both";
+
 export type Account = {
   id: string;
   phone: string;
@@ -166,4 +169,10 @@ export type Account = {
   passkeyEnabled: boolean;
   role: "customer" | "provider" | "admin";
   avatarUrl?: string | null;
+  preferredCategoryIds: string[];
+  preferredIntent: PreferredIntent | null;
+  onboardingCompletedAt: string | null;
+  homeLat: number | null;
+  homeLng: number | null;
+  homeNeighborhood: string | null;
 };

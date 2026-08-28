@@ -28,15 +28,17 @@ function unwrap<T>(data: { data?: T } & Partial<T>): T {
   return (data.data ?? data) as T;
 }
 
-export function useCatalog() {
+export function useCatalog(categoryIds?: string[]) {
   const [catalog, setCatalog] = useState<Catalog>({ providers: [], dropPoints: [] });
   const [ready, setReady] = useState(false);
+  const filterKey = (categoryIds ?? []).join(",");
 
   const reload = useCallback(async () => {
-    const data = await readJson<Catalog>(await fetch("/api/catalog"));
+    const qs = filterKey ? `?category_id=${encodeURIComponent(filterKey)}` : "";
+    const data = await readJson<Catalog>(await fetch(`/api/catalog${qs}`));
     setCatalog({ providers: data.providers, dropPoints: data.dropPoints });
     setReady(true);
-  }, []);
+  }, [filterKey]);
 
   useEffect(() => {
     void reload();
@@ -168,12 +170,18 @@ export function useSession() {
   const [ready, setReady] = useState(false);
 
   const reload = useCallback(async () => {
-    const data = await readJson<{ account: Account | null; loyalty: Loyalty | null }>(
-      await fetch("/api/auth/session"),
-    );
-    setAccount(data.account);
-    setLoyalty(data.loyalty);
-    setReady(true);
+    try {
+      const data = await readJson<{ account: Account | null; loyalty: Loyalty | null }>(
+        await fetch("/api/auth/session", { signal: AbortSignal.timeout(8000) }),
+      );
+      setAccount(data.account);
+      setLoyalty(data.loyalty);
+    } catch {
+      setAccount(null);
+      setLoyalty(null);
+    } finally {
+      setReady(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -291,4 +299,94 @@ export async function postReview(orderId: string, input: { rating: number; body:
     await fetch(`/api/orders/${orderId}/review`, { method: "POST", body }),
   );
   return data.review;
+}
+
+export type ServiceCategory = {
+  id: string;
+  name: string;
+  icon: string;
+  fulfillmentMode: string;
+  pricingModel: string;
+};
+
+export async function fetchCategories() {
+  const data = unwrap(
+    await readJson<{ data?: { categories: ServiceCategory[] }; categories?: ServiceCategory[] }>(
+      await fetch("/api/categories"),
+    ),
+  );
+  return data.categories ?? [];
+}
+
+export async function patchPreferences(body: {
+  intent?: "seek" | "offer" | "both" | null;
+  categoryIds?: string[];
+  homeLat?: number | null;
+  homeLng?: number | null;
+  homeNeighborhood?: string | null;
+  completed?: boolean;
+  skipped?: boolean;
+}) {
+  await readJson(
+    await fetch("/api/me/preferences", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+export async function fetchMyProvider() {
+  const data = unwrap(
+    await readJson<{ data?: { provider: Record<string, unknown> }; provider?: Record<string, unknown> }>(
+      await fetch("/api/providers/me/profile"),
+    ),
+  );
+  return data.provider!;
+}
+
+export async function patchMyProviderProfile(body: {
+  bio?: string;
+  lat?: number;
+  lng?: number;
+  neighborhood?: string;
+  hasDryer?: boolean;
+  status?: "active" | "paused";
+  categoryId?: string;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { provider: Record<string, unknown> }; provider?: Record<string, unknown> }>(
+      await fetch("/api/providers/me/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.provider!;
+}
+
+export async function postMyAvailability(body: {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  deliveryMode: "door" | "point" | "both";
+}) {
+  await readJson(
+    await fetch("/api/providers/me/availability", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+export async function postMyDropPoint(body: { label: string; lat: number; lng: number }) {
+  await readJson(
+    await fetch("/api/providers/me/drop-points", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
 }

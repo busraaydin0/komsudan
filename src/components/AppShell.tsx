@@ -6,31 +6,34 @@ import { AppNotice } from "@/components/AppNotice";
 import { NoticeCenter } from "@/components/NoticeCenter";
 import { CustomerApp } from "@/components/CustomerApp";
 import { LoginGate } from "@/components/LoginGate";
+import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { PermissionPrompt } from "@/components/PermissionPrompt";
 import { ProviderDesk } from "@/components/ProviderDesk";
 import { TabBar, type AppTab } from "@/components/TabBar";
 import { useSession } from "@/lib/api";
 import { permissionAsked } from "@/lib/permissions";
+import type { PreferredIntent } from "@/lib/types";
 
-function readTab(): AppTab {
+function readTab(intent?: PreferredIntent | null): AppTab {
   if (typeof window === "undefined") return "harita";
   const q = new URLSearchParams(window.location.search).get("tab");
   if (q === "masa") return "hizmet";
   if (q === "siparis" || q === "hizmet" || q === "harita" || q === "hesap") return q;
-  return "harita";
+  return intent === "offer" ? "hizmet" : "harita";
 }
 
 export function AppShell() {
   const [tab, setTab] = useState<AppTab | null>(null);
   const [askPerms, setAskPerms] = useState(false);
+  const [editDiscovery, setEditDiscovery] = useState(false);
   const { account, loyalty, ready, reload } = useSession();
 
   useEffect(() => {
-    setTab(readTab());
+    setTab((prev) => prev ?? readTab(account?.preferredIntent));
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       void navigator.serviceWorker.register("/sw.js");
     }
-  }, []);
+  }, [account?.preferredIntent]);
 
   useEffect(() => {
     if (!ready || !account?.identityVerified || !account.passkeyEnabled) return;
@@ -49,15 +52,32 @@ export function AppShell() {
     else go("hesap");
   }
 
-  if (!ready || !tab) {
+  if (!ready) {
     return <div className="h-dvh bg-[var(--paper)]" />;
   }
 
   const locked = !account || !account.identityVerified || !account.passkeyEnabled;
   if (locked) {
+    return <LoginGate account={account} onReady={reload} />;
+  }
+
+  if (!account.onboardingCompletedAt || editDiscovery) {
     return (
-      <LoginGate account={account} onReady={reload} />
+      <OnboardingFlow
+        account={account}
+        onDone={async (intent) => {
+          setEditDiscovery(false);
+          await reload();
+          const next = intent === "offer" ? "hizmet" : "harita";
+          setTab(next);
+          window.history.replaceState(null, "", next === "harita" ? "/" : `/?tab=${next}`);
+        }}
+      />
     );
+  }
+
+  if (!tab) {
+    return <div className="h-dvh bg-[var(--paper)]" />;
   }
 
   const hideMap = tab === "hizmet" || tab === "hesap";
@@ -78,6 +98,9 @@ export function AppShell() {
           loyaltyRate={loyalty?.rate ?? 0}
           loyaltyLabel={loyalty?.label ?? "Komşu"}
           meAvatar={account.avatarUrl}
+          categoryIds={account.preferredCategoryIds ?? []}
+          homeLat={account.homeLat}
+          homeLng={account.homeLng}
           onOpenOrders={() => go("siparis")}
           onPlacedOrder={() => go("siparis")}
           onBackToMap={() => go("harita")}
@@ -85,7 +108,7 @@ export function AppShell() {
       </div>
       {tab === "hizmet" && (
         <div className="relative z-10 h-full overflow-y-auto">
-          <ProviderDesk />
+          <ProviderDesk onOpenSetup={() => setEditDiscovery(true)} />
         </div>
       )}
       {tab === "hesap" && (
@@ -96,6 +119,7 @@ export function AppShell() {
             onLogout={() => void reload()}
             onRefresh={reload}
             onOpenMap={() => go("harita")}
+            onEditDiscovery={() => setEditDiscovery(true)}
           />
         </div>
       )}

@@ -1,6 +1,11 @@
 import type { DropPoint, Provider } from "@/lib/types";
 
-export function toProvider(row: { id: string; payload: string; remaining: number }): Provider {
+export function toProvider(row: {
+  id: string;
+  payload: string;
+  remaining: number;
+  category_id?: string | null;
+}): Provider {
   const p = JSON.parse(row.payload) as Provider;
   return {
     ...p,
@@ -8,6 +13,7 @@ export function toProvider(row: { id: string; payload: string; remaining: number
     workPhotos: p.workPhotos ?? [],
     avatarUrl: p.avatarUrl ?? null,
     recentReviews: p.recentReviews ?? [],
+    categoryId: row.category_id ?? p.categoryId ?? "camasir",
   };
 }
 

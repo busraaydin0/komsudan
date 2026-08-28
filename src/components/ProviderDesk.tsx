@@ -39,7 +39,7 @@ function monthLabel(key: string) {
   return label.charAt(0).toLocaleUpperCase("tr-TR") + label.slice(1);
 }
 
-export function ProviderDesk() {
+export function ProviderDesk({ onOpenSetup }: { onOpenSetup?: () => void } = {}) {
   const { providers, dropPoints, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload } = useOrders();
   const wallet = orders
@@ -73,6 +73,11 @@ export function ProviderDesk() {
           </p>
           <p className="text-xs text-[var(--muted)]">Çukurambar pilotu</p>
         </div>
+        {onOpenSetup && (
+          <button type="button" onClick={onOpenSetup} className="text-xs text-[var(--clay)]">
+            Kurulum
+          </button>
+        )}
       </header>
 
       <main className="mx-auto max-w-lg px-5 pb-[calc(var(--tabbar)+1.5rem)]">

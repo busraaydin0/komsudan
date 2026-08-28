@@ -12,6 +12,12 @@ export type UserRow = {
   identity_verified: number;
   passkey_id: string | null;
   avatar_url: string | null;
+  preferred_category_ids: string | null;
+  preferred_intent: string | null;
+  onboarding_completed_at: string | null;
+  home_lat: number | null;
+  home_lng: number | null;
+  home_neighborhood: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -34,7 +40,12 @@ export type RefreshRow = {
   created_at: string;
 };
 
-const USER_SELECT = `id, phone, name, full_name, role, identity_verified, passkey_id, avatar_url, created_at, updated_at`;
+const USER_COLS =
+  "id, phone, name, full_name, role, identity_verified, passkey_id, avatar_url, preferred_category_ids, preferred_intent, onboarding_completed_at, home_lat, home_lng, home_neighborhood, created_at, updated_at";
+const USER_SELECT = USER_COLS;
+const USER_SELECT_U = USER_COLS.split(", ")
+  .map((c) => `u.${c}`)
+  .join(", ");
 
 export function hashToken(value: string) {
   return createHash("sha256").update(value).digest("hex");
@@ -90,6 +101,43 @@ export function setUserAvatar(id: string, url: string | null) {
   const now = new Date().toISOString();
   db().prepare("UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?").run(url, now, id);
   db().prepare("UPDATE provider_profiles SET avatar_url = ?, updated_at = ? WHERE user_id = ?").run(url, now, id);
+  return getUserById(id)!;
+}
+
+export function updateUserPreferences(
+  id: string,
+  patch: {
+    preferredCategoryIds: string[] | null;
+    preferredIntent: string | null;
+    onboardingCompletedAt: string | null;
+    homeLat: number | null;
+    homeLng: number | null;
+    homeNeighborhood: string | null;
+  },
+) {
+  const now = new Date().toISOString();
+  db()
+    .prepare(
+      `UPDATE users SET
+         preferred_category_ids = ?,
+         preferred_intent = ?,
+         onboarding_completed_at = ?,
+         home_lat = ?,
+         home_lng = ?,
+         home_neighborhood = ?,
+         updated_at = ?
+       WHERE id = ?`,
+    )
+    .run(
+      patch.preferredCategoryIds ? JSON.stringify(patch.preferredCategoryIds) : null,
+      patch.preferredIntent,
+      patch.onboardingCompletedAt,
+      patch.homeLat,
+      patch.homeLng,
+      patch.homeNeighborhood,
+      now,
+      id,
+    );
   return getUserById(id)!;
 }
 
@@ -189,7 +237,7 @@ export function insertSession(token: string, userId: string, expiresAt: string) 
 export function getUserBySession(token: string): UserRow | undefined {
   return db()
     .prepare(
-      `SELECT u.id, u.phone, u.name, u.full_name, u.role, u.identity_verified, u.passkey_id, u.avatar_url, u.created_at, u.updated_at
+      `SELECT ${USER_SELECT_U}
        FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token = ? AND s.expires_at > ?`,
     )
