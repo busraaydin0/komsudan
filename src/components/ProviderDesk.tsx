@@ -21,6 +21,7 @@ import { PreserveServiceEditor } from "@/components/PreserveServiceEditor";
 import { CarpetServiceEditor } from "@/components/CarpetServiceEditor";
 import { LessonServiceEditor } from "@/components/LessonServiceEditor";
 import { TalkServiceEditor } from "@/components/TalkServiceEditor";
+import { GraveServiceEditor } from "@/components/GraveServiceEditor";
 
 const LABEL: Record<OrderStatus, string> = {
   onay_bekliyor: "Bekliyor",
@@ -136,6 +137,8 @@ export function ProviderDesk() {
 
         <TalkServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
 
+        <GraveServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
         <h2 className="k-rise mt-8 font-[family-name:var(--font-display)] text-xl">Gelen siparişler</h2>
         {!ready ? (
           <ul className="mt-3 space-y-3">
@@ -246,7 +249,8 @@ function OrderCard({
   const hali = order.packageId === "hali";
   const odev = order.packageId === "odev";
   const dil = order.packageId === "dil";
-  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev || dil;
+  const mezar = order.packageId === "mezar";
+  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev || dil || mezar;
   const next = nextStatus(order.status, order.packageId, catalog);
   const foodLabel: Partial<Record<OrderStatus, string>> = {
     teslim_alindi: "Hazırlanıyor",
@@ -280,7 +284,7 @@ function OrderCard({
         {p?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev || dil
+          : sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev || dil || mezar
             ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
             : `${order.pieces} parça · ${pack?.title}`}
       </p>

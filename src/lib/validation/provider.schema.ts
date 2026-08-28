@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti", "kislik", "hali", "odev", "dil"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti", "kislik", "hali", "odev", "dil", "mezar"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -825,6 +825,97 @@ export const talkCreateSchema = z
   });
 
 export const talkPatchSchema = talkCreateSchema;
+
+const graveKindSchema = z.object({
+  temizlik: z.boolean(),
+  cicek: z.boolean(),
+  sulama: z.boolean(),
+  ot: z.boolean(),
+  cevre: z.boolean(),
+  ziyaret: z.boolean(),
+  other: z.boolean(),
+});
+
+const gravePriceSchema = z.object({
+  visit: z.boolean(),
+  job: z.boolean(),
+  monthly: z.boolean(),
+  other: z.boolean(),
+});
+
+const graveFlowerSchema = z.object({
+  customer: z.boolean(),
+  provider: z.boolean(),
+  together: z.boolean(),
+});
+
+const graveFeeSchema = z.object({
+  included: z.boolean(),
+  extra: z.boolean(),
+});
+
+const gravePhotoSendSchema = z.object({
+  beforeAfter: z.boolean(),
+  after: z.boolean(),
+  none: z.boolean(),
+});
+
+const graveAvailSchema = z.object({
+  once: z.boolean(),
+  weekly: z.boolean(),
+  monthly: z.boolean(),
+  days: z.boolean(),
+});
+
+export const graveCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    description: z.string().trim().max(400).optional().nullable(),
+    kinds: graveKindSchema.optional(),
+    cemetery: z.string().trim().min(2, "Mezarlık / bölge yaz.").max(120),
+    radiusKm: z.number().int().min(1, "Hizmet alanı 1–50 km.").max(50, "Hizmet alanı 1–50 km.").optional(),
+    price: z.number({ error: "Fiyat gerekli." }).int().min(1, "Fiyat 1–10.000 ₺.").max(10_000, "Fiyat 1–10.000 ₺."),
+    pricing: gravePriceSchema.optional(),
+    flowers: graveFlowerSchema.optional(),
+    fees: graveFeeSchema.optional(),
+    durationMin: z.number().int().min(1, "Süre 1–480 dakika.").max(480, "Süre 1–480 dakika.").optional().nullable(),
+    photos: gravePhotoSendSchema.optional(),
+    avails: graveAvailSchema.optional(),
+    workHours: z.string().trim().max(80).optional().nullable(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (
+      val.kinds &&
+      !val.kinds.temizlik &&
+      !val.kinds.cicek &&
+      !val.kinds.sulama &&
+      !val.kinds.ot &&
+      !val.kinds.cevre &&
+      !val.kinds.ziyaret &&
+      !val.kinds.other
+    ) {
+      ctx.addIssue({ code: "custom", message: "En az bir hizmet türü seç.", path: ["kinds"] });
+    }
+    if (val.pricing && !val.pricing.visit && !val.pricing.job && !val.pricing.monthly && !val.pricing.other) {
+      ctx.addIssue({ code: "custom", message: "En az bir fiyatlandırma seç.", path: ["pricing"] });
+    }
+    if (val.flowers && !val.flowers.customer && !val.flowers.provider && !val.flowers.together) {
+      ctx.addIssue({ code: "custom", message: "Çiçek / bitki seçeneği seç.", path: ["flowers"] });
+    }
+    if (val.fees && !val.fees.included && !val.fees.extra) {
+      ctx.addIssue({ code: "custom", message: "Çiçek / malzeme ücretini seç.", path: ["fees"] });
+    }
+    if (val.photos && !val.photos.beforeAfter && !val.photos.after && !val.photos.none) {
+      ctx.addIssue({ code: "custom", message: "Fotoğraf gönderme seçeneği seç.", path: ["photos"] });
+    }
+    if (val.avails && !val.avails.once && !val.avails.weekly && !val.avails.monthly && !val.avails.days) {
+      ctx.addIssue({ code: "custom", message: "En az bir müsaitlik seç.", path: ["avails"] });
+    }
+  });
+
+export const gravePatchSchema = graveCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

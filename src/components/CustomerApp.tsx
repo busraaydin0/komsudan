@@ -160,6 +160,20 @@ import {
   talkPlaceList,
   talkQtyBounds,
 } from "@/lib/talk";
+import {
+  dropsForGrave,
+  graveAvailList,
+  graveCanOrder,
+  graveDropLabel,
+  graveDurationLabel,
+  graveFeeList,
+  graveFlowerList,
+  graveKindList,
+  gravePhotoList,
+  gravePriceList,
+  graveQtyBounds,
+  graveUnitMeta,
+} from "@/lib/grave";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFood, estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
@@ -189,6 +203,7 @@ import type {
   ProviderCarpet,
   ProviderLesson,
   ProviderTalk,
+  ProviderGrave,
 } from "@/lib/types";
 
 const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), {
@@ -252,6 +267,10 @@ function isOdev(p: Pick<Provider, "categoryId">) {
 
 function isDil(p: Pick<Provider, "categoryId">) {
   return p.categoryId === "dil";
+}
+
+function isMezar(p: Pick<Provider, "categoryId">) {
+  return p.categoryId === "mezar";
 }
 
 function laundryInFilter(ids?: string[]) {
@@ -322,6 +341,10 @@ function listPrice(p: Provider): number | null {
   }
   if (isDil(p)) {
     const prices = (p.talks ?? []).filter((x) => x.price > 0).map((x) => x.price);
+    return prices.length ? Math.min(...prices) : null;
+  }
+  if (isMezar(p)) {
+    const prices = (p.graves ?? []).filter((x) => x.price > 0).map((x) => x.price);
     return prices.length ? Math.min(...prices) : null;
   }
   return p.packages.find((x) => x.id === "tam")?.pricePerPiece ?? p.packages.at(-1)?.pricePerPiece ?? null;
@@ -430,6 +453,7 @@ export function CustomerApp({
   const hali = selected ? isHali(selected) : false;
   const odev = selected ? isOdev(selected) : false;
   const dil = selected ? isDil(selected) : false;
+  const mezar = selected ? isMezar(selected) : false;
   const product = selected?.products?.find((x) => x.id === productId) ?? selected?.products?.[0];
   const service = selected?.services?.find((x) => x.id === productId) ?? selected?.services?.[0];
   const repair = selected?.repairs?.find((x) => x.id === productId) ?? selected?.repairs?.[0];
@@ -443,6 +467,7 @@ export function CustomerApp({
   const carpet = selected?.carpets?.find((x) => x.id === productId) ?? selected?.carpets?.[0];
   const lesson = selected?.lessons?.find((x) => x.id === productId) ?? selected?.lessons?.[0];
   const talk = selected?.talks?.find((x) => x.id === productId) ?? selected?.talks?.[0];
+  const grave = selected?.graves?.find((x) => x.id === productId) ?? selected?.graves?.[0];
   const quote = selected
     ? davet && product
       ? estimateFood(guests, product.pricePerPerson, loyaltyRate)
@@ -491,6 +516,10 @@ export function CustomerApp({
                             : dil && talk && talkCanOrder(talk)
                               ? estimateFood(guests, talk.price, loyaltyRate)
                               : dil
+                                ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
+                            : mezar && grave && graveCanOrder(grave)
+                              ? estimateFood(guests, grave.price, loyaltyRate)
+                              : mezar
                                 ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
                             : estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
     : { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 };
@@ -575,6 +604,9 @@ export function CustomerApp({
       } else if (isDil(selected)) {
         const first = selected.talks?.[0]?.id ?? null;
         setProductId(selected.talks?.some((x) => x.id === productId) ? productId : first);
+      } else if (isMezar(selected)) {
+        const first = selected.graves?.[0]?.id ?? null;
+        setProductId(selected.graves?.some((x) => x.id === productId) ? productId : first);
       } else {
         setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
       }
@@ -635,6 +667,7 @@ export function CustomerApp({
       const haliOrder = isHali(selected);
       const odevOrder = isOdev(selected);
       const dilOrder = isDil(selected);
+      const mezarOrder = isMezar(selected);
       if (davetOrder && !allergy.trim()) {
         setErr("Alerji durumunu yaz. Yoksa “yok” de.");
         setPlacing(false);
@@ -691,6 +724,11 @@ export function CustomerApp({
         return;
       }
       if (dilOrder && !talkCanOrder(talk)) {
+        setErr("Bu hizmet için fiyat yok.");
+        setPlacing(false);
+        return;
+      }
+      if (mezarOrder && !graveCanOrder(grave)) {
         setErr("Bu hizmet için fiyat yok.");
         setPlacing(false);
         return;
@@ -821,6 +859,16 @@ export function CustomerApp({
                 ? {
                     providerId: selected.id,
                     productId: talk?.id,
+                    guestCount: guests,
+                    drop,
+                    dropPointId: drop === "nokta" ? dropId : null,
+                    slot,
+                    note,
+                  }
+              : mezarOrder
+                ? {
+                    providerId: selected.id,
+                    productId: grave?.id,
                     guestCount: guests,
                     drop,
                     dropPointId: drop === "nokta" ? dropId : null,
@@ -990,6 +1038,8 @@ export function CustomerApp({
                                 ? "Ödev eşliği verenin evinde, ortak alanda veya online. Eve kimse girmez."
                               : categoryIds?.length === 1 && categoryIds[0] === "dil"
                                 ? "Dil pratiği verenin evinde, ortak alanda veya online. Eve kimse girmez."
+                              : categoryIds?.length === 1 && categoryIds[0] === "mezar"
+                                ? "Mezar bakımı mezarlıkta yapılır. Eve kimse girmez."
                               : "Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak."}
               </p>
               <button
@@ -1162,6 +1212,13 @@ export function CustomerApp({
                     setGuests((n) => Math.min(max, Math.max(min, n)));
                     const allowed = dropsForTalk(card, selected.drops);
                     setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
+                  } else if (isMezar(selected)) {
+                    const card =
+                      selected.graves?.find((x) => x.id === productId) ?? selected.graves?.[0];
+                    const { min, max } = graveQtyBounds(card, selected.remaining);
+                    setGuests((n) => Math.min(max, Math.max(min, n)));
+                    const allowed = dropsForGrave(card, selected.drops);
+                    setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
                   } else {
                     setPieces((n) => clampPieces(n, selected.remaining));
                   }
@@ -1191,8 +1248,11 @@ export function CustomerApp({
                 carpet={carpet}
                 lesson={lesson}
                 talk={talk}
+                grave={grave}
                 productName={
-                  dil
+                  mezar
+                    ? grave?.name
+                    : dil
                     ? talk?.name
                     : odev
                     ? lesson?.name
@@ -1438,6 +1498,10 @@ function List({
                                     ? (p.talks ?? []).length
                                       ? ` · ${(p.talks ?? []).map((x) => x.name).join(", ")}`
                                       : " · hizmet yok"
+                                  : isMezar(p)
+                                    ? (p.graves ?? []).length
+                                      ? ` · ${(p.graves ?? []).map((x) => x.name).join(", ")}`
+                                      : " · hizmet yok"
                                 : dryingListLabel(p)
                               ? ` · ${dryingListLabel(p)}`
                               : ""}
@@ -1463,7 +1527,7 @@ function List({
                           ? ((isTamir(p) ? p.repairs : p.techs) ?? []).length
                             ? "inceleme"
                             : "hizmet yok"
-                          : isAraba(p) || isDikis(p) || isKurye(p) || isBahce(p) || isKargo(p) || isCikti(p) || isKislik(p) || isHali(p) || isOdev(p) || isDil(p)
+                          : isAraba(p) || isDikis(p) || isKurye(p) || isBahce(p) || isKargo(p) || isCikti(p) || isKislik(p) || isHali(p) || isOdev(p) || isDil(p) || isMezar(p)
                             ? "hizmet yok"
                             : "menü yok"
                         : isDavet(p)
@@ -1480,6 +1544,8 @@ function List({
                               ? `${tl(price)}/ders`
                             : isDil(p)
                               ? `${tl(price)}/görüşme`
+                            : isMezar(p)
+                              ? `${tl(price)}/${graveUnitMeta((p.graves ?? []).find((x) => x.price === price)?.pricing ?? (p.graves ?? [])[0]?.pricing).qty}`
                             : isKargo(p)
                               ? (p.cargos ?? []).some((x) => x.price > 0 && x.priceType === "mesafe")
                                 ? `${tl(price)}'den`
@@ -1534,7 +1600,8 @@ function ProviderPane({
   const hali = isHali(p);
   const odev = isOdev(p);
   const dil = isDil(p);
-  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali || odev || dil;
+  const mezar = isMezar(p);
+  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali || odev || dil || mezar;
   const items = davet
     ? (p.products ?? [])
     : dikis
@@ -1561,6 +1628,8 @@ function ProviderPane({
                       ? (p.lessons ?? [])
                     : dil
                       ? (p.talks ?? [])
+                    : mezar
+                      ? (p.graves ?? [])
             : p.packages;
   const canNext = unitCatalog ? items.length > 0 : p.packages.length > 0;
   return (
@@ -1597,6 +1666,8 @@ function ProviderPane({
                     ? `bugün ${p.remaining} ders yer`
                     : dil
                     ? `bugün ${p.remaining} görüşme yer`
+                    : mezar
+                    ? `bugün ${p.remaining} iş yer`
                     : dikis || tamir || teknoloji || araba || kurye || bahce || kargo
                     ? `bugün ${p.remaining} yer`
                     : `bugün ${p.remaining} parça yer`}
@@ -2062,6 +2133,42 @@ function ProviderPane({
                   </span>
                 </button>
               ))
+          : mezar
+            ? (p.graves ?? []).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onProduct(item.id)}
+                  className={`k-chip flex w-full gap-3 rounded-2xl px-3 py-3 text-left ring-1 ${
+                    productId === item.id
+                      ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
+                      : "bg-[var(--paper)] ring-[var(--line)]"
+                  }`}
+                >
+                  {item.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                  ) : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex justify-between font-medium">
+                      {item.name}
+                      <span className="tabular-nums">
+                        {tl(item.price)}/{graveUnitMeta(item.pricing).qty}
+                      </span>
+                    </span>
+                    {(graveKindList(item.kinds).length || item.cemetery) && (
+                      <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                        {[
+                          graveKindList(item.kinds).slice(0, 2).join(", ") || null,
+                          item.cemetery || null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              ))
           : p.packages.map((pack) => (
               <button
                 key={pack.id}
@@ -2119,6 +2226,9 @@ function ProviderPane({
         {dil && (p.talks ?? []).length === 0 && (
           <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
         )}
+        {mezar && (p.graves ?? []).length === 0 && (
+          <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
+        )}
       </div>
       <button
         type="button"
@@ -2153,6 +2263,7 @@ function Checkout({
   carpet,
   lesson,
   talk,
+  grave,
   productName,
   express,
   onExpress,
@@ -2192,6 +2303,7 @@ function Checkout({
   carpet?: ProviderCarpet;
   lesson?: ProviderLesson;
   talk?: ProviderTalk;
+  grave?: ProviderGrave;
   productName?: string;
   express: boolean;
   onExpress: (v: boolean) => void;
@@ -2224,8 +2336,11 @@ function Checkout({
   const hali = isHali(p);
   const odev = isOdev(p);
   const dil = isDil(p);
-  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali || odev || dil;
-  const unit = dil
+  const mezar = isMezar(p);
+  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali || odev || dil || mezar;
+  const unit = mezar
+    ? graveUnitMeta(grave?.pricing)
+    : dil
     ? TALK_UNIT
     : odev
     ? LESSON_UNIT
@@ -2250,7 +2365,9 @@ function Checkout({
         : dikis
           ? sewingUnitMeta(service?.priceUnit)
           : foodUnitMeta(product?.priceUnit);
-  const bounds = dil
+  const bounds = mezar
+    ? graveQtyBounds(grave, p.remaining)
+    : dil
     ? talkQtyBounds(talk, p.remaining)
     : odev
     ? lessonQtyBounds(lesson, p.remaining)
@@ -2277,7 +2394,9 @@ function Checkout({
           : foodQtyBounds(product, p.remaining);
   const cap = unitPriced ? bounds.max : Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
   const minCount = unitPriced ? bounds.min : PIECES_MIN;
-  const foodDrops = dil
+  const foodDrops = mezar
+    ? dropsForGrave(grave, p.drops)
+    : dil
     ? dropsForTalk(talk, p.drops)
     : odev
     ? dropsForLesson(lesson, p.drops)
@@ -2329,7 +2448,9 @@ function Checkout({
   }
 
   const count = unitPriced ? guests : pieces;
-  const unitPrice = dil
+  const unitPrice = mezar
+    ? (grave?.price ?? 0)
+    : dil
     ? (talk?.price ?? 0)
     : odev
     ? (lesson?.price ?? 0)
@@ -2365,21 +2486,22 @@ function Checkout({
     (!kislik || preserveCanOrder(preserve)) &&
     (!hali || carpetCanOrder(carpet)) &&
     (!odev || lessonCanOrder(lesson)) &&
-    (!dil || talkCanOrder(talk));
+    (!dil || talkCanOrder(talk)) &&
+    (!mezar || graveCanOrder(grave));
   const qtyTitle =
     unit.id === "kisi" ? "Kaç kişilik?" : unit.id === "kg" ? "Kaç kg?" : `Kaç ${unit.qty}?`;
 
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
-        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali || odev || dil ? "← Hizmet" : "← Paket"}
+        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali || odev || dil || mezar ? "← Hizmet" : "← Paket"}
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">
         {unitPriced ? qtyTitle : "Kaç parça?"}
       </h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
         {unitPriced
-          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali || odev || dil ? "Seçili hizmet" : "Seçili yemek")} · ${
+          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali || odev || dil || mezar ? "Seçili hizmet" : "Seçili yemek")} · ${
               (tamir || teknoloji) && !canPlace
                 ? "fiyat inceleme sonrası."
                 : kurye && courier?.priceType === "mesafe"
@@ -2828,6 +2950,44 @@ function Checkout({
       {dil && talk?.notes ? (
         <p className="mt-2 text-xs text-[var(--muted)]">{talk.notes}</p>
       ) : null}
+      {mezar && grave?.description ? (
+        <p className="mt-3 text-xs text-[var(--muted)]">{grave.description}</p>
+      ) : null}
+      {mezar && graveKindList(grave?.kinds).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{graveKindList(grave?.kinds).join(", ")}</p>
+      ) : null}
+      {mezar && grave?.cemetery ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          {grave.cemetery}
+          {grave.radiusKm ? ` · ${grave.radiusKm} km'ye kadar` : ""}
+        </p>
+      ) : null}
+      {mezar && gravePriceList(grave?.pricing).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{gravePriceList(grave?.pricing).join(", ")}</p>
+      ) : null}
+      {mezar && graveFlowerList(grave?.flowers).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          Çiçek: {graveFlowerList(grave?.flowers).join(", ")}
+        </p>
+      ) : null}
+      {mezar && graveFeeList(grave?.fees).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{graveFeeList(grave?.fees).join(", ")}</p>
+      ) : null}
+      {mezar && graveDurationLabel(grave?.durationMin) ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{graveDurationLabel(grave?.durationMin)}</p>
+      ) : null}
+      {mezar && gravePhotoList(grave?.photos).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{gravePhotoList(grave?.photos).join(", ")}</p>
+      ) : null}
+      {mezar && graveAvailList(grave?.avails).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{graveAvailList(grave?.avails).join(", ")}</p>
+      ) : null}
+      {mezar && grave?.workHours ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{grave.workHours}</p>
+      ) : null}
+      {mezar && grave?.notes ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{grave.notes}</p>
+      ) : null}
       {davet && product?.allergens && (
         <p className="mt-2 text-xs text-[var(--muted)]">İçerik / alerjen: {product.allergens}</p>
       )}
@@ -2864,7 +3024,9 @@ function Checkout({
               drop === d ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
             }`}
           >
-            {dil
+            {mezar
+              ? graveDropLabel(d)
+              : dil
               ? talkDropLabel(d, talk?.place)
               : odev
               ? lessonDropLabel(d, lesson?.place)
@@ -2942,6 +3104,8 @@ function Checkout({
             ? "Sınıf, konu, platform…"
             : dil
             ? "Hedef, seviye, platform…"
+            : mezar
+            ? "Mezarlık, parsel, çiçek tercihi…"
             : hali
             ? "Leke, ebat, kapı kodu…"
             : kislik
@@ -3025,7 +3189,8 @@ function Track({
   const hali = order.packageId === "hali";
   const odev = order.packageId === "odev";
   const dil = order.packageId === "dil";
-  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev || dil;
+  const mezar = order.packageId === "mezar";
+  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev || dil || mezar;
   const steps = trackSteps(order.packageId, catalog);
   const idx = steps.indexOf(order.status);
   const [busy, setBusy] = useState(false);
@@ -3040,7 +3205,7 @@ function Track({
         {provider?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev || dil
+          : sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev || dil || mezar
             ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
             : `${order.pieces} parça`}{" "}
         · {tl(order.total)}

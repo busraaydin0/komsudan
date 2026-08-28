@@ -133,6 +133,15 @@ import {
   updateTalk,
   type TalkWrite,
 } from "@/lib/db/talks";
+import {
+  countGraves,
+  deactivateGrave,
+  insertGrave,
+  listGraves,
+  toPublicGrave,
+  updateGrave,
+  type GraveWrite,
+} from "@/lib/db/graves";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -214,6 +223,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     carpets: listCarpets(row.user_id).map(toPublicCarpet),
     lessons: listLessons(row.user_id).map(toPublicLesson),
     talks: listTalks(row.user_id).map(toPublicTalk),
+    graves: listGraves(row.user_id).map(toPublicGrave),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -289,7 +299,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti" || categoryId === "kislik" || categoryId === "hali" || categoryId === "odev" || categoryId === "dil")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti" || categoryId === "kislik" || categoryId === "hali" || categoryId === "odev" || categoryId === "dil" || categoryId === "mezar")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -715,10 +725,25 @@ export function ensureDilOffer(
   });
 }
 
+export function ensureMezarOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Mezar bakımı. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "mezar",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil" | "mezar";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -765,6 +790,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "dil") {
     return ensureDilOffer(user, input);
+  }
+  if (categoryId === "mezar") {
+    return ensureMezarOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -1744,6 +1772,95 @@ export function patchMyTalk(user: AuthUser, talkId: string, input: TalkWrite) {
 export function removeMyTalk(user: AuthUser, talkId: string) {
   requireProvider(user);
   if (!deactivateTalk(talkId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_GRAVES = 12;
+
+function anyGraveFlag(obj?: Record<string, boolean> | null) {
+  return Boolean(obj && Object.values(obj).some(Boolean));
+}
+
+function assertGraveWrite(input: GraveWrite) {
+  if (input.kinds && !anyGraveFlag(input.kinds)) {
+    throw new ApiError(400, "En az bir hizmet türü seç.", "VALIDATION_ERROR");
+  }
+  const cemetery = input.cemetery?.trim() ?? "";
+  if (cemetery.length < 2) {
+    throw new ApiError(400, "Mezarlık / bölge yaz.", "VALIDATION_ERROR");
+  }
+  if (input.radiusKm != null && (!Number.isInteger(input.radiusKm) || input.radiusKm < 1 || input.radiusKm > 50)) {
+    throw new ApiError(400, "Hizmet alanı 1–50 km.", "VALIDATION_ERROR");
+  }
+  if (input.pricing && !anyGraveFlag(input.pricing)) {
+    throw new ApiError(400, "En az bir fiyatlandırma seç.", "VALIDATION_ERROR");
+  }
+  if (input.flowers && !anyGraveFlag(input.flowers)) {
+    throw new ApiError(400, "Çiçek / bitki seçeneği seç.", "VALIDATION_ERROR");
+  }
+  if (input.fees && !anyGraveFlag(input.fees)) {
+    throw new ApiError(400, "Çiçek / malzeme ücretini seç.", "VALIDATION_ERROR");
+  }
+  if (
+    input.durationMin != null &&
+    (!Number.isInteger(input.durationMin) || input.durationMin < 1 || input.durationMin > 480)
+  ) {
+    throw new ApiError(400, "Süre 1–480 dakika.", "VALIDATION_ERROR");
+  }
+  if (input.photos && !anyGraveFlag(input.photos)) {
+    throw new ApiError(400, "Fotoğraf gönderme seçeneği seç.", "VALIDATION_ERROR");
+  }
+  if (input.avails && !anyGraveFlag(input.avails)) {
+    throw new ApiError(400, "En az bir müsaitlik seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyGraves(user: AuthUser) {
+  requireProvider(user);
+  return listGraves(user.id, false).map(toPublicGrave);
+}
+
+export function addMyGrave(user: AuthUser, input: GraveWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "mezar") {
+    throw new ApiError(400, "Mezar kartı yalnızca Mezar Bakımı & Çiçeklendirme alanında.", "VALIDATION_ERROR");
+  }
+  assertGraveWrite(input);
+  if (countGraves(user.id, false) >= MAX_GRAVES) {
+    throw new ApiError(400, `En fazla ${MAX_GRAVES} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicGrave(
+    insertGrave(user.id, {
+      ...input,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      cemetery: input.cemetery?.trim() || null,
+      workHours: input.workHours?.trim() || null,
+      notes: input.notes?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyGrave(user: AuthUser, graveId: string, input: GraveWrite) {
+  requireProvider(user);
+  assertGraveWrite(input);
+  const row = updateGrave(graveId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    cemetery: input.cemetery?.trim() || null,
+    workHours: input.workHours?.trim() || null,
+    notes: input.notes?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicGrave(row);
+}
+
+export function removeMyGrave(user: AuthUser, graveId: string) {
+  requireProvider(user);
+  if (!deactivateGrave(graveId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };

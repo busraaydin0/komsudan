@@ -70,7 +70,7 @@ export function canTransition(from: ApiLifecycle, to: ApiLifecycle, packageId: P
 
 export function nextStatus(
   current: OrderStatus,
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil",
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil" | "mezar",
   food = false,
 ): OrderStatus | null {
   if (
@@ -87,7 +87,8 @@ export function nextStatus(
     packageId === "kislik" ||
     packageId === "hali" ||
     packageId === "odev" ||
-    packageId === "dil"
+    packageId === "dil" ||
+    packageId === "mezar"
   ) {
     if (current === "onay_bekliyor") return "teslim_alindi";
     if (current === "teslim_alindi") return "hazir";
@@ -118,7 +119,7 @@ export const PICKUP_CODE_LEN = 6;
 export const PICKUP_CODE_TRIES = 5;
 
 export function trackSteps(
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil",
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil" | "mezar",
   food = false,
 ): OrderStatus[] {
   if (
@@ -135,7 +136,8 @@ export function trackSteps(
     packageId === "kislik" ||
     packageId === "hali" ||
     packageId === "odev" ||
-    packageId === "dil"
+    packageId === "dil" ||
+    packageId === "mezar"
   ) {
     return ["onay_bekliyor", "teslim_alindi", "hazir", "teslim_edildi"];
   }

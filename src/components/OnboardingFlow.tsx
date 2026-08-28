@@ -131,6 +131,7 @@ export function OnboardingFlow({
         offerCat === "hali" ||
         offerCat === "odev" ||
         offerCat === "dil" ||
+        offerCat === "mezar" ||
         offerCat === "davet"
           ? offerCat
           : "davet",
@@ -264,7 +265,7 @@ export function OnboardingFlow({
                 <RoleCard
                   on={seek}
                   title="Hizmet arıyorum"
-                  hint="Çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye, bahçe, kargo, çıktı, kışlık, halı, ödev, dil — komşudan al"
+                  hint="Çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye, bahçe, kargo, çıktı, kışlık, halı, ödev, dil, mezar — komşudan al"
                   onClick={() => {
                     setSeek((v) => !v);
                     setErr("");
@@ -273,7 +274,7 @@ export function OnboardingFlow({
                 <RoleCard
                   on={offer}
                   title="Hizmet vermek istiyorum"
-                  hint="Çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye, bahçe, kargo, çıktı, kışlık, halı, ödev veya dil — alanı sonra seçersin"
+                  hint="Çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye, bahçe, kargo, çıktı, kışlık, halı, ödev, dil veya mezar — alanı sonra seçersin"
                   onClick={() => {
                     setOffer((v) => !v);
                     setLaundryAdded(false);
@@ -311,7 +312,7 @@ export function OnboardingFlow({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ara: çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye, bahçe, kargo, çıktı, kışlık, halı, ödev, dil…"
+                placeholder="Ara: çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye, bahçe, kargo, çıktı, kışlık, halı, ödev, dil, mezar…"
                 className="mt-4 w-full rounded-2xl bg-[var(--paper)] px-3 py-3 text-base ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
               />
               {seek && (
@@ -424,6 +425,11 @@ export function OnboardingFlow({
                       Hizmetlerini Hizmet sekmesinden ekleyeceksin: dil, tür, seviye, yer.
                     </p>
                   )}
+                  {offerCat === "mezar" && (
+                    <p className="mt-3 text-xs text-[var(--muted)]">
+                      Hizmetlerini Hizmet sekmesinden ekleyeceksin: tür, mezarlık, fiyat, fotoğraf.
+                    </p>
+                  )}
                 </>
               )}
               <button
@@ -512,7 +518,9 @@ function CategoryPick({
               }`}
             >
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--card)] text-lg" aria-hidden>
-                {c.icon === "globe"
+                {c.icon === "headstone"
+                  ? "🪦"
+                  : c.icon === "globe"
                   ? "🌍"
                   : c.icon === "book"
                   ? "📚"

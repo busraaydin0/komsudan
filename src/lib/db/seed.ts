@@ -22,6 +22,7 @@ import { upsertPreserve } from "./preserves";
 import { upsertCarpet } from "./carpets";
 import { upsertLesson } from "./lessons";
 import { upsertTalk } from "./talks";
+import { upsertGrave } from "./graves";
 
 const SEED_PHONES: Record<string, string> = {
   elif: "5321100001",
@@ -74,6 +75,9 @@ const SEED_PHONES: Record<string, string> = {
   dilara: "5321100048",
   burcu: "5321100049",
   ceren: "5321100050",
+  defne: "5321100051",
+  irem: "5321100052",
+  jale: "5321100053",
 };
 
 function deliveryMode(drops: Array<"kapi" | "nokta">): "door" | "point" | "both" {
@@ -367,6 +371,26 @@ function seedProviderDirectory() {
         place: talk.place,
         materials: talk.materials,
         notes: talk.notes,
+      });
+    }
+    for (const grave of p.graves ?? []) {
+      upsertGrave({
+        id: grave.id,
+        provider_id: p.id,
+        name: grave.name,
+        description: grave.description,
+        kinds: grave.kinds,
+        cemetery: grave.cemetery,
+        radiusKm: grave.radiusKm,
+        price: grave.price,
+        pricing: grave.pricing,
+        flowers: grave.flowers,
+        fees: grave.fees,
+        durationMin: grave.durationMin,
+        photos: grave.photos,
+        avails: grave.avails,
+        workHours: grave.workHours,
+        notes: grave.notes,
       });
     }
     if (p.drops.includes("nokta")) {

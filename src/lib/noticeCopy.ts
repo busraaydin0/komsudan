@@ -51,6 +51,8 @@ function qtyLabel(cat: string, n: number, productName?: string | null): string {
       return name ? `${n} ders · ${name}` : `${n} ders`;
     case "dil":
       return name ? `${n} görüşme · ${name}` : `${n} görüşme`;
+    case "mezar":
+      return name ? `${n} işlem · ${name}` : `${n} işlem`;
     default:
       return name ? `${n} parça · ${name}` : `${n} parça`;
   }
@@ -369,6 +371,27 @@ const ORDER: Record<string, Record<NoticeKind, Template[]>> = {
     cancelled: [{ title: "Görüşme iptal", body: (c) => `${c.orderId} iptal. Ön otorizasyon çözüldü, para çekilmedi.` }],
     pickup: [{ title: "Yeni teslim kodu", body: (c) => `Beş hatalı deneme oldu. Yeni kod: ${c.rawCode || "—"} (SMS simülasyonu, gerçek SMS yok.)` }],
   },
+  mezar: {
+    created: [
+      { title: "Yeni mezar bakımı", body: (c) => `${c.qty} geldi. Kabul veya red için Hizmet’e bak.` },
+      { title: "Ziyaret talebi", body: (c) => `${c.qty}. Mezarlık işi Hizmet’ten bak.` },
+    ],
+    accepted: [
+      { title: "Bakım kabul edildi", body: (c) => `${c.orderId} alındı. Mezarlığa yazıldı.` },
+      { title: "Ziyaret teyit", body: (c) => `${c.qty} kabul. Sıraya girdi.` },
+    ],
+    ready: [
+      { title: "Bakım hazır", body: (c) => `${c.orderId} teslime hazır.${c.code} (SMS simülasyonu, gerçek SMS yok.)` },
+      { title: "Ziyaret bitti", body: (c) => `${c.qty} hazır.${c.code} (SMS simülasyonu, gerçek SMS yok.)` },
+    ],
+    completed: [
+      { title: "Bakım bitti", body: (c) => `${c.orderId} tamam. Ödeme alındı.` },
+      { title: "Ziyaret kapandı", body: (c) => `${c.qty} teslim bitti. Ödeme alındı.` },
+    ],
+    rejected: [{ title: "Bakım reddedildi", body: (c) => `${c.orderId} kabul edilmedi. Ön otorizasyon çözüldü.` }],
+    cancelled: [{ title: "Bakım iptal", body: (c) => `${c.orderId} iptal. Ön otorizasyon çözüldü, para çekilmedi.` }],
+    pickup: [{ title: "Yeni teslim kodu", body: (c) => `Beş hatalı deneme oldu. Yeni kod: ${c.rawCode || "—"} (SMS simülasyonu, gerçek SMS yok.)` }],
+  },
 };
 
 const FALLBACK = ORDER.camasir!;
@@ -466,6 +489,12 @@ export const NUDGES: Record<string, Line[]> = {
     { title: "Kelime unutuluyor.", body: "Görüşmeyi yarına bırakma. Komşudan bak." },
     { title: "Sınav konuşması.", body: "Pratiği Komşudan hallet. Eve kimse girmez." },
     { title: "Ağız açılmıyor.", body: "Haritadan dil komşusu seç. Bir görüşme yeter." },
+  ],
+  mezar: [
+    { title: "Mezarlık bekliyor mu?", body: "Temizlik ve çiçek mezarlıkta. Eve kimse girmez." },
+    { title: "Çiçek soldu.", body: "Bakımı yarına bırakma. Komşudan bak." },
+    { title: "Ziyaret uzak.", body: "Fotoğrafı Komşudan iste. Sen evde kal." },
+    { title: "Bayram öncesi.", body: "Haritadan mezar bakımı seç. Parseli not düş." },
   ],
 };
 

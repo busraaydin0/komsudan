@@ -12,6 +12,7 @@ import { listPreserves, toPublicPreserve } from "./preserves";
 import { listCarpets, toPublicCarpet } from "./carpets";
 import { listLessons, toPublicLesson } from "./lessons";
 import { listTalks, toPublicTalk } from "./talks";
+import { listGraves, toPublicGrave } from "./graves";
 
 export function toProvider(row: {
   id: string;
@@ -34,6 +35,7 @@ export function toProvider(row: {
   const carpets = listCarpets(p.id).map(toPublicCarpet);
   const lessons = listLessons(p.id).map(toPublicLesson);
   const talks = listTalks(p.id).map(toPublicTalk);
+  const graves = listGraves(p.id).map(toPublicGrave);
   return {
     ...p,
     remaining: row.remaining,
@@ -54,6 +56,7 @@ export function toProvider(row: {
     carpets: carpets.length > 0 ? carpets : (p.carpets ?? []),
     lessons: lessons.length > 0 ? lessons : (p.lessons ?? []),
     talks: talks.length > 0 ? talks : (p.talks ?? []),
+    graves: graves.length > 0 ? graves : (p.graves ?? []),
   };
 }
 

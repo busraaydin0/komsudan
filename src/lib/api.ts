@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTalk, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderGrave, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTalk, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -372,7 +372,7 @@ export async function patchMyProviderProfile(body: {
 }
 
 export async function postMyOffer(body: {
-  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil";
+  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil" | "mezar";
   dryingType?: "makine" | "ip" | "ikisi";
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
@@ -1376,5 +1376,81 @@ export async function uploadMyTalkPhoto(id: string, file: File) {
 export async function deleteMyTalk(id: string) {
   await readJson(
     await fetch(`/api/providers/me/talks/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}
+
+export async function postMyGrave(body: {
+  name: string;
+  description?: string | null;
+  kinds?: {
+    temizlik: boolean;
+    cicek: boolean;
+    sulama: boolean;
+    ot: boolean;
+    cevre: boolean;
+    ziyaret: boolean;
+    other: boolean;
+  };
+  cemetery?: string | null;
+  radiusKm?: number;
+  price: number;
+  pricing?: { visit: boolean; job: boolean; monthly: boolean; other: boolean };
+  flowers?: { customer: boolean; provider: boolean; together: boolean };
+  fees?: { included: boolean; extra: boolean };
+  durationMin?: number | null;
+  photos?: { beforeAfter: boolean; after: boolean; none: boolean };
+  avails?: { once: boolean; weekly: boolean; monthly: boolean; days: boolean };
+  workHours?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { grave: ProviderGrave }; grave?: ProviderGrave }>(
+      await fetch("/api/providers/me/graves", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.grave!;
+}
+
+export async function fetchMyGraves() {
+  const data = unwrap(
+    await readJson<{ data?: { graves: ProviderGrave[] }; graves?: ProviderGrave[] }>(
+      await fetch("/api/providers/me/graves"),
+    ),
+  );
+  return data.graves ?? [];
+}
+
+export async function patchMyGrave(id: string, body: Parameters<typeof postMyGrave>[0]) {
+  const data = unwrap(
+    await readJson<{ data?: { grave: ProviderGrave }; grave?: ProviderGrave }>(
+      await fetch(`/api/providers/me/graves/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.grave!;
+}
+
+export async function uploadMyGravePhoto(id: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = unwrap(
+    await readJson<{ data?: { photoUrl: string }; photoUrl?: string }>(
+      await fetch(`/api/providers/me/graves/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
+    ),
+  );
+  return data.photoUrl!;
+}
+
+export async function deleteMyGrave(id: string) {
+  await readJson(
+    await fetch(`/api/providers/me/graves/${encodeURIComponent(id)}`, { method: "DELETE" }),
   );
 }

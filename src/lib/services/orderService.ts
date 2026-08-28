@@ -27,6 +27,8 @@ import { dropsForLesson, lessonCanOrder, lessonQtyBounds } from "@/lib/lesson";
 import { getLesson, toPublicLesson } from "@/lib/db/lessons";
 import { dropsForTalk, talkCanOrder, talkQtyBounds } from "@/lib/talk";
 import { getTalk, toPublicTalk } from "@/lib/db/talks";
+import { dropsForGrave, graveCanOrder, graveQtyBounds, graveUnitMeta } from "@/lib/grave";
+import { getGrave, toPublicGrave } from "@/lib/db/graves";
 import { getCargo, toPublicCargo } from "@/lib/db/cargos";
 import { strategyFor } from "@/lib/fulfillment";
 import {
@@ -205,6 +207,7 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
   if (cat.id === "hali") return createHaliOrder(input, userId, provider);
   if (cat.id === "odev") return createOdevOrder(input, userId, provider);
   if (cat.id === "dil") return createDilOrder(input, userId, provider);
+  if (cat.id === "mezar") return createMezarOrder(input, userId, provider);
   return createLaundryOrder(input, userId, provider);
 }
 
@@ -258,6 +261,8 @@ function insertPendingOrder(args: {
             ? "ders yer"
           : args.packageId === "dil"
             ? "görüşme yer"
+          : args.packageId === "mezar"
+            ? "iş yer"
           : args.packageId === "dikis" ||
             args.packageId === "tamir" ||
             args.packageId === "teknoloji" ||
@@ -1015,6 +1020,58 @@ function createDilOrder(input: CreateOrderInput, userId: string, provider: NonNu
   const id = insertPendingOrder({
     providerId: provider.id,
     packageId: "dil",
+    pieces: qty,
+    express: false,
+    drop: input.drop,
+    dropPointId,
+    slot: input.slot,
+    note: (input.note ?? "").trim().slice(0, 500),
+    quote,
+    userId,
+    productId: row.id,
+    productName: row.name,
+    guestCount: qty,
+  });
+  const order = getOrder(id)!;
+  notifyNewOrder({
+    id,
+    provider_id: provider.id,
+    user_id: userId,
+    pieces: qty,
+  });
+  return order;
+}
+
+function createMezarOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
+  const graveId = (input.productId ?? "").trim();
+  if (!graveId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
+  const row = getGrave(graveId);
+  if (!row || row.provider_id !== provider.id || !row.is_active) {
+    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
+  }
+
+  const card = toPublicGrave(row);
+  if (!graveCanOrder(card)) {
+    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
+  }
+
+  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
+  const { min, max } = graveQtyBounds(card, provider.remaining);
+  const unit = graveUnitMeta(card.pricing);
+  if (!Number.isFinite(qty) || qty < min || qty > max) {
+    throw new ApiError(400, `Miktar ${min}–${max} ${unit.qty} olmalı.`, "VALIDATION_ERROR");
+  }
+
+  const allowedDrops = dropsForGrave(card, provider.drops);
+  if (!allowedDrops.includes(input.drop)) {
+    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
+  }
+
+  const dropPointId = validateDropAndSlot(provider, input);
+  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
+  const id = insertPendingOrder({
+    providerId: provider.id,
+    packageId: "mezar",
     pieces: qty,
     express: false,
     drop: input.drop,

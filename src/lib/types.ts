@@ -283,6 +283,42 @@ export type ProviderTalk = {
   isActive?: boolean;
 };
 
+export type GraveKind = {
+  temizlik: boolean;
+  cicek: boolean;
+  sulama: boolean;
+  ot: boolean;
+  cevre: boolean;
+  ziyaret: boolean;
+  other: boolean;
+};
+export type GravePrice = { visit: boolean; job: boolean; monthly: boolean; other: boolean };
+export type GraveFlower = { customer: boolean; provider: boolean; together: boolean };
+export type GraveFee = { included: boolean; extra: boolean };
+export type GravePhotoSend = { beforeAfter: boolean; after: boolean; none: boolean };
+export type GraveAvail = { once: boolean; weekly: boolean; monthly: boolean; days: boolean };
+
+/** Mezar bakımı kartı. İşlem başı fiyat; siparişte sunucu çarpar. İş mezarlıkta. */
+export type ProviderGrave = {
+  id: string;
+  name: string;
+  description?: string | null;
+  photoUrl?: string | null;
+  kinds: GraveKind;
+  cemetery?: string | null;
+  radiusKm: number;
+  price: number;
+  pricing: GravePrice;
+  flowers: GraveFlower;
+  fees: GraveFee;
+  durationMin?: number | null;
+  photos: GravePhotoSend;
+  avails: GraveAvail;
+  workHours?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+};
+
 /** Kargo & paket kartı. Sabit fiyatta sunucu çarpar; mesafeye göre listedeki tutar başlangıç. */
 export type ProviderCargo = {
   id: string;
@@ -524,6 +560,7 @@ export type Provider = {
   carpets?: ProviderCarpet[];
   lessons?: ProviderLesson[];
   talks?: ProviderTalk[];
+  graves?: ProviderGrave[];
 };
 
 export type DropPoint = {
@@ -562,7 +599,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil";
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil" | "mezar";
   pieces: number;
   express: boolean;
   drop: DropMethod;
