@@ -233,32 +233,25 @@ const DEFAULT_SLOTS = [
   "Yarın 18:00–19:00",
 ];
 
-export function ensureLaundryOffer(
+function ensureDirectoryEntry(
   user: AuthUser,
   input: {
-    dryingType: DryingType;
-    packages: { id: PackageId; pricePerPiece: number }[];
     lat: number;
     lng: number;
     neighborhood: string;
+    bio: string;
+    hasDryer: boolean;
+    categoryId: string;
+    packages: ServicePackage[];
+    dryingType?: DryingType;
   },
 ) {
-  assertUniquePackages(input.packages);
-  const catalogPacks: ServicePackage[] = input.packages.map((pack) => {
-    const meta = PACKAGES.find((p) => p.id === pack.id);
-    if (!meta) throw new ApiError(400, "Paket bulunamadı.", "VALIDATION_ERROR");
-    return { id: pack.id, title: meta.title, blurb: meta.blurb, pricePerPiece: pack.pricePerPiece };
-  });
-  const hasDryer = hasDryerFrom(input.dryingType);
   const neighborhood = input.neighborhood.trim() || PILOT.label;
-  const blurb = dryingBlurb(input.dryingType);
-
   if (user.role !== "admin") {
     setUserRole(user.id, "provider");
   }
-
   const existing = getProfile(user.id);
-  const bio = existing?.bio?.trim() ? existing.bio : blurb;
+  const bio = existing?.bio?.trim() ? existing.bio : input.bio;
   if (!existing) {
     upsertProfile({
       userId: user.id,
@@ -266,12 +259,12 @@ export function ensureLaundryOffer(
       lat: input.lat,
       lng: input.lng,
       neighborhood,
-      hasDryer,
+      hasDryer: input.hasDryer,
       isFounder: false,
       ratingAvg: 0,
       ratingCount: 0,
       avatarUrl: user.avatarUrl,
-      categoryId: "camasir",
+      categoryId: input.categoryId,
     });
   } else {
     updateProfileFields(user.id, {
@@ -279,8 +272,8 @@ export function ensureLaundryOffer(
       lat: input.lat,
       lng: input.lng,
       neighborhood,
-      hasDryer,
-      categoryId: "camasir",
+      hasDryer: input.hasDryer,
+      categoryId: input.categoryId,
     });
   }
 
@@ -292,10 +285,10 @@ export function ensureLaundryOffer(
     loc: { lat: input.lat, lng: input.lng },
     rating: 0,
     reviews: 0,
-    packages: catalogPacks,
+    packages: input.packages,
     capacity: 24,
     remaining: 24,
-    hasDryer,
+    hasDryer: input.hasDryer,
     dryingType: input.dryingType,
     express: false,
     trust: "yeni",
@@ -305,7 +298,7 @@ export function ensureLaundryOffer(
     avatarUrl: user.avatarUrl,
     workPhotos: [],
     recentReviews: [],
-    categoryId: "camasir",
+    categoryId: input.categoryId,
   };
 
   if (!catalogProviderExists(user.id)) {
@@ -313,39 +306,21 @@ export function ensureLaundryOffer(
       id: user.id,
       payload: { ...payload },
       remaining: 24,
-      categoryId: "camasir",
+      categoryId: input.categoryId,
     });
   } else {
     patchCatalogPayload(user.id, {
-      packages: catalogPacks,
-      hasDryer,
+      packages: input.packages,
+      hasDryer: input.hasDryer,
       dryingType: input.dryingType,
       loc: payload.loc,
       neighborhood,
       bio,
       name: payload.name,
       drops,
-      categoryId: "camasir",
+      categoryId: input.categoryId,
     });
   }
-
-  for (const pack of input.packages) {
-    const meta = PACKAGES.find((p) => p.id === pack.id)!;
-    upsertPackage({
-      id: `${user.id}:${pack.id}`,
-      provider_id: user.id,
-      name: meta.title,
-      price_per_kg: pack.pricePerPiece,
-      min_order_amount: MIN_ORDER,
-      express_available: 0,
-      express_surcharge_pct: 0,
-      is_active: 1,
-    });
-  }
-  deactivateOtherPackages(
-    user.id,
-    input.packages.map((p) => `${user.id}:${p.id}`),
-  );
 
   if (countSlots(user.id) === 0) {
     for (const day of [1, 2, 3, 4, 5]) {
@@ -377,6 +352,94 @@ export function ensureLaundryOffer(
   const row = getProfile(user.id);
   if (!row) throw new ApiError(500, "Profil oluşturulamadı.", "INTERNAL");
   return toPublic(row);
+}
+
+export function ensureLaundryOffer(
+  user: AuthUser,
+  input: {
+    dryingType: DryingType;
+    packages: { id: PackageId; pricePerPiece: number }[];
+    lat: number;
+    lng: number;
+    neighborhood: string;
+  },
+) {
+  assertUniquePackages(input.packages);
+  const catalogPacks: ServicePackage[] = input.packages.map((pack) => {
+    const meta = PACKAGES.find((p) => p.id === pack.id);
+    if (!meta) throw new ApiError(400, "Paket bulunamadı.", "VALIDATION_ERROR");
+    return { id: pack.id, title: meta.title, blurb: meta.blurb, pricePerPiece: pack.pricePerPiece };
+  });
+  const row = ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: dryingBlurb(input.dryingType),
+    hasDryer: hasDryerFrom(input.dryingType),
+    categoryId: "camasir",
+    packages: catalogPacks,
+    dryingType: input.dryingType,
+  });
+  for (const pack of input.packages) {
+    const meta = PACKAGES.find((p) => p.id === pack.id)!;
+    upsertPackage({
+      id: `${user.id}:${pack.id}`,
+      provider_id: user.id,
+      name: meta.title,
+      price_per_kg: pack.pricePerPiece,
+      min_order_amount: MIN_ORDER,
+      express_available: 0,
+      express_surcharge_pct: 0,
+      is_active: 1,
+    });
+  }
+  deactivateOtherPackages(
+    user.id,
+    input.packages.map((p) => `${user.id}:${p.id}`),
+  );
+  return row;
+}
+
+export function ensureDavetOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Davet ikramlık. Menünü Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "davet",
+    packages: [],
+  });
+}
+
+export function ensureServiceOffer(
+  user: AuthUser,
+  input: {
+    categoryId?: "camasir" | "davet";
+    dryingType?: DryingType;
+    packages?: { id: PackageId; pricePerPiece: number }[];
+    lat: number;
+    lng: number;
+    neighborhood: string;
+  },
+) {
+  const categoryId = input.categoryId ?? "camasir";
+  if (categoryId === "davet") {
+    return ensureDavetOffer(user, input);
+  }
+  if (!input.dryingType || !input.packages?.length) {
+    throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
+  }
+  return ensureLaundryOffer(user, {
+    dryingType: input.dryingType,
+    packages: input.packages,
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+  });
 }
 
 export function listMyAvailability(user: AuthUser) {

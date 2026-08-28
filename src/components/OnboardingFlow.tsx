@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { NEIGHBORHOODS, PACKAGES, PILOT } from "@/lib/data";
 import { DRYING_OPTIONS } from "@/lib/drying";
-import { fetchCategories, patchPreferences, postMyLaundryOffer, type ServiceCategory } from "@/lib/api";
+import { fetchCategories, patchPreferences, postMyOffer, type ServiceCategory } from "@/lib/api";
 import { readLocationIfGranted, requestLocation } from "@/lib/permissions";
 import { tl } from "@/lib/pricing";
 import type { Account, DryingType, PackageId, PreferredIntent } from "@/lib/types";
@@ -30,6 +30,11 @@ export function OnboardingFlow({
     tam: 18,
   });
   const [laundryAdded, setLaundryAdded] = useState(false);
+  const [offerCat, setOfferCat] = useState<string | null>(
+    account.preferredIntent === "offer" && account.preferredCategoryIds?.[0]
+      ? account.preferredCategoryIds[0]
+      : null,
+  );
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<string[]>(
@@ -64,11 +69,20 @@ export function OnboardingFlow({
     });
   }, [categories, query]);
 
-  function toggleCat(id: string) {
-    setPicked((prev) => {
-      if (offer && !seek) return [id];
-      return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-    });
+  function toggleSeekCat(id: string) {
+    setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setErr("");
+  }
+
+  function pickOfferCat(id: string) {
+    setOfferCat(id);
+    setLaundryAdded(false);
+    setErr("");
+  }
+
+  function mapCategoryIds() {
+    if (seek) return picked;
+    return offerCat ? [offerCat] : [];
   }
 
   function addLaundry() {
@@ -86,16 +100,28 @@ export function OnboardingFlow({
   }
 
   async function persistOffer() {
-    if (!offer || !laundryAdded || !dryingType) return;
+    if (!offer || !offerCat) return;
     const lat = home?.lat ?? PILOT.center.lat;
     const lng = home?.lng ?? PILOT.center.lng;
     const place = (home?.neighborhood || neighborhood || PILOT.label).trim().slice(0, 80);
-    await postMyLaundryOffer({
-      dryingType,
-      packages: offered.map((id) => ({ id, pricePerPiece: prices[id] })),
+    const neighborhoodName = place || PILOT.label;
+    if (offerCat === "camasir") {
+      if (!laundryAdded || !dryingType) return;
+      await postMyOffer({
+        categoryId: "camasir",
+        dryingType,
+        packages: offered.map((id) => ({ id, pricePerPiece: prices[id] })),
+        lat,
+        lng,
+        neighborhood: neighborhoodName,
+      });
+      return;
+    }
+    await postMyOffer({
+      categoryId: "davet",
       lat,
       lng,
-      neighborhood: place || PILOT.label,
+      neighborhood: neighborhoodName,
     });
   }
 
@@ -103,7 +129,7 @@ export function OnboardingFlow({
     await persistOffer();
     await patchPreferences({
       intent,
-      categoryIds: extra.categoryIds ?? (offer && !seek ? ["camasir"] : picked),
+      categoryIds: extra.categoryIds ?? mapCategoryIds(),
       homeLat: home?.lat ?? null,
       homeLng: home?.lng ?? null,
       homeNeighborhood: home?.neighborhood || neighborhood || null,
@@ -119,7 +145,7 @@ export function OnboardingFlow({
       await persist({
         skipped: true,
         completed: true,
-        categoryIds: step === "role" ? (offer && laundryAdded ? ["camasir"] : []) : picked,
+        categoryIds: step === "role" ? [] : mapCategoryIds(),
       });
       onDone(intent);
     } catch (e) {
@@ -134,22 +160,21 @@ export function OnboardingFlow({
       setErr("En az birini seç veya şimdi değil de.");
       return;
     }
-    if (offer && !laundryAdded) {
-      setErr("Parça fiyatı ve kurutmayı yazıp Hizmet ekle’ye bas.");
-      return;
-    }
     setErr("");
-    if (offer && !seek) {
-      setPicked(["camasir"]);
-      setStep("location");
-      return;
-    }
     setStep("category");
   }
 
   async function nextFromCategory() {
-    if (picked.length === 0) {
-      setErr("Bir hizmet alanı seç veya şimdi değil de.");
+    if (seek && picked.length === 0) {
+      setErr("Aradığın hizmet alanını seç veya şimdi değil de.");
+      return;
+    }
+    if (offer && !offerCat) {
+      setErr("Vereceğin hizmet alanını seç.");
+      return;
+    }
+    if (offer && offerCat === "camasir" && !laundryAdded) {
+      setErr("Parça fiyatı ve kurutmayı yazıp Hizmet ekle’ye bas.");
       return;
     }
     setErr("");
@@ -233,7 +258,7 @@ export function OnboardingFlow({
                 <RoleCard
                   on={offer}
                   title="Hizmet vermek istiyorum"
-                  hint="Çamaşır yıkıyorsan aşağıda fiyat ve kurutmayı yaz"
+                  hint="Çamaşır yıkama veya davet ikramlık — alanı sonra seçersin"
                   onClick={() => {
                     setOffer((v) => !v);
                     setLaundryAdded(false);
@@ -241,33 +266,6 @@ export function OnboardingFlow({
                   }}
                 />
               </div>
-              {offer && (
-                <LaundryOfferQa
-                  dryingType={dryingType}
-                  offered={offered}
-                  prices={prices}
-                  added={laundryAdded}
-                  onDrying={(id) => {
-                    setDryingType(id);
-                    setLaundryAdded(false);
-                    setErr("");
-                  }}
-                  onTogglePack={(id) => {
-                    setOffered((prev) => {
-                      if (prev.includes(id)) return prev.length === 1 ? prev : prev.filter((x) => x !== id);
-                      return PACKAGES.map((p) => p.id).filter((x) => x === id || prev.includes(x));
-                    });
-                    setLaundryAdded(false);
-                    setErr("");
-                  }}
-                  onPrice={(id, n) => {
-                    setPrices((prev) => ({ ...prev, [id]: n }));
-                    setLaundryAdded(false);
-                    setErr("");
-                  }}
-                  onAdd={() => void addLaundry()}
-                />
-              )}
               <button
                 type="button"
                 disabled={busy}
@@ -282,10 +280,18 @@ export function OnboardingFlow({
           {step === "category" && (
             <>
               <h1 className="font-[family-name:var(--font-display)] text-2xl">
-                {offer && !seek ? "Hangi alanda hizmet vereceksin?" : "Hangi hizmetler?"}
+                {offer && seek
+                  ? "Alanlar"
+                  : offer
+                    ? "Hangi alanda hizmet vereceksin?"
+                    : "Hangi hizmetler?"}
               </h1>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                {offer && !seek ? "Bir komşu bir alan." : "Birden fazla seçebilirsin. Liste uzayınca ara."}
+                {offer && seek
+                  ? "Aradığın alanlar birden fazla olabilir. Vereceğin hizmet tek alan."
+                  : offer
+                    ? "Bir komşu bir alan."
+                    : "Birden fazla seçebilirsin. Liste uzayınca ara."}
               </p>
               <input
                 value={query}
@@ -293,36 +299,58 @@ export function OnboardingFlow({
                 placeholder="Ara: çamaşır yıkama, davet ikramlık…"
                 className="mt-4 w-full rounded-2xl bg-[var(--paper)] px-3 py-3 text-base ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
               />
-              <ul className="mt-3 max-h-[40vh] space-y-2 overflow-y-auto">
-                {filtered.map((c) => {
-                  const on = picked.includes(c.id);
-                  return (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        onClick={() => toggleCat(c.id)}
-                        className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left ring-1 ${
-                          on ? "bg-[var(--sand)] ring-[var(--clay)]" : "bg-[var(--paper)] ring-[var(--line)]"
-                        }`}
-                      >
-                        <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--card)] text-lg" aria-hidden>
-                          {c.icon === "feast" ? "🥧" : c.icon === "laundry" ? "🧺" : "•"}
-                        </span>
-                        <span>
-                          <span className="block text-sm font-medium">{c.name}</span>
-                          <span className="text-xs text-[var(--muted)]">
-                            {c.blurb ||
-                              (c.fulfillmentMode === "delivery" ? "Kapı / nokta teslim" : "Eve gelen hizmet")}
-                          </span>
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-                {filtered.length === 0 && (
-                  <li className="text-sm text-[var(--muted)]">Bu aramaya uyan alan yok.</li>
-                )}
-              </ul>
+              {seek && (
+                <>
+                  {offer && <p className="mt-4 text-sm font-medium">Hizmet arıyorum</p>}
+                  <CategoryPick
+                    items={filtered}
+                    selected={picked}
+                    onPick={toggleSeekCat}
+                  />
+                </>
+              )}
+              {offer && (
+                <>
+                  {seek && <p className="mt-4 text-sm font-medium">Hizmet vereceğim</p>}
+                  <CategoryPick
+                    items={filtered}
+                    selected={offerCat ? [offerCat] : []}
+                    onPick={pickOfferCat}
+                  />
+                  {offerCat === "camasir" && (
+                    <LaundryOfferQa
+                      dryingType={dryingType}
+                      offered={offered}
+                      prices={prices}
+                      added={laundryAdded}
+                      onDrying={(id) => {
+                        setDryingType(id);
+                        setLaundryAdded(false);
+                        setErr("");
+                      }}
+                      onTogglePack={(id) => {
+                        setOffered((prev) => {
+                          if (prev.includes(id)) return prev.length === 1 ? prev : prev.filter((x) => x !== id);
+                          return PACKAGES.map((p) => p.id).filter((x) => x === id || prev.includes(x));
+                        });
+                        setLaundryAdded(false);
+                        setErr("");
+                      }}
+                      onPrice={(id, n) => {
+                        setPrices((prev) => ({ ...prev, [id]: n }));
+                        setLaundryAdded(false);
+                        setErr("");
+                      }}
+                      onAdd={() => void addLaundry()}
+                    />
+                  )}
+                  {offerCat === "davet" && (
+                    <p className="mt-3 text-xs text-[var(--muted)]">
+                      Menünü Hizmet sekmesinden ekleyeceksin: ürün, fiyat birimi, alerjen.
+                    </p>
+                  )}
+                </>
+              )}
               <button
                 type="button"
                 disabled={busy}
@@ -383,6 +411,47 @@ export function OnboardingFlow({
         </div>
       </div>
     </div>
+  );
+}
+
+function CategoryPick({
+  items,
+  selected,
+  onPick,
+}: {
+  items: ServiceCategory[];
+  selected: string[];
+  onPick: (id: string) => void;
+}) {
+  return (
+    <ul className="mt-3 space-y-2">
+      {items.map((c) => {
+        const on = selected.includes(c.id);
+        return (
+          <li key={c.id}>
+            <button
+              type="button"
+              onClick={() => onPick(c.id)}
+              className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left ring-1 ${
+                on ? "bg-[var(--sand)] ring-[var(--clay)]" : "bg-[var(--paper)] ring-[var(--line)]"
+              }`}
+            >
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--card)] text-lg" aria-hidden>
+                {c.icon === "feast" ? "🥧" : c.icon === "laundry" ? "🧺" : "•"}
+              </span>
+              <span>
+                <span className="block text-sm font-medium">{c.name}</span>
+                <span className="text-xs text-[var(--muted)]">
+                  {c.blurb ||
+                    (c.fulfillmentMode === "delivery" ? "Kapı / nokta teslim" : "Eve gelen hizmet")}
+                </span>
+              </span>
+            </button>
+          </li>
+        );
+      })}
+      {items.length === 0 && <li className="text-sm text-[var(--muted)]">Bu aramaya uyan alan yok.</li>}
+    </ul>
   );
 }
 

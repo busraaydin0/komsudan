@@ -371,9 +371,10 @@ export async function patchMyProviderProfile(body: {
   return data.provider!;
 }
 
-export async function postMyLaundryOffer(body: {
-  dryingType: "makine" | "ip" | "ikisi";
-  packages: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
+export async function postMyOffer(body: {
+  categoryId: "camasir" | "davet";
+  dryingType?: "makine" | "ip" | "ikisi";
+  packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
   lng: number;
   neighborhood: string;

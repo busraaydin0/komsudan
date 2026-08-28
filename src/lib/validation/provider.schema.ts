@@ -48,6 +48,25 @@ export const laundryOfferSchema = z.object({
   neighborhood: z.string().trim().min(1).max(80),
 });
 
+export const serviceOfferSchema = z
+  .object({
+    categoryId: z.enum(["camasir", "davet"]).default("camasir"),
+    dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
+    packages: laundryOfferSchema.shape.packages.optional(),
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+    neighborhood: z.string().trim().min(1).max(80),
+  })
+  .superRefine((val, ctx) => {
+    if (val.categoryId !== "camasir") return;
+    if (!val.dryingType) {
+      ctx.addIssue({ code: "custom", message: "Kurutma tipini seç.", path: ["dryingType"] });
+    }
+    if (!val.packages?.length) {
+      ctx.addIssue({ code: "custom", message: "En az bir paket seç.", path: ["packages"] });
+    }
+  });
+
 export const slotCreateSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
   startTime: hhmm,
