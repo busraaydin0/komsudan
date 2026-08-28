@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PILOT, trustLabel } from "@/lib/data";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
@@ -80,6 +80,8 @@ export function CustomerApp({
   const [note, setNote] = useState("");
   const [dryerOnly, setDryerOnly] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [listTall, setListTall] = useState(false);
+  const listDrag = useRef<{ y: number } | null>(null);
   const [err, setErr] = useState("");
   const [placing, setPlacing] = useState(false);
 
@@ -155,6 +157,29 @@ export function CustomerApp({
     setSelectedId(id);
     setSheet("provider");
     setHello(false);
+  }
+
+  function onListScroll(e: React.UIEvent<HTMLDivElement>) {
+    if (pane !== "map" || sheet !== "list") return;
+    if (!listTall && e.currentTarget.scrollTop > 8) setListTall(true);
+  }
+
+  function onSheetPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
+    if (pane !== "map" || sheet !== "list") return;
+    listDrag.current = { y: e.clientY };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function onSheetPointerUp(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!listDrag.current) return;
+    const dy = listDrag.current.y - e.clientY;
+    listDrag.current = null;
+    if (Math.abs(dy) < 12) {
+      setListTall((open) => !open);
+      return;
+    }
+    if (dy > 28) setListTall(true);
+    else if (dy < -28) setListTall(false);
   }
 
   async function place() {
@@ -311,15 +336,36 @@ export function CustomerApp({
       )}
 
       <section
-        className={`absolute inset-x-0 z-10 mx-auto max-w-lg px-3 transition-[max-height,top] duration-500 ease-[var(--ease-out)] ${
+        className={`absolute inset-x-0 z-10 mx-auto max-w-lg px-3 transition-[height,max-height,top] duration-300 ease-[var(--ease-out)] ${
           pane === "orders"
             ? "top-[calc(env(safe-area-inset-top)+4.25rem)] bottom-[var(--tabbar)]"
-            : `bottom-[var(--tabbar)] ${sheet === "list" ? "max-h-[38vh]" : "max-h-[calc(100dvh-var(--tabbar)-5.5rem)]"}`
+            : `bottom-[var(--tabbar)] ${
+                sheet === "list"
+                  ? listTall
+                    ? "h-[calc(100dvh-var(--tabbar)-5.5rem)] max-h-[calc(100dvh-var(--tabbar)-5.5rem)]"
+                    : "h-[38vh] max-h-[38vh]"
+                  : "max-h-[calc(100dvh-var(--tabbar)-5.5rem)]"
+              }`
         }`}
       >
-        <div className="h-full overflow-y-auto rounded-t-3xl bg-[var(--card)] shadow-[var(--shadow-sheet)] ring-1 ring-[var(--line)]">
+        <div
+          className="h-full overflow-y-auto overscroll-contain rounded-t-3xl bg-[var(--card)] shadow-[var(--shadow-sheet)] ring-1 ring-[var(--line)]"
+          onScroll={onListScroll}
+        >
           <div className="sticky top-0 z-10 flex justify-center bg-[var(--card)] pt-2 pb-1">
-            <div className="h-1 w-10 rounded-full bg-[var(--line)]" />
+            <button
+              type="button"
+              aria-label={listTall ? "Listeyi küçült" : "Listeyi aç"}
+              aria-expanded={listTall}
+              className="flex h-7 w-full touch-none items-center justify-center"
+              onPointerDown={onSheetPointerDown}
+              onPointerUp={onSheetPointerUp}
+              onPointerCancel={() => {
+                listDrag.current = null;
+              }}
+            >
+              <span className="h-1 w-10 rounded-full bg-[var(--line)]" />
+            </button>
           </div>
           <div key={sheet} className="k-sheet">
             {sheet === "list" && pane === "map" && (
