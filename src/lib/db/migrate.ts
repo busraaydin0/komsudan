@@ -170,6 +170,8 @@ function ensureColumns(db: Database.Database) {
   backfillCategories(db);
   addColumn(db, "service_categories", "icon", "icon TEXT");
   addColumn(db, "service_categories", "is_active", "is_active INTEGER NOT NULL DEFAULT 1");
+  addColumn(db, "service_categories", "blurb", "blurb TEXT");
+  addColumn(db, "service_categories", "sort_order", "sort_order INTEGER NOT NULL DEFAULT 0");
   addColumn(db, "users", "preferred_category_ids", "preferred_category_ids TEXT");
   addColumn(db, "users", "preferred_intent", "preferred_intent TEXT");
   addColumn(db, "users", "onboarding_completed_at", "onboarding_completed_at TEXT");
@@ -179,6 +181,18 @@ function ensureColumns(db: Database.Database) {
   db.exec(`
     UPDATE service_categories SET icon = 'laundry' WHERE id = 'camasir' AND (icon IS NULL OR icon = '');
     UPDATE service_categories SET is_active = 1 WHERE is_active IS NULL;
+    UPDATE service_categories SET
+      name = 'Çamaşır',
+      blurb = 'Yıka, katla, kapıda veya noktada bırak',
+      sort_order = 1
+    WHERE id = 'camasir';
+    UPDATE service_categories SET
+      name = 'Davet',
+      icon = 'feast',
+      blurb = 'Kısır, pasta, kurabiye — evden sofraya',
+      is_active = 1,
+      sort_order = 2
+    WHERE id = 'davet';
   `);
 }
 

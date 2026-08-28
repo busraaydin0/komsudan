@@ -305,6 +305,7 @@ export type ServiceCategory = {
   id: string;
   name: string;
   icon: string;
+  blurb: string;
   fulfillmentMode: string;
   pricingModel: string;
 };

@@ -23,7 +23,7 @@ Next.js 16 App Router **JSON API backend** olarak kalır. İleride React Native 
 
 ## Fazlar (sırayla, tek tek)
 
-0 DB + iskelet + zod/jwt → 1 Auth OTP/JWT `/me` → 2 Provider/paket/drop/availability + geo → 3 Sipariş çekirdeği → 4 Durum + history + foto → 5 Bildirim → 6 Ödeme authorize/capture → 6.5 kategori soyutlaması → **6.6 onboarding & keşif** → 7 ev yemeği (Tip A: davet — kısır/pasta/kurabiye) → 8 home-visit (Tip B) → 9+ review/dispute/log.
+0 DB + iskelet + zod/jwt → 1 Auth OTP/JWT `/me` → 2 Provider/paket/drop/availability + geo → 3 Sipariş çekirdeği → 4 Durum + history + foto → 5 Bildirim → 6 Ödeme authorize/capture → 6.5 kategori soyutlaması → 6.6 onboarding & keşif → **7 davet (Tip A: kısır/pasta/kurabiye)** → 8 home-visit (Tip B) → 9+ review/dispute/log.
 
 Orijinal “7 review / 8 dispute / 9 test” **Faz 9+** oldu. Bir fazı bitirmeden sonrakine geçme. "Tüm backend'i yaz" diye genişletme.
 

@@ -8,6 +8,7 @@ export function listCategoriesPublic() {
     id: row.id,
     name: row.name,
     icon: row.icon || row.id,
+    blurb: row.blurb || "",
     fulfillmentMode: row.fulfillment_mode,
     pricingModel: row.pricing_model,
   }));

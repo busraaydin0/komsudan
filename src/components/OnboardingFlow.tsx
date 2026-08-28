@@ -49,10 +49,10 @@ export function OnboardingFlow({
   const filtered = useMemo(() => {
     const q = query.trim().toLocaleLowerCase("tr");
     if (!q) return categories;
-    return categories.filter(
-      (c) =>
-        c.name.toLocaleLowerCase("tr").includes(q) || c.id.toLocaleLowerCase("tr").includes(q),
-    );
+    return categories.filter((c) => {
+      const hay = `${c.name} ${c.id} ${c.blurb}`.toLocaleLowerCase("tr");
+      return hay.includes(q);
+    });
   }, [categories, query]);
 
   function toggleCat(id: string) {
@@ -182,7 +182,7 @@ export function OnboardingFlow({
                 <RoleCard
                   on={seek}
                   title="Hizmet arıyorum"
-                  hint="Çamaşır, sonra yemek — komşudan al"
+                  hint="Çamaşır, davet — komşudan al"
                   onClick={() => {
                     setSeek((v) => !v);
                     setErr("");
@@ -220,7 +220,7 @@ export function OnboardingFlow({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ara: çamaşır, yemek…"
+                placeholder="Ara: çamaşır, davet, kısır, pasta…"
                 className="mt-4 w-full rounded-2xl bg-[var(--paper)] px-3 py-3 text-base ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
               />
               <ul className="mt-3 max-h-[40vh] space-y-2 overflow-y-auto">
@@ -236,12 +236,13 @@ export function OnboardingFlow({
                         }`}
                       >
                         <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--card)] text-lg" aria-hidden>
-                          {c.icon === "laundry" ? "🧺" : "•"}
+                          {c.icon === "feast" ? "🥧" : c.icon === "laundry" ? "🧺" : "•"}
                         </span>
                         <span>
                           <span className="block text-sm font-medium">{c.name}</span>
                           <span className="text-xs text-[var(--muted)]">
-                            {c.fulfillmentMode === "delivery" ? "Kapı / nokta teslim" : "Eve gelen hizmet"}
+                            {c.blurb ||
+                              (c.fulfillmentMode === "delivery" ? "Kapı / nokta teslim" : "Eve gelen hizmet")}
                           </span>
                         </span>
                       </button>
