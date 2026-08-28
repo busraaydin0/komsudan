@@ -122,6 +122,18 @@ import {
   preserveStorageList,
   preserveUnitMeta,
 } from "@/lib/preserve";
+import {
+  CARPET_UNIT,
+  carpetCanOrder,
+  carpetCleanList,
+  carpetDaysLabel,
+  carpetDropLabel,
+  carpetKindList,
+  carpetPickupList,
+  carpetQtyBounds,
+  carpetSizeList,
+  dropsForCarpet,
+} from "@/lib/carpet";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFood, estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
@@ -148,6 +160,7 @@ import type {
   ProviderCargo,
   ProviderPrint,
   ProviderPreserve,
+  ProviderCarpet,
 } from "@/lib/types";
 
 const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), {
@@ -199,6 +212,10 @@ function isCikti(p: Pick<Provider, "categoryId">) {
 
 function isKislik(p: Pick<Provider, "categoryId">) {
   return p.categoryId === "kislik";
+}
+
+function isHali(p: Pick<Provider, "categoryId">) {
+  return p.categoryId === "hali";
 }
 
 function laundryInFilter(ids?: string[]) {
@@ -257,6 +274,10 @@ function listPrice(p: Provider): number | null {
   }
   if (isKislik(p)) {
     const prices = (p.preserves ?? []).filter((x) => x.price > 0).map((x) => x.price);
+    return prices.length ? Math.min(...prices) : null;
+  }
+  if (isHali(p)) {
+    const prices = (p.carpets ?? []).filter((x) => x.price > 0).map((x) => x.price);
     return prices.length ? Math.min(...prices) : null;
   }
   return p.packages.find((x) => x.id === "tam")?.pricePerPiece ?? p.packages.at(-1)?.pricePerPiece ?? null;
@@ -362,6 +383,7 @@ export function CustomerApp({
   const kargo = selected ? isKargo(selected) : false;
   const cikti = selected ? isCikti(selected) : false;
   const kislik = selected ? isKislik(selected) : false;
+  const hali = selected ? isHali(selected) : false;
   const product = selected?.products?.find((x) => x.id === productId) ?? selected?.products?.[0];
   const service = selected?.services?.find((x) => x.id === productId) ?? selected?.services?.[0];
   const repair = selected?.repairs?.find((x) => x.id === productId) ?? selected?.repairs?.[0];
@@ -372,6 +394,7 @@ export function CustomerApp({
   const cargo = selected?.cargos?.find((x) => x.id === productId) ?? selected?.cargos?.[0];
   const print = selected?.prints?.find((x) => x.id === productId) ?? selected?.prints?.[0];
   const preserve = selected?.preserves?.find((x) => x.id === productId) ?? selected?.preserves?.[0];
+  const carpet = selected?.carpets?.find((x) => x.id === productId) ?? selected?.carpets?.[0];
   const quote = selected
     ? davet && product
       ? estimateFood(guests, product.pricePerPerson, loyaltyRate)
@@ -408,6 +431,10 @@ export function CustomerApp({
                             : kislik && preserve && preserveCanOrder(preserve)
                               ? estimateFood(guests, preserve.price, loyaltyRate)
                               : kislik
+                                ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
+                            : hali && carpet && carpetCanOrder(carpet)
+                              ? estimateFood(guests, carpet.price, loyaltyRate)
+                              : hali
                                 ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
                             : estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
     : { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 };
@@ -483,6 +510,9 @@ export function CustomerApp({
       } else if (isKislik(selected)) {
         const first = selected.preserves?.[0]?.id ?? null;
         setProductId(selected.preserves?.some((x) => x.id === productId) ? productId : first);
+      } else if (isHali(selected)) {
+        const first = selected.carpets?.[0]?.id ?? null;
+        setProductId(selected.carpets?.some((x) => x.id === productId) ? productId : first);
       } else {
         setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
       }
@@ -540,6 +570,7 @@ export function CustomerApp({
       const kargoOrder = isKargo(selected);
       const ciktiOrder = isCikti(selected);
       const kislikOrder = isKislik(selected);
+      const haliOrder = isHali(selected);
       if (davetOrder && !allergy.trim()) {
         setErr("Alerji durumunu yaz. Yoksa “yok” de.");
         setPlacing(false);
@@ -581,6 +612,11 @@ export function CustomerApp({
         return;
       }
       if (kislikOrder && !preserveCanOrder(preserve)) {
+        setErr("Bu hizmet için fiyat yok.");
+        setPlacing(false);
+        return;
+      }
+      if (haliOrder && !carpetCanOrder(carpet)) {
         setErr("Bu hizmet için fiyat yok.");
         setPlacing(false);
         return;
@@ -681,6 +717,16 @@ export function CustomerApp({
                 ? {
                     providerId: selected.id,
                     productId: preserve?.id,
+                    guestCount: guests,
+                    drop,
+                    dropPointId: drop === "nokta" ? dropId : null,
+                    slot,
+                    note,
+                  }
+              : haliOrder
+                ? {
+                    providerId: selected.id,
+                    productId: carpet?.id,
                     guestCount: guests,
                     drop,
                     dropPointId: drop === "nokta" ? dropId : null,
@@ -844,6 +890,8 @@ export function CustomerApp({
                                 ? "A4 çıktı evde basılır; adresten veya noktada al. Eve kimse girmez."
                               : categoryIds?.length === 1 && categoryIds[0] === "kislik"
                                 ? "Kışlık evde hazırlanır; adresten veya noktada al. Eve kimse girmez."
+                              : categoryIds?.length === 1 && categoryIds[0] === "hali"
+                                ? "Halı evde yıkanmaz; adresten veya noktada al-ver. Eve kimse girmez."
                               : "Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak."}
               </p>
               <button
@@ -995,6 +1043,13 @@ export function CustomerApp({
                     setGuests((n) => Math.min(max, Math.max(min, n)));
                     const allowed = dropsForPreserve(card, selected.drops);
                     setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
+                  } else if (isHali(selected)) {
+                    const card =
+                      selected.carpets?.find((x) => x.id === productId) ?? selected.carpets?.[0];
+                    const { min, max } = carpetQtyBounds(card, selected.remaining);
+                    setGuests((n) => Math.min(max, Math.max(min, n)));
+                    const allowed = dropsForCarpet(card, selected.drops);
+                    setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
                   } else {
                     setPieces((n) => clampPieces(n, selected.remaining));
                   }
@@ -1021,8 +1076,11 @@ export function CustomerApp({
                 cargo={cargo}
                 print={print}
                 preserve={preserve}
+                carpet={carpet}
                 productName={
-                  kislik
+                  hali
+                    ? carpet?.name
+                    : kislik
                     ? preserve?.name
                     : cikti
                     ? print?.name
@@ -1250,6 +1308,10 @@ function List({
                                     ? (p.preserves ?? []).length
                                       ? ` · ${(p.preserves ?? []).map((x) => x.name).join(", ")}`
                                       : " · hizmet yok"
+                                  : isHali(p)
+                                    ? (p.carpets ?? []).length
+                                      ? ` · ${(p.carpets ?? []).map((x) => x.name).join(", ")}`
+                                      : " · hizmet yok"
                                 : dryingListLabel(p)
                               ? ` · ${dryingListLabel(p)}`
                               : ""}
@@ -1275,7 +1337,7 @@ function List({
                           ? ((isTamir(p) ? p.repairs : p.techs) ?? []).length
                             ? "inceleme"
                             : "hizmet yok"
-                          : isAraba(p) || isDikis(p) || isKurye(p) || isBahce(p) || isKargo(p) || isCikti(p) || isKislik(p)
+                          : isAraba(p) || isDikis(p) || isKurye(p) || isBahce(p) || isKargo(p) || isCikti(p) || isKislik(p) || isHali(p)
                             ? "hizmet yok"
                             : "menü yok"
                         : isDavet(p)
@@ -1286,6 +1348,8 @@ function List({
                               ? `${tl(price)}/sayfa`
                             : isKislik(p)
                               ? `${tl(price)}/${preserveUnitMeta((p.preserves ?? []).find((x) => x.price === price)?.priceUnit ?? (p.preserves ?? [])[0]?.priceUnit).qty}`
+                            : isHali(p)
+                              ? `${tl(price)}/adet`
                             : isKargo(p)
                               ? (p.cargos ?? []).some((x) => x.price > 0 && x.priceType === "mesafe")
                                 ? `${tl(price)}'den`
@@ -1337,7 +1401,8 @@ function ProviderPane({
   const kargo = isKargo(p);
   const cikti = isCikti(p);
   const kislik = isKislik(p);
-  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik;
+  const hali = isHali(p);
+  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali;
   const items = davet
     ? (p.products ?? [])
     : dikis
@@ -1358,6 +1423,8 @@ function ProviderPane({
                     ? (p.prints ?? [])
                     : kislik
                       ? (p.preserves ?? [])
+                    : hali
+                      ? (p.carpets ?? [])
             : p.packages;
   const canNext = unitCatalog ? items.length > 0 : p.packages.length > 0;
   return (
@@ -1388,6 +1455,8 @@ function ProviderPane({
                     ? `bugün ${p.remaining} sayfa yer`
                     : kislik
                     ? `bugün ${p.remaining} yer`
+                    : hali
+                    ? `bugün ${p.remaining} adet yer`
                     : dikis || tamir || teknoloji || araba || kurye || bahce || kargo
                     ? `bugün ${p.remaining} yer`
                     : `bugün ${p.remaining} parça yer`}
@@ -1751,6 +1820,40 @@ function ProviderPane({
                   </span>
                 </button>
               ))
+          : hali
+            ? (p.carpets ?? []).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onProduct(item.id)}
+                  className={`k-chip flex w-full gap-3 rounded-2xl px-3 py-3 text-left ring-1 ${
+                    productId === item.id
+                      ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
+                      : "bg-[var(--paper)] ring-[var(--line)]"
+                  }`}
+                >
+                  {item.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                  ) : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex justify-between font-medium">
+                      {item.name}
+                      <span className="tabular-nums">{tl(item.price)}/adet</span>
+                    </span>
+                    {(carpetKindList(item.kinds).length || carpetSizeList(item.sizes).length) && (
+                      <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                        {[
+                          carpetKindList(item.kinds).slice(0, 2).join(", ") || null,
+                          carpetSizeList(item.sizes).slice(0, 2).join(", ") || null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              ))
           : p.packages.map((pack) => (
               <button
                 key={pack.id}
@@ -1799,6 +1902,9 @@ function ProviderPane({
         {kislik && (p.preserves ?? []).length === 0 && (
           <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
         )}
+        {hali && (p.carpets ?? []).length === 0 && (
+          <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
+        )}
       </div>
       <button
         type="button"
@@ -1830,6 +1936,7 @@ function Checkout({
   cargo,
   print,
   preserve,
+  carpet,
   productName,
   express,
   onExpress,
@@ -1866,6 +1973,7 @@ function Checkout({
   cargo?: ProviderCargo;
   print?: ProviderPrint;
   preserve?: ProviderPreserve;
+  carpet?: ProviderCarpet;
   productName?: string;
   express: boolean;
   onExpress: (v: boolean) => void;
@@ -1895,8 +2003,11 @@ function Checkout({
   const kargo = isKargo(p);
   const cikti = isCikti(p);
   const kislik = isKislik(p);
-  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik;
-  const unit = kislik
+  const hali = isHali(p);
+  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali;
+  const unit = hali
+    ? CARPET_UNIT
+    : kislik
     ? preserveUnitMeta(preserve?.priceUnit)
     : cikti
     ? PRINT_UNIT
@@ -1915,7 +2026,9 @@ function Checkout({
         : dikis
           ? sewingUnitMeta(service?.priceUnit)
           : foodUnitMeta(product?.priceUnit);
-  const bounds = kislik
+  const bounds = hali
+    ? carpetQtyBounds(carpet, p.remaining)
+    : kislik
     ? preserveQtyBounds(preserve, p.remaining)
     : cikti
     ? printQtyBounds(print, p.remaining)
@@ -1936,7 +2049,9 @@ function Checkout({
           : foodQtyBounds(product, p.remaining);
   const cap = unitPriced ? bounds.max : Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
   const minCount = unitPriced ? bounds.min : PIECES_MIN;
-  const foodDrops = kislik
+  const foodDrops = hali
+    ? dropsForCarpet(carpet, p.drops)
+    : kislik
     ? dropsForPreserve(preserve, p.drops)
     : cikti
     ? dropsForPrint(print, p.drops)
@@ -1982,7 +2097,9 @@ function Checkout({
   }
 
   const count = unitPriced ? guests : pieces;
-  const unitPrice = kislik
+  const unitPrice = hali
+    ? (carpet?.price ?? 0)
+    : kislik
     ? (preserve?.price ?? 0)
     : cikti
     ? (print?.price ?? 0)
@@ -2009,21 +2126,22 @@ function Checkout({
     (!bahce || gardenCanOrder(garden)) &&
     (!kargo || cargoCanOrder(cargo)) &&
     (!cikti || printCanOrder(print)) &&
-    (!kislik || preserveCanOrder(preserve));
+    (!kislik || preserveCanOrder(preserve)) &&
+    (!hali || carpetCanOrder(carpet));
   const qtyTitle =
     unit.id === "kisi" ? "Kaç kişilik?" : unit.id === "kg" ? "Kaç kg?" : `Kaç ${unit.qty}?`;
 
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
-        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik ? "← Hizmet" : "← Paket"}
+        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali ? "← Hizmet" : "← Paket"}
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">
         {unitPriced ? qtyTitle : "Kaç parça?"}
       </h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
         {unitPriced
-          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik ? "Seçili hizmet" : "Seçili yemek")} · ${
+          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali ? "Seçili hizmet" : "Seçili yemek")} · ${
               (tamir || teknoloji) && !canPlace
                 ? "fiyat inceleme sonrası."
                 : kurye && courier?.priceType === "mesafe"
@@ -2380,6 +2498,41 @@ function Checkout({
       {kislik && preserve?.notes ? (
         <p className="mt-2 text-xs text-[var(--muted)]">{preserve.notes}</p>
       ) : null}
+      {hali && carpet?.description ? (
+        <p className="mt-3 text-xs text-[var(--muted)]">{carpet.description}</p>
+      ) : null}
+      {hali && carpetKindList(carpet?.kinds).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{carpetKindList(carpet?.kinds).join(", ")}</p>
+      ) : null}
+      {hali && carpetSizeList(carpet?.sizes).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{carpetSizeList(carpet?.sizes).join(", ")}</p>
+      ) : null}
+      {hali && carpetCleanList(carpet?.cleans).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{carpetCleanList(carpet?.cleans).join(", ")}</p>
+      ) : null}
+      {hali && carpet?.minOrder ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">En az {carpet.minOrder} adet</p>
+      ) : null}
+      {hali && carpetDaysLabel(carpet?.leadDays) ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Hazırlama: {carpetDaysLabel(carpet?.leadDays)}.</p>
+      ) : null}
+      {hali && carpetDaysLabel(carpet?.noticeDays, " önce") ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          Bildirim: {carpetDaysLabel(carpet?.noticeDays, " önce")}.
+        </p>
+      ) : null}
+      {hali && carpetPickupList(carpet?.pickup).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Alma: {carpetPickupList(carpet?.pickup).join(", ")}</p>
+      ) : null}
+      {hali && carpet?.readyAt ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Teslim zamanı: {carpet.readyAt}</p>
+      ) : null}
+      {hali && carpet?.products ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Ürünler: {carpet.products}</p>
+      ) : null}
+      {hali && carpet?.notes ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{carpet.notes}</p>
+      ) : null}
       {davet && product?.allergens && (
         <p className="mt-2 text-xs text-[var(--muted)]">İçerik / alerjen: {product.allergens}</p>
       )}
@@ -2416,7 +2569,9 @@ function Checkout({
               drop === d ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
             }`}
           >
-            {kislik
+            {hali
+              ? carpetDropLabel(d)
+              : kislik
               ? preserveDropLabel(d)
               : cikti
               ? printDropLabel(d)
@@ -2484,6 +2639,8 @@ function Checkout({
             ? "Şube, fiş no, kapı kodu…"
             : cikti
             ? "Sayfa, renk, dosya adı…"
+            : hali
+            ? "Leke, ebat, kapı kodu…"
             : kislik
             ? "Kavanoz, alerji, teslim saati…"
             : kurye
@@ -2562,7 +2719,8 @@ function Track({
   const cargo = order.packageId === "kargo";
   const print = order.packageId === "cikti";
   const preserve = order.packageId === "kislik";
-  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print || preserve;
+  const hali = order.packageId === "hali";
+  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali;
   const steps = trackSteps(order.packageId, catalog);
   const idx = steps.indexOf(order.status);
   const [busy, setBusy] = useState(false);
@@ -2577,7 +2735,7 @@ function Track({
         {provider?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : sewing || repair || tech || wash || courier || garden || cargo || print || preserve
+          : sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali
             ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
             : `${order.pieces} parça`}{" "}
         · {tl(order.total)}

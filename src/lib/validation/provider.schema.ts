@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti", "kislik"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti", "kislik", "hali"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -575,6 +575,63 @@ export const preserveCreateSchema = z
   });
 
 export const preservePatchSchema = preserveCreateSchema;
+
+const carpetKindSchema = z.object({
+  hali: z.boolean(),
+  kilim: z.boolean(),
+  yolluk: z.boolean(),
+  other: z.boolean(),
+});
+const carpetSizeSchema = z.object({
+  kucuk: z.boolean(),
+  orta: z.boolean(),
+  buyuk: z.boolean(),
+  xl: z.boolean(),
+});
+const carpetCleanSchema = z.object({
+  genel: z.boolean(),
+  leke: z.boolean(),
+  koku: z.boolean(),
+  ozel: z.boolean(),
+});
+const carpetPickupSchema = z.object({
+  adres: z.boolean(),
+  nokta: z.boolean(),
+});
+
+export const carpetCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    description: z.string().trim().max(400).optional().nullable(),
+    kinds: carpetKindSchema.optional(),
+    sizes: carpetSizeSchema.optional(),
+    minOrder: z.number().int().min(1, "Adet 1–40.").max(40, "Adet 1–40.").optional(),
+    cleans: carpetCleanSchema.optional(),
+    price: z.number({ error: "Fiyat gerekli." }).int().min(1, "Fiyat 1–50.000 ₺.").max(50_000, "Fiyat 1–50.000 ₺."),
+    leadDays: z.number().int().min(0).max(30).optional().nullable(),
+    pickup: carpetPickupSchema.optional(),
+    readyAt: z.string().trim().max(80).optional().nullable(),
+    products: z.string().trim().max(120).optional().nullable(),
+    noticeDays: z.number().int().min(0).max(30).optional().nullable(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.kinds && !val.kinds.hali && !val.kinds.kilim && !val.kinds.yolluk && !val.kinds.other) {
+      ctx.addIssue({ code: "custom", message: "En az bir hizmet türü seç.", path: ["kinds"] });
+    }
+    if (val.sizes && !val.sizes.kucuk && !val.sizes.orta && !val.sizes.buyuk && !val.sizes.xl) {
+      ctx.addIssue({ code: "custom", message: "En az bir halı boyutu seç.", path: ["sizes"] });
+    }
+    if (val.cleans && !val.cleans.genel && !val.cleans.leke && !val.cleans.koku && !val.cleans.ozel) {
+      ctx.addIssue({ code: "custom", message: "En az bir temizlik türü seç.", path: ["cleans"] });
+    }
+    if (val.pickup && !val.pickup.adres && !val.pickup.nokta) {
+      ctx.addIssue({ code: "custom", message: "En az bir teslim alma yöntemi seç.", path: ["pickup"] });
+    }
+  });
+
+export const carpetPatchSchema = carpetCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

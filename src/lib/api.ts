@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCourier, ProviderGarden, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -372,7 +372,7 @@ export async function patchMyProviderProfile(body: {
 }
 
 export async function postMyOffer(body: {
-  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik";
+  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali";
   dryingType?: "makine" | "ip" | "ikisi";
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
@@ -1147,5 +1147,72 @@ export async function uploadMyPreservePhoto(id: string, file: File) {
 export async function deleteMyPreserve(id: string) {
   await readJson(
     await fetch(`/api/providers/me/preserves/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}
+
+export async function postMyCarpet(body: {
+  name: string;
+  description?: string | null;
+  kinds?: { hali: boolean; kilim: boolean; yolluk: boolean; other: boolean };
+  sizes?: { kucuk: boolean; orta: boolean; buyuk: boolean; xl: boolean };
+  minOrder?: number;
+  cleans?: { genel: boolean; leke: boolean; koku: boolean; ozel: boolean };
+  price: number;
+  leadDays?: number | null;
+  pickup?: { adres: boolean; nokta: boolean };
+  readyAt?: string | null;
+  products?: string | null;
+  noticeDays?: number | null;
+  notes?: string | null;
+  isActive?: boolean;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { carpet: ProviderCarpet }; carpet?: ProviderCarpet }>(
+      await fetch("/api/providers/me/carpets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.carpet!;
+}
+
+export async function fetchMyCarpets() {
+  const data = unwrap(
+    await readJson<{ data?: { carpets: ProviderCarpet[] }; carpets?: ProviderCarpet[] }>(
+      await fetch("/api/providers/me/carpets"),
+    ),
+  );
+  return data.carpets ?? [];
+}
+
+export async function patchMyCarpet(id: string, body: Parameters<typeof postMyCarpet>[0]) {
+  const data = unwrap(
+    await readJson<{ data?: { carpet: ProviderCarpet }; carpet?: ProviderCarpet }>(
+      await fetch(`/api/providers/me/carpets/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.carpet!;
+}
+
+export async function uploadMyCarpetPhoto(id: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = unwrap(
+    await readJson<{ data?: { photoUrl: string }; photoUrl?: string }>(
+      await fetch(`/api/providers/me/carpets/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
+    ),
+  );
+  return data.photoUrl!;
+}
+
+export async function deleteMyCarpet(id: string) {
+  await readJson(
+    await fetch(`/api/providers/me/carpets/${encodeURIComponent(id)}`, { method: "DELETE" }),
   );
 }

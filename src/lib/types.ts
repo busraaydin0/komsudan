@@ -133,6 +133,11 @@ export type PreservePriceUnit = "kg" | "porsiyon" | "paket" | "tepsi" | "adet";
 export type PreserveStorage = { frozen: boolean; fresh: boolean; dried: boolean; jarred: boolean };
 export type PreservePickup = { adres: boolean; nokta: boolean };
 
+export type CarpetKind = { hali: boolean; kilim: boolean; yolluk: boolean; other: boolean };
+export type CarpetSize = { kucuk: boolean; orta: boolean; buyuk: boolean; xl: boolean };
+export type CarpetClean = { genel: boolean; leke: boolean; koku: boolean; ozel: boolean };
+export type CarpetPickup = { adres: boolean; nokta: boolean };
+
 /** Evde çıktı kartı. Sayfa başı fiyat; siparişte sunucu çarpar. */
 export type ProviderPrint = {
   id: string;
@@ -172,6 +177,26 @@ export type ProviderPreserve = {
   pickup: PreservePickup;
   season?: string | null;
   allergens?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+};
+
+/** Halı yıkama kartı. Adet başı fiyat; siparişte sunucu çarpar. */
+export type ProviderCarpet = {
+  id: string;
+  name: string;
+  description?: string | null;
+  photoUrl?: string | null;
+  kinds: CarpetKind;
+  sizes: CarpetSize;
+  minOrder?: number;
+  cleans: CarpetClean;
+  price: number;
+  leadDays?: number | null;
+  pickup: CarpetPickup;
+  readyAt?: string | null;
+  products?: string | null;
+  noticeDays?: number | null;
   notes?: string | null;
   isActive?: boolean;
 };
@@ -414,6 +439,7 @@ export type Provider = {
   cargos?: ProviderCargo[];
   prints?: ProviderPrint[];
   preserves?: ProviderPreserve[];
+  carpets?: ProviderCarpet[];
 };
 
 export type DropPoint = {
@@ -452,7 +478,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik";
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali";
   pieces: number;
   express: boolean;
   drop: DropMethod;

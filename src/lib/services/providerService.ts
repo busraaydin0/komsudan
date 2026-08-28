@@ -106,6 +106,15 @@ import {
   updatePreserve,
   type PreserveWrite,
 } from "@/lib/db/preserves";
+import {
+  countCarpets,
+  deactivateCarpet,
+  insertCarpet,
+  listCarpets,
+  toPublicCarpet,
+  updateCarpet,
+  type CarpetWrite,
+} from "@/lib/db/carpets";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -184,6 +193,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     cargos: listCargos(row.user_id).map(toPublicCargo),
     prints: listPrints(row.user_id).map(toPublicPrint),
     preserves: listPreserves(row.user_id).map(toPublicPreserve),
+    carpets: listCarpets(row.user_id).map(toPublicCarpet),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -259,7 +269,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti" || categoryId === "kislik")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti" || categoryId === "kislik" || categoryId === "hali")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -640,10 +650,25 @@ export function ensureKislikOffer(
   });
 }
 
+export function ensureHaliOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Halı yıkama. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "hali",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -681,6 +706,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "kislik") {
     return ensureKislikOffer(user, input);
+  }
+  if (categoryId === "hali") {
+    return ensureHaliOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -1423,6 +1451,79 @@ export function patchMyPreserve(user: AuthUser, preserveId: string, input: Prese
 export function removeMyPreserve(user: AuthUser, preserveId: string) {
   requireProvider(user);
   if (!deactivatePreserve(preserveId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_CARPETS = 12;
+
+function assertCarpetWrite(input: CarpetWrite) {
+  if (input.price < 1) {
+    throw new ApiError(400, "Fiyat 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
+  }
+  const k = input.kinds;
+  if (k && !k.hali && !k.kilim && !k.yolluk && !k.other) {
+    throw new ApiError(400, "En az bir hizmet türü seç.", "VALIDATION_ERROR");
+  }
+  const s = input.sizes;
+  if (s && !s.kucuk && !s.orta && !s.buyuk && !s.xl) {
+    throw new ApiError(400, "En az bir halı boyutu seç.", "VALIDATION_ERROR");
+  }
+  const c = input.cleans;
+  if (c && !c.genel && !c.leke && !c.koku && !c.ozel) {
+    throw new ApiError(400, "En az bir temizlik türü seç.", "VALIDATION_ERROR");
+  }
+  const p = input.pickup;
+  if (p && !p.adres && !p.nokta) {
+    throw new ApiError(400, "En az bir teslim alma yöntemi seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyCarpets(user: AuthUser) {
+  requireProvider(user);
+  return listCarpets(user.id, false).map(toPublicCarpet);
+}
+
+export function addMyCarpet(user: AuthUser, input: CarpetWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "hali") {
+    throw new ApiError(400, "Halı kartı yalnızca Halı Yıkama alanında.", "VALIDATION_ERROR");
+  }
+  assertCarpetWrite(input);
+  if (countCarpets(user.id, false) >= MAX_CARPETS) {
+    throw new ApiError(400, `En fazla ${MAX_CARPETS} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicCarpet(
+    insertCarpet(user.id, {
+      ...input,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      readyAt: input.readyAt?.trim() || null,
+      products: input.products?.trim() || null,
+      notes: input.notes?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyCarpet(user: AuthUser, carpetId: string, input: CarpetWrite) {
+  requireProvider(user);
+  assertCarpetWrite(input);
+  const row = updateCarpet(carpetId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    readyAt: input.readyAt?.trim() || null,
+    products: input.products?.trim() || null,
+    notes: input.notes?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicCarpet(row);
+}
+
+export function removeMyCarpet(user: AuthUser, carpetId: string) {
+  requireProvider(user);
+  if (!deactivateCarpet(carpetId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };

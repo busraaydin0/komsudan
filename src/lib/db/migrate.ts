@@ -274,6 +274,15 @@ function ensureColumns(db: Database.Database) {
       is_active = 1,
       sort_order = 11
     WHERE id = 'kislik';
+    INSERT OR IGNORE INTO service_categories (id, name, fulfillment_mode, pricing_model)
+    VALUES ('hali', 'Halı Yıkama', 'delivery', 'fixed');
+    UPDATE service_categories SET
+      name = 'Halı Yıkama',
+      icon = 'soap',
+      blurb = 'Halı, kilim — yakında al-ver',
+      is_active = 1,
+      sort_order = 12
+    WHERE id = 'hali';
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS provider_services (
@@ -569,6 +578,39 @@ function ensureColumns(db: Database.Database) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_preserves_provider ON provider_preserves(provider_id);
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_carpets (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL REFERENCES provider_profiles(user_id),
+      name TEXT NOT NULL,
+      description TEXT,
+      photo_url TEXT,
+      kind_hali INTEGER NOT NULL DEFAULT 0,
+      kind_kilim INTEGER NOT NULL DEFAULT 0,
+      kind_yolluk INTEGER NOT NULL DEFAULT 0,
+      kind_other INTEGER NOT NULL DEFAULT 0,
+      size_kucuk INTEGER NOT NULL DEFAULT 0,
+      size_orta INTEGER NOT NULL DEFAULT 0,
+      size_buyuk INTEGER NOT NULL DEFAULT 0,
+      size_xl INTEGER NOT NULL DEFAULT 0,
+      min_order INTEGER NOT NULL DEFAULT 1,
+      clean_genel INTEGER NOT NULL DEFAULT 0,
+      clean_leke INTEGER NOT NULL DEFAULT 0,
+      clean_koku INTEGER NOT NULL DEFAULT 0,
+      clean_ozel INTEGER NOT NULL DEFAULT 0,
+      price INTEGER NOT NULL DEFAULT 0,
+      lead_days INTEGER,
+      pick_adres INTEGER NOT NULL DEFAULT 0,
+      pick_nokta INTEGER NOT NULL DEFAULT 0,
+      ready_at TEXT,
+      products TEXT,
+      notice_days INTEGER,
+      notes TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_carpets_provider ON provider_carpets(provider_id);
   `);
   addColumn(db, "orders", "product_id", "product_id TEXT");
   addColumn(db, "orders", "product_name", "product_name TEXT");
