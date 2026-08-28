@@ -48,7 +48,7 @@ export function getCategoryForProvider(providerId: string): CategoryRow {
     row ??
     getCategory(DEFAULT_CATEGORY_ID) ?? {
       id: DEFAULT_CATEGORY_ID,
-      name: "Çamaşır",
+      name: "Çamaşır Yıkama",
       icon: "laundry",
       fulfillment_mode: "delivery",
       pricing_model: "per_piece",

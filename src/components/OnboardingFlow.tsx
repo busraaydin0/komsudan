@@ -176,7 +176,7 @@ export function OnboardingFlow({
                 <RoleCard
                   on={seek}
                   title="Hizmet arıyorum"
-                  hint="Çamaşır, davet — komşudan al"
+                  hint="Çamaşır yıkama, davet ikramlık — komşudan al"
                   onClick={() => {
                     setSeek((v) => !v);
                     setErr("");
@@ -214,7 +214,7 @@ export function OnboardingFlow({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ara: çamaşır, davet, kısır, pasta…"
+                placeholder="Ara: çamaşır yıkama, davet ikramlık…"
                 className="mt-4 w-full rounded-2xl bg-[var(--paper)] px-3 py-3 text-base ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
               />
               <ul className="mt-3 max-h-[40vh] space-y-2 overflow-y-auto">
