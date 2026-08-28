@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -253,6 +253,89 @@ export const washCreateSchema = z
   });
 
 export const washPatchSchema = washCreateSchema;
+
+const courierTransportSchema = z.object({
+  yaya: z.boolean(),
+  bisiklet: z.boolean(),
+  ebike: z.boolean(),
+  motor: z.boolean(),
+});
+const courierSizeSchema = z.object({
+  kucuk: z.boolean(),
+  orta: z.boolean(),
+  buyuk: z.boolean(),
+});
+const courierRouteSchema = z.object({
+  adresAdres: z.boolean(),
+  noktaAdres: z.boolean(),
+  noktaNokta: z.boolean(),
+});
+const courierCarrySchema = z.object({
+  evrak: z.boolean(),
+  paket: z.boolean(),
+  kiyafet: z.boolean(),
+  anahtar: z.boolean(),
+  hediye: z.boolean(),
+  kisisel: z.boolean(),
+  diger: z.boolean(),
+});
+const courierConfirmSchema = z.object({
+  kod: z.boolean(),
+  app: z.boolean(),
+});
+
+export const courierCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    description: z.string().trim().max(400).optional().nullable(),
+    transport: courierTransportSchema.optional(),
+    sizes: courierSizeSchema.optional(),
+    maxKm: z.number().int().min(1, "Mesafe 1–50 km.").max(50, "Mesafe 1–50 km.").optional(),
+    price: z.number({ error: "Fiyat gerekli." }).int().min(1, "Fiyat 1–50.000 ₺.").max(50_000, "Fiyat 1–50.000 ₺."),
+    priceType: z.enum(["sabit", "mesafe"]).optional(),
+    durationMin: z.number().int().min(0).max(480).optional().nullable(),
+    routes: courierRouteSchema.optional(),
+    avail: z.enum(["hemen", "randevu", "saat"]).optional(),
+    workHours: z.string().trim().max(80).optional().nullable(),
+    region: z.string().trim().max(120).optional().nullable(),
+    carry: courierCarrySchema.optional(),
+    carryOther: z.string().trim().max(80).optional().nullable(),
+    refuse: z.string().trim().max(400).optional().nullable(),
+    confirm: courierConfirmSchema.optional(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.transport && !val.transport.yaya && !val.transport.bisiklet && !val.transport.ebike && !val.transport.motor) {
+      ctx.addIssue({ code: "custom", message: "En az bir ulaşım türü seç.", path: ["transport"] });
+    }
+    if (val.sizes && !val.sizes.kucuk && !val.sizes.orta && !val.sizes.buyuk) {
+      ctx.addIssue({ code: "custom", message: "En az bir paket boyutu seç.", path: ["sizes"] });
+    }
+    if (val.routes && !val.routes.adresAdres && !val.routes.noktaAdres && !val.routes.noktaNokta) {
+      ctx.addIssue({ code: "custom", message: "En az bir teslimat şekli seç.", path: ["routes"] });
+    }
+    if (
+      val.carry &&
+      !val.carry.evrak &&
+      !val.carry.paket &&
+      !val.carry.kiyafet &&
+      !val.carry.anahtar &&
+      !val.carry.hediye &&
+      !val.carry.kisisel &&
+      !val.carry.diger
+    ) {
+      ctx.addIssue({ code: "custom", message: "En az bir taşınabilir paket türü seç.", path: ["carry"] });
+    }
+    if (val.carry?.diger && !val.carryOther?.trim()) {
+      ctx.addIssue({ code: "custom", message: "Diğer paket türünü yaz.", path: ["carryOther"] });
+    }
+    if (val.confirm && !val.confirm.kod && !val.confirm.app) {
+      ctx.addIssue({ code: "custom", message: "En az bir teslim onayı seç.", path: ["confirm"] });
+    }
+  });
+
+export const courierPatchSchema = courierCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

@@ -32,7 +32,7 @@ export function LaundryProfile({
   const [ok, setOk] = useState("");
 
   useEffect(() => {
-    if (!me || me.categoryId === "davet" || me.categoryId === "dikis" || me.categoryId === "tamir" || me.categoryId === "teknoloji" || me.categoryId === "araba") return;
+    if (!me || me.categoryId === "davet" || me.categoryId === "dikis" || me.categoryId === "tamir" || me.categoryId === "teknoloji" || me.categoryId === "araba" || me.categoryId === "kurye") return;
     setBio(me.bio);
     setDryingType(dryingFromProvider(me));
     setExpress(me.express);
@@ -46,7 +46,7 @@ export function LaundryProfile({
     });
   }, [me]);
 
-  if (!me || me.categoryId === "davet" || me.categoryId === "dikis" || me.categoryId === "tamir" || me.categoryId === "teknoloji" || me.categoryId === "araba") return null;
+  if (!me || me.categoryId === "davet" || me.categoryId === "dikis" || me.categoryId === "tamir" || me.categoryId === "teknoloji" || me.categoryId === "araba" || me.categoryId === "kurye") return null;
 
   const tone = seatTone(me.remaining, me.capacity);
 

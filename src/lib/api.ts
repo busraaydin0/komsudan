@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCourier, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -372,7 +372,7 @@ export async function patchMyProviderProfile(body: {
 }
 
 export async function postMyOffer(body: {
-  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba";
+  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye";
   dryingType?: "makine" | "ip" | "ikisi";
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
@@ -762,5 +762,89 @@ export async function uploadMyWashPhoto(id: string, file: File) {
 export async function deleteMyWash(id: string) {
   await readJson(
     await fetch(`/api/providers/me/washes/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}
+
+export async function postMyCourier(body: {
+  name: string;
+  description?: string | null;
+  transport?: {
+    yaya: boolean;
+    bisiklet: boolean;
+    ebike: boolean;
+    motor: boolean;
+  };
+  sizes?: { kucuk: boolean; orta: boolean; buyuk: boolean };
+  maxKm?: number;
+  price: number;
+  priceType?: "sabit" | "mesafe";
+  durationMin?: number | null;
+  routes?: { adresAdres: boolean; noktaAdres: boolean; noktaNokta: boolean };
+  avail?: "hemen" | "randevu" | "saat";
+  workHours?: string | null;
+  region?: string | null;
+  carry?: {
+    evrak: boolean;
+    paket: boolean;
+    kiyafet: boolean;
+    anahtar: boolean;
+    hediye: boolean;
+    kisisel: boolean;
+    diger: boolean;
+  };
+  carryOther?: string | null;
+  refuse?: string | null;
+  confirm?: { kod: boolean; app: boolean };
+  notes?: string | null;
+  isActive?: boolean;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { courier: ProviderCourier }; courier?: ProviderCourier }>(
+      await fetch("/api/providers/me/couriers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.courier!;
+}
+
+export async function fetchMyCouriers() {
+  const data = unwrap(
+    await readJson<{ data?: { couriers: ProviderCourier[] }; couriers?: ProviderCourier[] }>(
+      await fetch("/api/providers/me/couriers"),
+    ),
+  );
+  return data.couriers ?? [];
+}
+
+export async function patchMyCourier(id: string, body: Parameters<typeof postMyCourier>[0]) {
+  const data = unwrap(
+    await readJson<{ data?: { courier: ProviderCourier }; courier?: ProviderCourier }>(
+      await fetch(`/api/providers/me/couriers/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.courier!;
+}
+
+export async function uploadMyCourierPhoto(id: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = unwrap(
+    await readJson<{ data?: { photoUrl: string; courier: ProviderCourier }; photoUrl?: string; courier?: ProviderCourier }>(
+      await fetch(`/api/providers/me/couriers/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
+    ),
+  );
+  return data;
+}
+
+export async function deleteMyCourier(id: string) {
+  await readJson(
+    await fetch(`/api/providers/me/couriers/${encodeURIComponent(id)}`, { method: "DELETE" }),
   );
 }

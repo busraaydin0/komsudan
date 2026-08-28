@@ -14,6 +14,7 @@ import { upsertService } from "./services";
 import { upsertRepair } from "./repairs";
 import { upsertTech } from "./tech";
 import { upsertWash } from "./washes";
+import { upsertCourier } from "./couriers";
 
 const SEED_PHONES: Record<string, string> = {
   elif: "5321100001",
@@ -42,6 +43,9 @@ const SEED_PHONES: Record<string, string> = {
   okan: "5321100024",
   serkan: "5321100025",
   volkan: "5321100026",
+  deniz: "5321100027",
+  kaan: "5321100028",
+  yusuf: "5321100029",
 };
 
 function deliveryMode(drops: Array<"kapi" | "nokta">): "door" | "point" | "both" {
@@ -174,6 +178,29 @@ function seedProviderDirectory() {
         workHours: wash.workHours,
         materials: wash.materials,
         notes: wash.notes,
+      });
+    }
+    for (const courier of p.couriers ?? []) {
+      upsertCourier({
+        id: courier.id,
+        provider_id: p.id,
+        name: courier.name,
+        description: courier.description,
+        transport: courier.transport,
+        sizes: courier.sizes,
+        maxKm: courier.maxKm,
+        price: courier.price,
+        priceType: courier.priceType,
+        durationMin: courier.durationMin,
+        routes: courier.routes,
+        avail: courier.avail,
+        workHours: courier.workHours,
+        region: courier.region,
+        carry: courier.carry,
+        carryOther: courier.carryOther,
+        refuse: courier.refuse,
+        confirm: courier.confirm,
+        notes: courier.notes,
       });
     }
     if (p.drops.includes("nokta")) {

@@ -4,6 +4,7 @@ import { listServices, toPublicService } from "./services";
 import { listRepairs, toPublicRepair } from "./repairs";
 import { listTechs, toPublicTech } from "./tech";
 import { listWashes, toPublicWash } from "./washes";
+import { listCouriers, toPublicCourier } from "./couriers";
 
 export function toProvider(row: {
   id: string;
@@ -18,6 +19,7 @@ export function toProvider(row: {
   const repairs = listRepairs(p.id).map(toPublicRepair);
   const techs = listTechs(p.id).map(toPublicTech);
   const washes = listWashes(p.id).map(toPublicWash);
+  const couriers = listCouriers(p.id).map(toPublicCourier);
   return {
     ...p,
     remaining: row.remaining,
@@ -30,6 +32,7 @@ export function toProvider(row: {
     repairs: repairs.length > 0 ? repairs : (p.repairs ?? []),
     techs: techs.length > 0 ? techs : (p.techs ?? []),
     washes: washes.length > 0 ? washes : (p.washes ?? []),
+    couriers: couriers.length > 0 ? couriers : (p.couriers ?? []),
   };
 }
 

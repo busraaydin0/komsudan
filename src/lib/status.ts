@@ -70,7 +70,7 @@ export function canTransition(from: ApiLifecycle, to: ApiLifecycle, packageId: P
 
 export function nextStatus(
   current: OrderStatus,
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba",
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye",
   food = false,
 ): OrderStatus | null {
   if (
@@ -79,7 +79,8 @@ export function nextStatus(
     packageId === "dikis" ||
     packageId === "tamir" ||
     packageId === "teknoloji" ||
-    packageId === "araba"
+    packageId === "araba" ||
+    packageId === "kurye"
   ) {
     if (current === "onay_bekliyor") return "teslim_alindi";
     if (current === "teslim_alindi") return "hazir";
@@ -110,7 +111,7 @@ export const PICKUP_CODE_LEN = 6;
 export const PICKUP_CODE_TRIES = 5;
 
 export function trackSteps(
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba",
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye",
   food = false,
 ): OrderStatus[] {
   if (
@@ -119,7 +120,8 @@ export function trackSteps(
     packageId === "dikis" ||
     packageId === "tamir" ||
     packageId === "teknoloji" ||
-    packageId === "araba"
+    packageId === "araba" ||
+    packageId === "kurye"
   ) {
     return ["onay_bekliyor", "teslim_alindi", "hazir", "teslim_edildi"];
   }

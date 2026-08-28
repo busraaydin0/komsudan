@@ -59,6 +59,51 @@ export type WashIncludes = {
   kurulama: boolean;
 };
 
+export type CourierTransport = {
+  yaya: boolean;
+  bisiklet: boolean;
+  ebike: boolean;
+  motor: boolean;
+};
+export type CourierSize = { kucuk: boolean; orta: boolean; buyuk: boolean };
+export type CourierPriceType = "sabit" | "mesafe";
+export type CourierRoute = { adresAdres: boolean; noktaAdres: boolean; noktaNokta: boolean };
+export type CourierAvail = "hemen" | "randevu" | "saat";
+export type CourierCarry = {
+  evrak: boolean;
+  paket: boolean;
+  kiyafet: boolean;
+  anahtar: boolean;
+  hediye: boolean;
+  kisisel: boolean;
+  diger: boolean;
+};
+export type CourierConfirm = { kod: boolean; app: boolean };
+
+/** Yakın mesafe kurye kartı. Sabit fiyatta sunucu çarpar; mesafeye göre listedeki tutar başlangıç. */
+export type ProviderCourier = {
+  id: string;
+  name: string;
+  description?: string | null;
+  photoUrl?: string | null;
+  transport: CourierTransport;
+  sizes: CourierSize;
+  maxKm: number;
+  price: number;
+  priceType?: CourierPriceType;
+  durationMin?: number | null;
+  routes: CourierRoute;
+  avail?: CourierAvail;
+  workHours?: string | null;
+  region?: string | null;
+  carry: CourierCarry;
+  carryOther?: string | null;
+  refuse?: string | null;
+  confirm: CourierConfirm;
+  notes?: string | null;
+  isActive?: boolean;
+};
+
 /** Araba yıkama kartı. Fiyat araç başı; siparişte sunucu çarpar. */
 export type ProviderWash = {
   id: string;
@@ -223,6 +268,7 @@ export type Provider = {
   repairs?: ProviderRepair[];
   techs?: ProviderTech[];
   washes?: ProviderWash[];
+  couriers?: ProviderCourier[];
 };
 
 export type DropPoint = {
@@ -261,7 +307,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba";
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye";
   pieces: number;
   express: boolean;
   drop: DropMethod;

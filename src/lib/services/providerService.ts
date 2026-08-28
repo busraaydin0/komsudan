@@ -61,6 +61,15 @@ import {
   updateWash,
   type WashWrite,
 } from "@/lib/db/washes";
+import {
+  countCouriers,
+  deactivateCourier,
+  insertCourier,
+  listCouriers,
+  toPublicCourier,
+  updateCourier,
+  type CourierWrite,
+} from "@/lib/db/couriers";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -134,6 +143,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     repairs: listRepairs(row.user_id).map(toPublicRepair),
     techs: listTechs(row.user_id).map(toPublicTech),
     washes: listWashes(row.user_id).map(toPublicWash),
+    couriers: listCouriers(row.user_id).map(toPublicCourier),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -209,7 +219,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -515,10 +525,25 @@ export function ensureArabaOffer(
   });
 }
 
+export function ensureKuryeOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Yakın mesafe kurye. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "kurye",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -541,6 +566,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "araba") {
     return ensureArabaOffer(user, input);
+  }
+  if (categoryId === "kurye") {
+    return ensureKuryeOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -889,6 +917,90 @@ export function patchMyWash(user: AuthUser, washId: string, input: WashWrite) {
 export function removeMyWash(user: AuthUser, washId: string) {
   requireProvider(user);
   if (!deactivateWash(washId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_COURIERS = 12;
+
+function assertCourierWrite(input: CourierWrite) {
+  if (input.price < 1) {
+    throw new ApiError(400, "Fiyat 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
+  }
+  const t = input.transport;
+  if (t && !t.yaya && !t.bisiklet && !t.ebike && !t.motor) {
+    throw new ApiError(400, "En az bir ulaşım türü seç.", "VALIDATION_ERROR");
+  }
+  const s = input.sizes;
+  if (s && !s.kucuk && !s.orta && !s.buyuk) {
+    throw new ApiError(400, "En az bir paket boyutu seç.", "VALIDATION_ERROR");
+  }
+  const r = input.routes;
+  if (r && !r.adresAdres && !r.noktaAdres && !r.noktaNokta) {
+    throw new ApiError(400, "En az bir teslimat şekli seç.", "VALIDATION_ERROR");
+  }
+  const c = input.carry;
+  if (c && !c.evrak && !c.paket && !c.kiyafet && !c.anahtar && !c.hediye && !c.kisisel && !c.diger) {
+    throw new ApiError(400, "En az bir taşınabilir paket türü seç.", "VALIDATION_ERROR");
+  }
+  if (c?.diger && !input.carryOther?.trim()) {
+    throw new ApiError(400, "Diğer paket türünü yaz.", "VALIDATION_ERROR");
+  }
+  const k = input.confirm;
+  if (k && !k.kod && !k.app) {
+    throw new ApiError(400, "En az bir teslim onayı seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyCouriers(user: AuthUser) {
+  requireProvider(user);
+  return listCouriers(user.id, false).map(toPublicCourier);
+}
+
+export function addMyCourier(user: AuthUser, input: CourierWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "kurye") {
+    throw new ApiError(400, "Kurye kartı yalnızca Yakın Mesafe Kurye alanında.", "VALIDATION_ERROR");
+  }
+  assertCourierWrite(input);
+  if (countCouriers(user.id, false) >= MAX_COURIERS) {
+    throw new ApiError(400, `En fazla ${MAX_COURIERS} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicCourier(
+    insertCourier(user.id, {
+      ...input,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      region: input.region?.trim() || null,
+      notes: input.notes?.trim() || null,
+      workHours: input.workHours?.trim() || null,
+      refuse: input.refuse?.trim() || null,
+      carryOther: input.carryOther?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyCourier(user: AuthUser, courierId: string, input: CourierWrite) {
+  requireProvider(user);
+  assertCourierWrite(input);
+  const row = updateCourier(courierId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    region: input.region?.trim() || null,
+    notes: input.notes?.trim() || null,
+    workHours: input.workHours?.trim() || null,
+    refuse: input.refuse?.trim() || null,
+    carryOther: input.carryOther?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicCourier(row);
+}
+
+export function removeMyCourier(user: AuthUser, courierId: string) {
+  requireProvider(user);
+  if (!deactivateCourier(courierId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };
