@@ -37,6 +37,47 @@ function isDavet(p: Pick<Provider, "categoryId">) {
   return p.categoryId === "davet";
 }
 
+type NearbySort = "near" | "far" | "priceHigh" | "priceLow" | "rating" | "reviews" | "space";
+
+const NEARBY_SORTS: { id: NearbySort; label: string }[] = [
+  { id: "near", label: "Yakından uzağa" },
+  { id: "far", label: "Uzaktan yakına" },
+  { id: "priceHigh", label: "Fiyat çoktan aza" },
+  { id: "priceLow", label: "Fiyat azdan çoğa" },
+  { id: "rating", label: "En çok puanlanan" },
+  { id: "reviews", label: "En çok yorum" },
+  { id: "space", label: "Bugün yer var" },
+];
+
+function listPrice(p: Provider): number | null {
+  if (isDavet(p)) {
+    const prices = (p.products ?? []).map((x) => x.pricePerPerson);
+    return prices.length ? Math.min(...prices) : null;
+  }
+  return p.packages.find((x) => x.id === "tam")?.pricePerPiece ?? p.packages.at(-1)?.pricePerPiece ?? null;
+}
+
+function sortNearby(rows: { p: Provider; km: number }[], sort: NearbySort) {
+  const copy = [...rows];
+  copy.sort((a, b) => {
+    if (sort === "far") return b.km - a.km || b.p.rating - a.p.rating;
+    if (sort === "priceHigh" || sort === "priceLow") {
+      const pa = listPrice(a.p);
+      const pb = listPrice(b.p);
+      if (pa == null && pb == null) return a.km - b.km;
+      if (pa == null) return 1;
+      if (pb == null) return -1;
+      const dir = sort === "priceHigh" ? -1 : 1;
+      return (pa - pb) * dir || a.km - b.km;
+    }
+    if (sort === "rating") return b.p.rating - a.p.rating || b.p.reviews - a.p.reviews || a.km - b.km;
+    if (sort === "reviews") return b.p.reviews - a.p.reviews || b.p.rating - a.p.rating || a.km - b.km;
+    if (sort === "space") return b.p.remaining - a.p.remaining || a.km - b.km;
+    return a.km - b.km || b.p.rating - a.p.rating;
+  });
+  return copy;
+}
+
 type Sheet = "list" | "provider" | "checkout" | "track";
 
 type Props = {
@@ -414,6 +455,7 @@ export function CustomerApp({
                 ranked={ranked}
                 ready={ready}
                 onPick={openProvider}
+                onSortChange={() => setListTall(true)}
                 onTrack={
                   orders[0]
                     ? () => {
@@ -540,12 +582,22 @@ function List({
   ready,
   onPick,
   onTrack,
+  onSortChange,
 }: {
   ranked: { p: Provider; km: number }[];
   ready: boolean;
   onPick: (id: string) => void;
   onTrack?: () => void;
+  onSortChange?: () => void;
 }) {
+  const [sort, setSort] = useState<NearbySort>("near");
+  const sorted = useMemo(() => sortNearby(ranked, sort), [ranked, sort]);
+
+  function pickSort(id: NearbySort) {
+    setSort(id);
+    onSortChange?.();
+  }
+
   return (
     <div className="p-4 pt-2">
       <div className="mb-3 flex items-baseline justify-between">
@@ -556,6 +608,27 @@ function List({
           </button>
         )}
       </div>
+      <div
+        className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-0.5"
+        role="group"
+        aria-label="Sıralama"
+      >
+        {NEARBY_SORTS.map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            aria-pressed={sort === opt.id}
+            onClick={() => pickSort(opt.id)}
+            className={`k-chip shrink-0 rounded-full px-2.5 py-1.5 text-xs ring-1 ${
+              sort === opt.id
+                ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]"
+                : "ring-[var(--line)]"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
       {!ready ? (
         <ul className="space-y-2">
           {[0, 1, 2].map((i) => (
@@ -564,7 +637,7 @@ function List({
         </ul>
       ) : (
         <ul className="space-y-2">
-          {ranked.map(({ p, km }, i) => {
+          {sorted.map(({ p, km }, i) => {
             const tone = seatTone(p.remaining, p.capacity);
             const load = seatLabel(tone);
             const fill =
@@ -585,6 +658,7 @@ function List({
                 : tone === "low"
                   ? "text-[var(--load-low)]"
                   : "";
+            const price = listPrice(p);
             return (
               <li key={p.id} className="k-rise" style={{ animationDelay: `${i * 45}ms` }}>
                 <button
@@ -621,14 +695,11 @@ function List({
                   <span className="shrink-0 text-right text-sm">
                     <span className="block tabular-nums">{p.rating.toFixed(1)}</span>
                     <span className="text-xs text-[var(--muted)]">
-                      {isDavet(p)
-                        ? (p.products ?? []).length
-                          ? `${tl(Math.min(...(p.products ?? []).map((x) => x.pricePerPerson)))}/kişi`
-                          : "menü yok"
-                        : `${tl(
-                            p.packages.find((x) => x.id === "tam")?.pricePerPiece ??
-                              p.packages.at(-1)!.pricePerPiece,
-                          )}/parça`}
+                      {price == null
+                        ? "menü yok"
+                        : isDavet(p)
+                          ? `${tl(price)}/kişi`
+                          : `${tl(price)}/parça`}
                     </span>
                   </span>
                 </button>
