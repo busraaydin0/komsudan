@@ -11,6 +11,7 @@ import { listPrints, toPublicPrint } from "./prints";
 import { listPreserves, toPublicPreserve } from "./preserves";
 import { listCarpets, toPublicCarpet } from "./carpets";
 import { listLessons, toPublicLesson } from "./lessons";
+import { listTalks, toPublicTalk } from "./talks";
 
 export function toProvider(row: {
   id: string;
@@ -32,6 +33,7 @@ export function toProvider(row: {
   const preserves = listPreserves(p.id).map(toPublicPreserve);
   const carpets = listCarpets(p.id).map(toPublicCarpet);
   const lessons = listLessons(p.id).map(toPublicLesson);
+  const talks = listTalks(p.id).map(toPublicTalk);
   return {
     ...p,
     remaining: row.remaining,
@@ -51,6 +53,7 @@ export function toProvider(row: {
     preserves: preserves.length > 0 ? preserves : (p.preserves ?? []),
     carpets: carpets.length > 0 ? carpets : (p.carpets ?? []),
     lessons: lessons.length > 0 ? lessons : (p.lessons ?? []),
+    talks: talks.length > 0 ? talks : (p.talks ?? []),
   };
 }
 

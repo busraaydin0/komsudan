@@ -124,6 +124,15 @@ import {
   updateLesson,
   type LessonWrite,
 } from "@/lib/db/lessons";
+import {
+  countTalks,
+  deactivateTalk,
+  insertTalk,
+  listTalks,
+  toPublicTalk,
+  updateTalk,
+  type TalkWrite,
+} from "@/lib/db/talks";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -204,6 +213,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     preserves: listPreserves(row.user_id).map(toPublicPreserve),
     carpets: listCarpets(row.user_id).map(toPublicCarpet),
     lessons: listLessons(row.user_id).map(toPublicLesson),
+    talks: listTalks(row.user_id).map(toPublicTalk),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -279,7 +289,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti" || categoryId === "kislik" || categoryId === "hali" || categoryId === "odev")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti" || categoryId === "kislik" || categoryId === "hali" || categoryId === "odev" || categoryId === "dil")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -690,10 +700,25 @@ export function ensureOdevOffer(
   });
 }
 
+export function ensureDilOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Dil pratiği. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "dil",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -737,6 +762,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "odev") {
     return ensureOdevOffer(user, input);
+  }
+  if (categoryId === "dil") {
+    return ensureDilOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -1634,6 +1662,88 @@ export function patchMyLesson(user: AuthUser, lessonId: string, input: LessonWri
 export function removeMyLesson(user: AuthUser, lessonId: string) {
   requireProvider(user);
   if (!deactivateLesson(lessonId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_TALKS = 12;
+
+function assertTalkWrite(input: TalkWrite) {
+  if (input.price < 1) {
+    throw new ApiError(400, "Fiyat 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
+  }
+  const l = input.langs;
+  if (l && !l.en && !l.de && !l.es && !l.fr && !l.it && !l.ar && !l.other) {
+    throw new ApiError(400, "En az bir dil seç.", "VALIDATION_ERROR");
+  }
+  if (l?.other && !input.langOther?.trim()) {
+    throw new ApiError(400, "Diğer dili yaz.", "VALIDATION_ERROR");
+  }
+  const k = input.kinds;
+  if (k && !k.speaking && !k.chat && !k.beginner && !k.vocab && !k.pronun && !k.grammar && !k.exam) {
+    throw new ApiError(400, "En az bir hizmet türü seç.", "VALIDATION_ERROR");
+  }
+  const lv = input.levels;
+  if (lv && !lv.a1 && !lv.a2 && !lv.b) {
+    throw new ApiError(400, "En az bir seviye seç.", "VALIDATION_ERROR");
+  }
+  const d = input.durations;
+  if (d && !d.m30 && !d.m45 && !d.m60) {
+    throw new ApiError(400, "En az bir süre seç.", "VALIDATION_ERROR");
+  }
+  const p = input.place;
+  if (p && !p.ev && !p.ortak && !p.online) {
+    throw new ApiError(400, "En az bir görüşme yeri seç.", "VALIDATION_ERROR");
+  }
+  const m = input.materials;
+  if (m && !m.provider && !m.student && !m.together) {
+    throw new ApiError(400, "En az bir materyal seçeneği seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyTalks(user: AuthUser) {
+  requireProvider(user);
+  return listTalks(user.id, false).map(toPublicTalk);
+}
+
+export function addMyTalk(user: AuthUser, input: TalkWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "dil") {
+    throw new ApiError(400, "Dil kartı yalnızca Yabancı Dil Pratiği alanında.", "VALIDATION_ERROR");
+  }
+  assertTalkWrite(input);
+  if (countTalks(user.id, false) >= MAX_TALKS) {
+    throw new ApiError(400, `En fazla ${MAX_TALKS} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicTalk(
+    insertTalk(user.id, {
+      ...input,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      langOther: input.langOther?.trim() || null,
+      notes: input.notes?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyTalk(user: AuthUser, talkId: string, input: TalkWrite) {
+  requireProvider(user);
+  assertTalkWrite(input);
+  const row = updateTalk(talkId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    langOther: input.langOther?.trim() || null,
+    notes: input.notes?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicTalk(row);
+}
+
+export function removeMyTalk(user: AuthUser, talkId: string) {
+  requireProvider(user);
+  if (!deactivateTalk(talkId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };

@@ -160,6 +160,29 @@ export type LessonDuration = { m30: boolean; m45: boolean; m60: boolean; m90: bo
 export type LessonPlace = { ev: boolean; ortak: boolean; online: boolean };
 export type LessonMaterials = { student: boolean; provider: boolean; none: boolean };
 
+export type TalkLang = {
+  en: boolean;
+  de: boolean;
+  es: boolean;
+  fr: boolean;
+  it: boolean;
+  ar: boolean;
+  other: boolean;
+};
+export type TalkKind = {
+  speaking: boolean;
+  chat: boolean;
+  beginner: boolean;
+  vocab: boolean;
+  pronun: boolean;
+  grammar: boolean;
+  exam: boolean;
+};
+export type TalkLevel = { a1: boolean; a2: boolean; b: boolean };
+export type TalkDuration = { m30: boolean; m45: boolean; m60: boolean };
+export type TalkPlace = { ev: boolean; ortak: boolean; online: boolean };
+export type TalkMaterials = { provider: boolean; student: boolean; together: boolean };
+
 /** Evde çıktı kartı. Sayfa başı fiyat; siparişte sunucu çarpar. */
 export type ProviderPrint = {
   id: string;
@@ -238,6 +261,24 @@ export type ProviderLesson = {
   place: LessonPlace;
   weekly?: number;
   materials: LessonMaterials;
+  notes?: string | null;
+  isActive?: boolean;
+};
+
+/** Dil pratiği kartı. Görüşme başı fiyat; siparişte sunucu çarpar. */
+export type ProviderTalk = {
+  id: string;
+  name: string;
+  description?: string | null;
+  photoUrl?: string | null;
+  langs: TalkLang;
+  langOther?: string | null;
+  kinds: TalkKind;
+  levels: TalkLevel;
+  durations: TalkDuration;
+  price: number;
+  place: TalkPlace;
+  materials: TalkMaterials;
   notes?: string | null;
   isActive?: boolean;
 };
@@ -482,6 +523,7 @@ export type Provider = {
   preserves?: ProviderPreserve[];
   carpets?: ProviderCarpet[];
   lessons?: ProviderLesson[];
+  talks?: ProviderTalk[];
 };
 
 export type DropPoint = {
@@ -520,7 +562,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev";
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil";
   pieces: number;
   express: boolean;
   drop: DropMethod;

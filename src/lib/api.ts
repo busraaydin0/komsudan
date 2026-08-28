@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTalk, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -372,7 +372,7 @@ export async function patchMyProviderProfile(body: {
 }
 
 export async function postMyOffer(body: {
-  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev";
+  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil";
   dryingType?: "makine" | "ip" | "ikisi";
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
@@ -1295,5 +1295,86 @@ export async function uploadMyLessonPhoto(id: string, file: File) {
 export async function deleteMyLesson(id: string) {
   await readJson(
     await fetch(`/api/providers/me/lessons/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}
+
+export async function postMyTalk(body: {
+  name: string;
+  description?: string | null;
+  langs?: {
+    en: boolean;
+    de: boolean;
+    es: boolean;
+    fr: boolean;
+    it: boolean;
+    ar: boolean;
+    other: boolean;
+  };
+  langOther?: string | null;
+  kinds?: {
+    speaking: boolean;
+    chat: boolean;
+    beginner: boolean;
+    vocab: boolean;
+    pronun: boolean;
+    grammar: boolean;
+    exam: boolean;
+  };
+  levels?: { a1: boolean; a2: boolean; b: boolean };
+  durations?: { m30: boolean; m45: boolean; m60: boolean };
+  price: number;
+  place?: { ev: boolean; ortak: boolean; online: boolean };
+  materials?: { provider: boolean; student: boolean; together: boolean };
+  notes?: string | null;
+  isActive?: boolean;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { talk: ProviderTalk }; talk?: ProviderTalk }>(
+      await fetch("/api/providers/me/talks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.talk!;
+}
+
+export async function fetchMyTalks() {
+  const data = unwrap(
+    await readJson<{ data?: { talks: ProviderTalk[] }; talks?: ProviderTalk[] }>(
+      await fetch("/api/providers/me/talks"),
+    ),
+  );
+  return data.talks ?? [];
+}
+
+export async function patchMyTalk(id: string, body: Parameters<typeof postMyTalk>[0]) {
+  const data = unwrap(
+    await readJson<{ data?: { talk: ProviderTalk }; talk?: ProviderTalk }>(
+      await fetch(`/api/providers/me/talks/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.talk!;
+}
+
+export async function uploadMyTalkPhoto(id: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = unwrap(
+    await readJson<{ data?: { photoUrl: string }; photoUrl?: string }>(
+      await fetch(`/api/providers/me/talks/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
+    ),
+  );
+  return data.photoUrl!;
+}
+
+export async function deleteMyTalk(id: string) {
+  await readJson(
+    await fetch(`/api/providers/me/talks/${encodeURIComponent(id)}`, { method: "DELETE" }),
   );
 }

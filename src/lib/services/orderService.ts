@@ -25,6 +25,8 @@ import { dropsForCarpet, carpetCanOrder, carpetQtyBounds } from "@/lib/carpet";
 import { getCarpet, toPublicCarpet } from "@/lib/db/carpets";
 import { dropsForLesson, lessonCanOrder, lessonQtyBounds } from "@/lib/lesson";
 import { getLesson, toPublicLesson } from "@/lib/db/lessons";
+import { dropsForTalk, talkCanOrder, talkQtyBounds } from "@/lib/talk";
+import { getTalk, toPublicTalk } from "@/lib/db/talks";
 import { getCargo, toPublicCargo } from "@/lib/db/cargos";
 import { strategyFor } from "@/lib/fulfillment";
 import {
@@ -202,6 +204,7 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
   if (cat.id === "kislik") return createKislikOrder(input, userId, provider);
   if (cat.id === "hali") return createHaliOrder(input, userId, provider);
   if (cat.id === "odev") return createOdevOrder(input, userId, provider);
+  if (cat.id === "dil") return createDilOrder(input, userId, provider);
   return createLaundryOrder(input, userId, provider);
 }
 
@@ -253,6 +256,8 @@ function insertPendingOrder(args: {
             ? "adet yer"
           : args.packageId === "odev"
             ? "ders yer"
+          : args.packageId === "dil"
+            ? "görüşme yer"
           : args.packageId === "dikis" ||
             args.packageId === "tamir" ||
             args.packageId === "teknoloji" ||
@@ -959,6 +964,57 @@ function createOdevOrder(input: CreateOrderInput, userId: string, provider: NonN
   const id = insertPendingOrder({
     providerId: provider.id,
     packageId: "odev",
+    pieces: qty,
+    express: false,
+    drop: input.drop,
+    dropPointId,
+    slot: input.slot,
+    note: (input.note ?? "").trim().slice(0, 500),
+    quote,
+    userId,
+    productId: row.id,
+    productName: row.name,
+    guestCount: qty,
+  });
+  const order = getOrder(id)!;
+  notifyNewOrder({
+    id,
+    provider_id: provider.id,
+    user_id: userId,
+    pieces: qty,
+  });
+  return order;
+}
+
+function createDilOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
+  const talkId = (input.productId ?? "").trim();
+  if (!talkId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
+  const row = getTalk(talkId);
+  if (!row || row.provider_id !== provider.id || !row.is_active) {
+    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
+  }
+
+  const card = toPublicTalk(row);
+  if (!talkCanOrder(card)) {
+    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
+  }
+
+  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
+  const { min, max } = talkQtyBounds(card, provider.remaining);
+  if (!Number.isFinite(qty) || qty < min || qty > max) {
+    throw new ApiError(400, `Miktar ${min}–${max} görüşme olmalı.`, "VALIDATION_ERROR");
+  }
+
+  const allowedDrops = dropsForTalk(card, provider.drops);
+  if (!allowedDrops.includes(input.drop)) {
+    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
+  }
+
+  const dropPointId = validateDropAndSlot(provider, input);
+  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
+  const id = insertPendingOrder({
+    providerId: provider.id,
+    packageId: "dil",
     pieces: qty,
     express: false,
     drop: input.drop,

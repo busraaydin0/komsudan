@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti", "kislik", "hali", "odev"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti", "kislik", "hali", "odev", "dil"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -722,6 +722,109 @@ export const lessonCreateSchema = z
   });
 
 export const lessonPatchSchema = lessonCreateSchema;
+
+const talkLangSchema = z.object({
+  en: z.boolean(),
+  de: z.boolean(),
+  es: z.boolean(),
+  fr: z.boolean(),
+  it: z.boolean(),
+  ar: z.boolean(),
+  other: z.boolean(),
+});
+
+const talkKindSchema = z.object({
+  speaking: z.boolean(),
+  chat: z.boolean(),
+  beginner: z.boolean(),
+  vocab: z.boolean(),
+  pronun: z.boolean(),
+  grammar: z.boolean(),
+  exam: z.boolean(),
+});
+
+const talkLevelSchema = z.object({
+  a1: z.boolean(),
+  a2: z.boolean(),
+  b: z.boolean(),
+});
+
+const talkDurationSchema = z.object({
+  m30: z.boolean(),
+  m45: z.boolean(),
+  m60: z.boolean(),
+});
+
+const talkPlaceSchema = z.object({
+  ev: z.boolean(),
+  ortak: z.boolean(),
+  online: z.boolean(),
+});
+
+const talkMaterialsSchema = z.object({
+  provider: z.boolean(),
+  student: z.boolean(),
+  together: z.boolean(),
+});
+
+export const talkCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    description: z.string().trim().max(400).optional().nullable(),
+    langs: talkLangSchema.optional(),
+    langOther: z.string().trim().max(80).optional().nullable(),
+    kinds: talkKindSchema.optional(),
+    levels: talkLevelSchema.optional(),
+    durations: talkDurationSchema.optional(),
+    price: z.number({ error: "Fiyat gerekli." }).int().min(1, "Fiyat 1–10.000 ₺.").max(10_000, "Fiyat 1–10.000 ₺."),
+    place: talkPlaceSchema.optional(),
+    materials: talkMaterialsSchema.optional(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (
+      val.langs &&
+      !val.langs.en &&
+      !val.langs.de &&
+      !val.langs.es &&
+      !val.langs.fr &&
+      !val.langs.it &&
+      !val.langs.ar &&
+      !val.langs.other
+    ) {
+      ctx.addIssue({ code: "custom", message: "En az bir dil seç.", path: ["langs"] });
+    }
+    if (val.langs?.other && !val.langOther?.trim()) {
+      ctx.addIssue({ code: "custom", message: "Diğer dili yaz.", path: ["langOther"] });
+    }
+    if (
+      val.kinds &&
+      !val.kinds.speaking &&
+      !val.kinds.chat &&
+      !val.kinds.beginner &&
+      !val.kinds.vocab &&
+      !val.kinds.pronun &&
+      !val.kinds.grammar &&
+      !val.kinds.exam
+    ) {
+      ctx.addIssue({ code: "custom", message: "En az bir hizmet türü seç.", path: ["kinds"] });
+    }
+    if (val.levels && !val.levels.a1 && !val.levels.a2 && !val.levels.b) {
+      ctx.addIssue({ code: "custom", message: "En az bir seviye seç.", path: ["levels"] });
+    }
+    if (val.durations && !val.durations.m30 && !val.durations.m45 && !val.durations.m60) {
+      ctx.addIssue({ code: "custom", message: "En az bir süre seç.", path: ["durations"] });
+    }
+    if (val.place && !val.place.ev && !val.place.ortak && !val.place.online) {
+      ctx.addIssue({ code: "custom", message: "En az bir görüşme yeri seç.", path: ["place"] });
+    }
+    if (val.materials && !val.materials.provider && !val.materials.student && !val.materials.together) {
+      ctx.addIssue({ code: "custom", message: "En az bir materyal seçeneği seç.", path: ["materials"] });
+    }
+  });
+
+export const talkPatchSchema = talkCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

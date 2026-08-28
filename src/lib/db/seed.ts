@@ -21,6 +21,7 @@ import { upsertPrint } from "./prints";
 import { upsertPreserve } from "./preserves";
 import { upsertCarpet } from "./carpets";
 import { upsertLesson } from "./lessons";
+import { upsertTalk } from "./talks";
 
 const SEED_PHONES: Record<string, string> = {
   elif: "5321100001",
@@ -70,6 +71,9 @@ const SEED_PHONES: Record<string, string> = {
   seda: "5321100045",
   tugce: "5321100046",
   melis: "5321100047",
+  dilara: "5321100048",
+  burcu: "5321100049",
+  ceren: "5321100050",
 };
 
 function deliveryMode(drops: Array<"kapi" | "nokta">): "door" | "point" | "both" {
@@ -346,6 +350,23 @@ function seedProviderDirectory() {
         weekly: lesson.weekly,
         materials: lesson.materials,
         notes: lesson.notes,
+      });
+    }
+    for (const talk of p.talks ?? []) {
+      upsertTalk({
+        id: talk.id,
+        provider_id: p.id,
+        name: talk.name,
+        description: talk.description,
+        langs: talk.langs,
+        langOther: talk.langOther,
+        kinds: talk.kinds,
+        levels: talk.levels,
+        durations: talk.durations,
+        price: talk.price,
+        place: talk.place,
+        materials: talk.materials,
+        notes: talk.notes,
       });
     }
     if (p.drops.includes("nokta")) {
