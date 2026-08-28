@@ -119,6 +119,20 @@ export type PrintSend = { app: boolean; email: boolean; other: boolean };
 export type PrintPickup = { adres: boolean; nokta: boolean };
 export type PrintAvail = "hemen" | "saat" | "randevu";
 
+export type PreserveKind = {
+  salca: boolean;
+  tarhana: boolean;
+  eriste: boolean;
+  manti: boolean;
+  sarma: boolean;
+  dondurucu: boolean;
+  other: boolean;
+};
+export type PreserveMaterial = "provider" | "customer" | "together";
+export type PreservePriceUnit = "kg" | "porsiyon" | "paket" | "tepsi" | "adet";
+export type PreserveStorage = { frozen: boolean; fresh: boolean; dried: boolean; jarred: boolean };
+export type PreservePickup = { adres: boolean; nokta: boolean };
+
 /** Evde çıktı kartı. Sayfa başı fiyat; siparişte sunucu çarpar. */
 export type ProviderPrint = {
   id: string;
@@ -135,6 +149,29 @@ export type ProviderPrint = {
   pickup: PrintPickup;
   avail?: PrintAvail;
   workHours?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+};
+
+/** Kışlık & dondurucu kartı. Birim başı fiyat; siparişte sunucu çarpar. */
+export type ProviderPreserve = {
+  id: string;
+  name: string;
+  description?: string | null;
+  photoUrl?: string | null;
+  kinds: PreserveKind;
+  portion?: string | null;
+  ingredients?: string | null;
+  material?: PreserveMaterial;
+  price: number;
+  priceUnit?: PreservePriceUnit;
+  minOrder?: number;
+  leadDays?: number | null;
+  noticeDays?: number | null;
+  storage: PreserveStorage;
+  pickup: PreservePickup;
+  season?: string | null;
+  allergens?: string | null;
   notes?: string | null;
   isActive?: boolean;
 };
@@ -376,6 +413,7 @@ export type Provider = {
   gardens?: ProviderGarden[];
   cargos?: ProviderCargo[];
   prints?: ProviderPrint[];
+  preserves?: ProviderPreserve[];
 };
 
 export type DropPoint = {
@@ -414,7 +452,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti";
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik";
   pieces: number;
   express: boolean;
   drop: DropMethod;

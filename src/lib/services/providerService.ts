@@ -97,6 +97,15 @@ import {
   updatePrint,
   type PrintWrite,
 } from "@/lib/db/prints";
+import {
+  countPreserves,
+  deactivatePreserve,
+  insertPreserve,
+  listPreserves,
+  toPublicPreserve,
+  updatePreserve,
+  type PreserveWrite,
+} from "@/lib/db/preserves";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -174,6 +183,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     gardens: listGardens(row.user_id).map(toPublicGarden),
     cargos: listCargos(row.user_id).map(toPublicCargo),
     prints: listPrints(row.user_id).map(toPublicPrint),
+    preserves: listPreserves(row.user_id).map(toPublicPreserve),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -249,7 +259,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti" || categoryId === "kislik")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -615,10 +625,25 @@ export function ensureCiktiOffer(
   });
 }
 
+export function ensureKislikOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Kışlık ve dondurucu. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "kislik",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -653,6 +678,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "cikti") {
     return ensureCiktiOffer(user, input);
+  }
+  if (categoryId === "kislik") {
+    return ensureKislikOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -1322,6 +1350,79 @@ export function patchMyPrint(user: AuthUser, printId: string, input: PrintWrite)
 export function removeMyPrint(user: AuthUser, printId: string) {
   requireProvider(user);
   if (!deactivatePrint(printId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_PRESERVES = 12;
+
+function assertPreserveWrite(input: PreserveWrite) {
+  if (input.price < 1) {
+    throw new ApiError(400, "Fiyat 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
+  }
+  const k = input.kinds;
+  if (k && !k.salca && !k.tarhana && !k.eriste && !k.manti && !k.sarma && !k.dondurucu && !k.other) {
+    throw new ApiError(400, "En az bir hazırlık türü seç.", "VALIDATION_ERROR");
+  }
+  const s = input.storage;
+  if (s && !s.frozen && !s.fresh && !s.dried && !s.jarred) {
+    throw new ApiError(400, "En az bir saklama / teslim durumu seç.", "VALIDATION_ERROR");
+  }
+  const p = input.pickup;
+  if (p && !p.adres && !p.nokta) {
+    throw new ApiError(400, "En az bir teslim alma yöntemi seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyPreserves(user: AuthUser) {
+  requireProvider(user);
+  return listPreserves(user.id, false).map(toPublicPreserve);
+}
+
+export function addMyPreserve(user: AuthUser, input: PreserveWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "kislik") {
+    throw new ApiError(400, "Kışlık kartı yalnızca Kışlık & Dondurucu Hazırlığı alanında.", "VALIDATION_ERROR");
+  }
+  assertPreserveWrite(input);
+  if (countPreserves(user.id, false) >= MAX_PRESERVES) {
+    throw new ApiError(400, `En fazla ${MAX_PRESERVES} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicPreserve(
+    insertPreserve(user.id, {
+      ...input,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      portion: input.portion?.trim() || null,
+      ingredients: input.ingredients?.trim() || null,
+      season: input.season?.trim() || null,
+      allergens: input.allergens?.trim() || null,
+      notes: input.notes?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyPreserve(user: AuthUser, preserveId: string, input: PreserveWrite) {
+  requireProvider(user);
+  assertPreserveWrite(input);
+  const row = updatePreserve(preserveId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    portion: input.portion?.trim() || null,
+    ingredients: input.ingredients?.trim() || null,
+    season: input.season?.trim() || null,
+    allergens: input.allergens?.trim() || null,
+    notes: input.notes?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicPreserve(row);
+}
+
+export function removeMyPreserve(user: AuthUser, preserveId: string) {
+  requireProvider(user);
+  if (!deactivatePreserve(preserveId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };

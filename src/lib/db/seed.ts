@@ -18,6 +18,7 @@ import { upsertCourier } from "./couriers";
 import { upsertGarden } from "./gardens";
 import { upsertCargo } from "./cargos";
 import { upsertPrint } from "./prints";
+import { upsertPreserve } from "./preserves";
 
 const SEED_PHONES: Record<string, string> = {
   elif: "5321100001",
@@ -58,6 +59,9 @@ const SEED_PHONES: Record<string, string> = {
   pinar: "5321100036",
   berk: "5321100037",
   nisa: "5321100038",
+  gulay: "5321100039",
+  meryem: "5321100040",
+  hulya: "5321100041",
 };
 
 function deliveryMode(drops: Array<"kapi" | "nokta">): "door" | "point" | "both" {
@@ -275,6 +279,28 @@ function seedProviderDirectory() {
         avail: print.avail,
         workHours: print.workHours,
         notes: print.notes,
+      });
+    }
+    for (const preserve of p.preserves ?? []) {
+      upsertPreserve({
+        id: preserve.id,
+        provider_id: p.id,
+        name: preserve.name,
+        description: preserve.description,
+        kinds: preserve.kinds,
+        portion: preserve.portion,
+        ingredients: preserve.ingredients,
+        material: preserve.material,
+        price: preserve.price,
+        priceUnit: preserve.priceUnit,
+        minOrder: preserve.minOrder,
+        leadDays: preserve.leadDays,
+        noticeDays: preserve.noticeDays,
+        storage: preserve.storage,
+        pickup: preserve.pickup,
+        season: preserve.season,
+        allergens: preserve.allergens,
+        notes: preserve.notes,
       });
     }
     if (p.drops.includes("nokta")) {

@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti", "kislik"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -521,6 +521,60 @@ export const printCreateSchema = z
   });
 
 export const printPatchSchema = printCreateSchema;
+
+const preserveKindSchema = z.object({
+  salca: z.boolean(),
+  tarhana: z.boolean(),
+  eriste: z.boolean(),
+  manti: z.boolean(),
+  sarma: z.boolean(),
+  dondurucu: z.boolean(),
+  other: z.boolean(),
+});
+const preserveStorageSchema = z.object({
+  frozen: z.boolean(),
+  fresh: z.boolean(),
+  dried: z.boolean(),
+  jarred: z.boolean(),
+});
+const preservePickupSchema = z.object({
+  adres: z.boolean(),
+  nokta: z.boolean(),
+});
+
+export const preserveCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    description: z.string().trim().max(400).optional().nullable(),
+    kinds: preserveKindSchema.optional(),
+    portion: z.string().trim().max(80).optional().nullable(),
+    ingredients: z.string().trim().max(400).optional().nullable(),
+    material: z.enum(["provider", "customer", "together"]).optional(),
+    price: z.number({ error: "Fiyat gerekli." }).int().min(1, "Fiyat 1–50.000 ₺.").max(50_000, "Fiyat 1–50.000 ₺."),
+    priceUnit: z.enum(["kg", "porsiyon", "paket", "tepsi", "adet"]).optional(),
+    minOrder: z.number().int().min(1, "Minimum 1–80.").max(80, "Minimum 1–80.").optional(),
+    leadDays: z.number().int().min(0).max(90).optional().nullable(),
+    noticeDays: z.number().int().min(0).max(60).optional().nullable(),
+    storage: preserveStorageSchema.optional(),
+    pickup: preservePickupSchema.optional(),
+    season: z.string().trim().max(80).optional().nullable(),
+    allergens: z.string().trim().max(300).optional().nullable(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.kinds && !val.kinds.salca && !val.kinds.tarhana && !val.kinds.eriste && !val.kinds.manti && !val.kinds.sarma && !val.kinds.dondurucu && !val.kinds.other) {
+      ctx.addIssue({ code: "custom", message: "En az bir hazırlık türü seç.", path: ["kinds"] });
+    }
+    if (val.storage && !val.storage.frozen && !val.storage.fresh && !val.storage.dried && !val.storage.jarred) {
+      ctx.addIssue({ code: "custom", message: "En az bir saklama / teslim durumu seç.", path: ["storage"] });
+    }
+    if (val.pickup && !val.pickup.adres && !val.pickup.nokta) {
+      ctx.addIssue({ code: "custom", message: "En az bir teslim alma yöntemi seç.", path: ["pickup"] });
+    }
+  });
+
+export const preservePatchSchema = preserveCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

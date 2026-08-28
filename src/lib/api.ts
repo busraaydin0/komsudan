@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCourier, ProviderGarden, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCourier, ProviderGarden, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -372,7 +372,7 @@ export async function patchMyProviderProfile(body: {
 }
 
 export async function postMyOffer(body: {
-  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti";
+  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik";
   dryingType?: "makine" | "ip" | "ikisi";
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
@@ -1069,5 +1069,83 @@ export async function uploadMyPrintPhoto(id: string, file: File) {
 export async function deleteMyPrint(id: string) {
   await readJson(
     await fetch(`/api/providers/me/prints/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}
+
+export async function postMyPreserve(body: {
+  name: string;
+  description?: string | null;
+  kinds?: {
+    salca: boolean;
+    tarhana: boolean;
+    eriste: boolean;
+    manti: boolean;
+    sarma: boolean;
+    dondurucu: boolean;
+    other: boolean;
+  };
+  portion?: string | null;
+  ingredients?: string | null;
+  material?: "provider" | "customer" | "together";
+  price: number;
+  priceUnit?: "kg" | "porsiyon" | "paket" | "tepsi" | "adet";
+  minOrder?: number;
+  leadDays?: number | null;
+  noticeDays?: number | null;
+  storage?: { frozen: boolean; fresh: boolean; dried: boolean; jarred: boolean };
+  pickup?: { adres: boolean; nokta: boolean };
+  season?: string | null;
+  allergens?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { preserve: ProviderPreserve }; preserve?: ProviderPreserve }>(
+      await fetch("/api/providers/me/preserves", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.preserve!;
+}
+
+export async function fetchMyPreserves() {
+  const data = unwrap(
+    await readJson<{ data?: { preserves: ProviderPreserve[] }; preserves?: ProviderPreserve[] }>(
+      await fetch("/api/providers/me/preserves"),
+    ),
+  );
+  return data.preserves ?? [];
+}
+
+export async function patchMyPreserve(id: string, body: Parameters<typeof postMyPreserve>[0]) {
+  const data = unwrap(
+    await readJson<{ data?: { preserve: ProviderPreserve }; preserve?: ProviderPreserve }>(
+      await fetch(`/api/providers/me/preserves/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.preserve!;
+}
+
+export async function uploadMyPreservePhoto(id: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = unwrap(
+    await readJson<{ data?: { photoUrl: string }; photoUrl?: string }>(
+      await fetch(`/api/providers/me/preserves/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
+    ),
+  );
+  return data.photoUrl!;
+}
+
+export async function deleteMyPreserve(id: string) {
+  await readJson(
+    await fetch(`/api/providers/me/preserves/${encodeURIComponent(id)}`, { method: "DELETE" }),
   );
 }

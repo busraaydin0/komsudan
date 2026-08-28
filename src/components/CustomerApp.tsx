@@ -110,6 +110,18 @@ import {
   printSideList,
   PRINT_UNIT,
 } from "@/lib/print";
+import {
+  dropsForPreserve,
+  preserveCanOrder,
+  preserveDaysLabel,
+  preserveDropLabel,
+  preserveKindList,
+  preserveMaterialLabel,
+  preservePickupList,
+  preserveQtyBounds,
+  preserveStorageList,
+  preserveUnitMeta,
+} from "@/lib/preserve";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFood, estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
@@ -135,6 +147,7 @@ import type {
   ProviderGarden,
   ProviderCargo,
   ProviderPrint,
+  ProviderPreserve,
 } from "@/lib/types";
 
 const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), {
@@ -182,6 +195,10 @@ function isKargo(p: Pick<Provider, "categoryId">) {
 
 function isCikti(p: Pick<Provider, "categoryId">) {
   return p.categoryId === "cikti";
+}
+
+function isKislik(p: Pick<Provider, "categoryId">) {
+  return p.categoryId === "kislik";
 }
 
 function laundryInFilter(ids?: string[]) {
@@ -236,6 +253,10 @@ function listPrice(p: Provider): number | null {
   }
   if (isCikti(p)) {
     const prices = (p.prints ?? []).filter((x) => x.price > 0).map((x) => x.price);
+    return prices.length ? Math.min(...prices) : null;
+  }
+  if (isKislik(p)) {
+    const prices = (p.preserves ?? []).filter((x) => x.price > 0).map((x) => x.price);
     return prices.length ? Math.min(...prices) : null;
   }
   return p.packages.find((x) => x.id === "tam")?.pricePerPiece ?? p.packages.at(-1)?.pricePerPiece ?? null;
@@ -340,6 +361,7 @@ export function CustomerApp({
   const bahce = selected ? isBahce(selected) : false;
   const kargo = selected ? isKargo(selected) : false;
   const cikti = selected ? isCikti(selected) : false;
+  const kislik = selected ? isKislik(selected) : false;
   const product = selected?.products?.find((x) => x.id === productId) ?? selected?.products?.[0];
   const service = selected?.services?.find((x) => x.id === productId) ?? selected?.services?.[0];
   const repair = selected?.repairs?.find((x) => x.id === productId) ?? selected?.repairs?.[0];
@@ -349,6 +371,7 @@ export function CustomerApp({
   const garden = selected?.gardens?.find((x) => x.id === productId) ?? selected?.gardens?.[0];
   const cargo = selected?.cargos?.find((x) => x.id === productId) ?? selected?.cargos?.[0];
   const print = selected?.prints?.find((x) => x.id === productId) ?? selected?.prints?.[0];
+  const preserve = selected?.preserves?.find((x) => x.id === productId) ?? selected?.preserves?.[0];
   const quote = selected
     ? davet && product
       ? estimateFood(guests, product.pricePerPerson, loyaltyRate)
@@ -381,6 +404,10 @@ export function CustomerApp({
                             : cikti && print && printCanOrder(print)
                               ? estimateFood(guests, print.price, loyaltyRate)
                               : cikti
+                                ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
+                            : kislik && preserve && preserveCanOrder(preserve)
+                              ? estimateFood(guests, preserve.price, loyaltyRate)
+                              : kislik
                                 ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
                             : estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
     : { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 };
@@ -453,6 +480,9 @@ export function CustomerApp({
       } else if (isCikti(selected)) {
         const first = selected.prints?.[0]?.id ?? null;
         setProductId(selected.prints?.some((x) => x.id === productId) ? productId : first);
+      } else if (isKislik(selected)) {
+        const first = selected.preserves?.[0]?.id ?? null;
+        setProductId(selected.preserves?.some((x) => x.id === productId) ? productId : first);
       } else {
         setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
       }
@@ -509,6 +539,7 @@ export function CustomerApp({
       const bahceOrder = isBahce(selected);
       const kargoOrder = isKargo(selected);
       const ciktiOrder = isCikti(selected);
+      const kislikOrder = isKislik(selected);
       if (davetOrder && !allergy.trim()) {
         setErr("Alerji durumunu yaz. Yoksa “yok” de.");
         setPlacing(false);
@@ -545,6 +576,11 @@ export function CustomerApp({
         return;
       }
       if (ciktiOrder && !printCanOrder(print)) {
+        setErr("Bu hizmet için fiyat yok.");
+        setPlacing(false);
+        return;
+      }
+      if (kislikOrder && !preserveCanOrder(preserve)) {
         setErr("Bu hizmet için fiyat yok.");
         setPlacing(false);
         return;
@@ -635,6 +671,16 @@ export function CustomerApp({
                 ? {
                     providerId: selected.id,
                     productId: print?.id,
+                    guestCount: guests,
+                    drop,
+                    dropPointId: drop === "nokta" ? dropId : null,
+                    slot,
+                    note,
+                  }
+              : kislikOrder
+                ? {
+                    providerId: selected.id,
+                    productId: preserve?.id,
                     guestCount: guests,
                     drop,
                     dropPointId: drop === "nokta" ? dropId : null,
@@ -796,6 +842,8 @@ export function CustomerApp({
                                 ? "Şubeden al, noktaya veya adrese bırak. Eve kimse girmez."
                               : categoryIds?.length === 1 && categoryIds[0] === "cikti"
                                 ? "A4 çıktı evde basılır; adresten veya noktada al. Eve kimse girmez."
+                              : categoryIds?.length === 1 && categoryIds[0] === "kislik"
+                                ? "Kışlık evde hazırlanır; adresten veya noktada al. Eve kimse girmez."
                               : "Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak."}
               </p>
               <button
@@ -940,6 +988,13 @@ export function CustomerApp({
                     setGuests((n) => Math.min(max, Math.max(min, n)));
                     const allowed = dropsForPrint(card, selected.drops);
                     setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
+                  } else if (isKislik(selected)) {
+                    const card =
+                      selected.preserves?.find((x) => x.id === productId) ?? selected.preserves?.[0];
+                    const { min, max } = preserveQtyBounds(card, selected.remaining);
+                    setGuests((n) => Math.min(max, Math.max(min, n)));
+                    const allowed = dropsForPreserve(card, selected.drops);
+                    setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
                   } else {
                     setPieces((n) => clampPieces(n, selected.remaining));
                   }
@@ -965,8 +1020,11 @@ export function CustomerApp({
                 garden={garden}
                 cargo={cargo}
                 print={print}
+                preserve={preserve}
                 productName={
-                  cikti
+                  kislik
+                    ? preserve?.name
+                    : cikti
                     ? print?.name
                     : kargo
                     ? cargo?.name
@@ -1188,6 +1246,10 @@ function List({
                                     ? (p.prints ?? []).length
                                       ? ` · ${(p.prints ?? []).map((x) => x.name).join(", ")}`
                                       : " · hizmet yok"
+                                  : isKislik(p)
+                                    ? (p.preserves ?? []).length
+                                      ? ` · ${(p.preserves ?? []).map((x) => x.name).join(", ")}`
+                                      : " · hizmet yok"
                                 : dryingListLabel(p)
                               ? ` · ${dryingListLabel(p)}`
                               : ""}
@@ -1213,7 +1275,7 @@ function List({
                           ? ((isTamir(p) ? p.repairs : p.techs) ?? []).length
                             ? "inceleme"
                             : "hizmet yok"
-                          : isAraba(p) || isDikis(p) || isKurye(p) || isBahce(p) || isKargo(p) || isCikti(p)
+                          : isAraba(p) || isDikis(p) || isKurye(p) || isBahce(p) || isKargo(p) || isCikti(p) || isKislik(p)
                             ? "hizmet yok"
                             : "menü yok"
                         : isDavet(p)
@@ -1222,6 +1284,8 @@ function List({
                             ? `${tl(price)}/araç`
                             : isCikti(p)
                               ? `${tl(price)}/sayfa`
+                            : isKislik(p)
+                              ? `${tl(price)}/${preserveUnitMeta((p.preserves ?? []).find((x) => x.price === price)?.priceUnit ?? (p.preserves ?? [])[0]?.priceUnit).qty}`
                             : isKargo(p)
                               ? (p.cargos ?? []).some((x) => x.price > 0 && x.priceType === "mesafe")
                                 ? `${tl(price)}'den`
@@ -1272,7 +1336,8 @@ function ProviderPane({
   const bahce = isBahce(p);
   const kargo = isKargo(p);
   const cikti = isCikti(p);
-  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti;
+  const kislik = isKislik(p);
+  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik;
   const items = davet
     ? (p.products ?? [])
     : dikis
@@ -1291,6 +1356,8 @@ function ProviderPane({
                   ? (p.cargos ?? [])
                   : cikti
                     ? (p.prints ?? [])
+                    : kislik
+                      ? (p.preserves ?? [])
             : p.packages;
   const canNext = unitCatalog ? items.length > 0 : p.packages.length > 0;
   return (
@@ -1319,6 +1386,8 @@ function ProviderPane({
                   ? `bugün ${p.remaining} kişilik yer`
                   : cikti
                     ? `bugün ${p.remaining} sayfa yer`
+                    : kislik
+                    ? `bugün ${p.remaining} yer`
                     : dikis || tamir || teknoloji || araba || kurye || bahce || kargo
                     ? `bugün ${p.remaining} yer`
                     : `bugün ${p.remaining} parça yer`}
@@ -1649,6 +1718,39 @@ function ProviderPane({
                   </span>
                 </button>
               ))
+          : kislik
+            ? (p.preserves ?? []).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onProduct(item.id)}
+                  className={`k-chip flex w-full gap-3 rounded-2xl px-3 py-3 text-left ring-1 ${
+                    productId === item.id
+                      ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
+                      : "bg-[var(--paper)] ring-[var(--line)]"
+                  }`}
+                >
+                  {item.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                  ) : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex justify-between font-medium">
+                      {item.name}
+                      <span className="tabular-nums">
+                        {tl(item.price)}/{preserveUnitMeta(item.priceUnit).qty}
+                      </span>
+                    </span>
+                    {(preserveKindList(item.kinds).length || item.description) && (
+                      <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                        {[preserveKindList(item.kinds).slice(0, 2).join(", ") || null, item.description]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              ))
           : p.packages.map((pack) => (
               <button
                 key={pack.id}
@@ -1694,6 +1796,9 @@ function ProviderPane({
         {cikti && (p.prints ?? []).length === 0 && (
           <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
         )}
+        {kislik && (p.preserves ?? []).length === 0 && (
+          <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
+        )}
       </div>
       <button
         type="button"
@@ -1724,6 +1829,7 @@ function Checkout({
   garden,
   cargo,
   print,
+  preserve,
   productName,
   express,
   onExpress,
@@ -1759,6 +1865,7 @@ function Checkout({
   garden?: ProviderGarden;
   cargo?: ProviderCargo;
   print?: ProviderPrint;
+  preserve?: ProviderPreserve;
   productName?: string;
   express: boolean;
   onExpress: (v: boolean) => void;
@@ -1787,8 +1894,11 @@ function Checkout({
   const bahce = isBahce(p);
   const kargo = isKargo(p);
   const cikti = isCikti(p);
-  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti;
-  const unit = cikti
+  const kislik = isKislik(p);
+  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik;
+  const unit = kislik
+    ? preserveUnitMeta(preserve?.priceUnit)
+    : cikti
     ? PRINT_UNIT
     : kargo
     ? CARGO_UNIT
@@ -1805,7 +1915,9 @@ function Checkout({
         : dikis
           ? sewingUnitMeta(service?.priceUnit)
           : foodUnitMeta(product?.priceUnit);
-  const bounds = cikti
+  const bounds = kislik
+    ? preserveQtyBounds(preserve, p.remaining)
+    : cikti
     ? printQtyBounds(print, p.remaining)
     : kargo
     ? cargoQtyBounds(cargo, p.remaining)
@@ -1824,7 +1936,9 @@ function Checkout({
           : foodQtyBounds(product, p.remaining);
   const cap = unitPriced ? bounds.max : Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
   const minCount = unitPriced ? bounds.min : PIECES_MIN;
-  const foodDrops = cikti
+  const foodDrops = kislik
+    ? dropsForPreserve(preserve, p.drops)
+    : cikti
     ? dropsForPrint(print, p.drops)
     : kargo
     ? dropsForCargo(cargo, p.drops)
@@ -1855,7 +1969,7 @@ function Checkout({
   }
 
   function typeCount(raw: string) {
-    const digits = raw.replace(/\D/g, "").slice(0, unit.id === "sayfa" ? 3 : 2);
+    const digits = raw.replace(/\D/g, "").slice(0, unit.id === "sayfa" || unit.id === "kg" ? 3 : 2);
     setDraft(digits);
     if (!digits) return;
     if (unitPriced) onGuests(clampGuests(Number(digits)));
@@ -1868,7 +1982,9 @@ function Checkout({
   }
 
   const count = unitPriced ? guests : pieces;
-  const unitPrice = cikti
+  const unitPrice = kislik
+    ? (preserve?.price ?? 0)
+    : cikti
     ? (print?.price ?? 0)
     : kargo
     ? (cargo?.price ?? 0)
@@ -1892,21 +2008,22 @@ function Checkout({
     (!kurye || courierCanOrder(courier)) &&
     (!bahce || gardenCanOrder(garden)) &&
     (!kargo || cargoCanOrder(cargo)) &&
-    (!cikti || printCanOrder(print));
+    (!cikti || printCanOrder(print)) &&
+    (!kislik || preserveCanOrder(preserve));
   const qtyTitle =
     unit.id === "kisi" ? "Kaç kişilik?" : unit.id === "kg" ? "Kaç kg?" : `Kaç ${unit.qty}?`;
 
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
-        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti ? "← Hizmet" : "← Paket"}
+        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik ? "← Hizmet" : "← Paket"}
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">
         {unitPriced ? qtyTitle : "Kaç parça?"}
       </h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
         {unitPriced
-          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti ? "Seçili hizmet" : "Seçili yemek")} · ${
+          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik ? "Seçili hizmet" : "Seçili yemek")} · ${
               (tamir || teknoloji) && !canPlace
                 ? "fiyat inceleme sonrası."
                 : kurye && courier?.priceType === "mesafe"
@@ -2220,6 +2337,49 @@ function Checkout({
       {cikti && print?.notes ? (
         <p className="mt-2 text-xs text-[var(--muted)]">{print.notes}</p>
       ) : null}
+      {kislik && preserve?.description ? (
+        <p className="mt-3 text-xs text-[var(--muted)]">{preserve.description}</p>
+      ) : null}
+      {kislik && preserveKindList(preserve?.kinds).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{preserveKindList(preserve?.kinds).join(", ")}</p>
+      ) : null}
+      {kislik && preserve?.portion ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Porsiyon: {preserve.portion}</p>
+      ) : null}
+      {kislik && preserve?.ingredients ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">İçerik: {preserve.ingredients}</p>
+      ) : null}
+      {kislik && preserveMaterialLabel(preserve?.material) ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{preserveMaterialLabel(preserve?.material)}</p>
+      ) : null}
+      {kislik && preserveDaysLabel(preserve?.leadDays) ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Hazırlama: {preserveDaysLabel(preserve?.leadDays)}.</p>
+      ) : null}
+      {kislik && preserveDaysLabel(preserve?.noticeDays, " önce") ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          Bildirim: {preserveDaysLabel(preserve?.noticeDays, " önce")}.
+        </p>
+      ) : null}
+      {kislik && preserveStorageList(preserve?.storage).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{preserveStorageList(preserve?.storage).join(", ")}</p>
+      ) : null}
+      {kislik && preservePickupList(preserve?.pickup).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Alma: {preservePickupList(preserve?.pickup).join(", ")}</p>
+      ) : null}
+      {kislik && preserve?.season ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{preserve.season}</p>
+      ) : null}
+      {kislik && preserve?.minOrder ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          En az {preserve.minOrder} {preserveUnitMeta(preserve.priceUnit).qty}
+        </p>
+      ) : null}
+      {kislik && preserve?.allergens ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Alerjen: {preserve.allergens}</p>
+      ) : null}
+      {kislik && preserve?.notes ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{preserve.notes}</p>
+      ) : null}
       {davet && product?.allergens && (
         <p className="mt-2 text-xs text-[var(--muted)]">İçerik / alerjen: {product.allergens}</p>
       )}
@@ -2256,7 +2416,9 @@ function Checkout({
               drop === d ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
             }`}
           >
-            {cikti
+            {kislik
+              ? preserveDropLabel(d)
+              : cikti
               ? printDropLabel(d)
               : kargo
               ? cargoDropLabel(d)
@@ -2322,6 +2484,8 @@ function Checkout({
             ? "Şube, fiş no, kapı kodu…"
             : cikti
             ? "Sayfa, renk, dosya adı…"
+            : kislik
+            ? "Kavanoz, alerji, teslim saati…"
             : kurye
             ? "Alıcı, kapı kodu, paket içeriği…"
             : araba
@@ -2397,7 +2561,8 @@ function Track({
   const garden = order.packageId === "bahce";
   const cargo = order.packageId === "kargo";
   const print = order.packageId === "cikti";
-  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print;
+  const preserve = order.packageId === "kislik";
+  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print || preserve;
   const steps = trackSteps(order.packageId, catalog);
   const idx = steps.indexOf(order.status);
   const [busy, setBusy] = useState(false);
@@ -2412,7 +2577,7 @@ function Track({
         {provider?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : sewing || repair || tech || wash || courier || garden || cargo || print
+          : sewing || repair || tech || wash || courier || garden || cargo || print || preserve
             ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
             : `${order.pieces} parça`}{" "}
         · {tl(order.total)}

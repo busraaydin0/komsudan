@@ -265,6 +265,15 @@ function ensureColumns(db: Database.Database) {
       is_active = 1,
       sort_order = 10
     WHERE id = 'cikti';
+    INSERT OR IGNORE INTO service_categories (id, name, fulfillment_mode, pricing_model)
+    VALUES ('kislik', 'Kışlık & Dondurucu Hazırlığı', 'delivery', 'fixed');
+    UPDATE service_categories SET
+      name = 'Kışlık & Dondurucu Hazırlığı',
+      icon = 'jar',
+      blurb = 'Salça, tarhana, dondurucu — yakında al',
+      is_active = 1,
+      sort_order = 11
+    WHERE id = 'kislik';
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS provider_services (
@@ -524,6 +533,42 @@ function ensureColumns(db: Database.Database) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_prints_provider ON provider_prints(provider_id);
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_preserves (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL REFERENCES provider_profiles(user_id),
+      name TEXT NOT NULL,
+      description TEXT,
+      photo_url TEXT,
+      kind_salca INTEGER NOT NULL DEFAULT 0,
+      kind_tarhana INTEGER NOT NULL DEFAULT 0,
+      kind_eriste INTEGER NOT NULL DEFAULT 0,
+      kind_manti INTEGER NOT NULL DEFAULT 0,
+      kind_sarma INTEGER NOT NULL DEFAULT 0,
+      kind_dondurucu INTEGER NOT NULL DEFAULT 0,
+      kind_other INTEGER NOT NULL DEFAULT 0,
+      portion TEXT,
+      ingredients TEXT,
+      material TEXT NOT NULL DEFAULT 'provider',
+      price INTEGER NOT NULL DEFAULT 0,
+      price_unit TEXT NOT NULL DEFAULT 'kg',
+      min_order INTEGER NOT NULL DEFAULT 1,
+      lead_days INTEGER,
+      notice_days INTEGER,
+      store_frozen INTEGER NOT NULL DEFAULT 0,
+      store_fresh INTEGER NOT NULL DEFAULT 0,
+      store_dried INTEGER NOT NULL DEFAULT 0,
+      store_jarred INTEGER NOT NULL DEFAULT 0,
+      pick_adres INTEGER NOT NULL DEFAULT 0,
+      pick_nokta INTEGER NOT NULL DEFAULT 0,
+      season TEXT,
+      allergens TEXT,
+      notes TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_preserves_provider ON provider_preserves(provider_id);
   `);
   addColumn(db, "orders", "product_id", "product_id TEXT");
   addColumn(db, "orders", "product_name", "product_name TEXT");
