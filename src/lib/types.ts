@@ -46,6 +46,39 @@ export type TechPriceUnit = "cihaz" | "islem" | "saat" | "paket";
 export type TechMaterials = "provider" | "customer" | "included" | "extra" | "none";
 export type TechDelivery = { adres: boolean; nokta: boolean; yakin: boolean; yerinde: boolean };
 
+export type WashJob = "dis" | "ic" | "icdis";
+export type WashVehicle = "otomobil" | "suv" | "ticari" | "diger";
+export type WashBooking = "randevu" | "musait";
+export type WashMaterials = "provider" | "customer";
+export type WashIncludes = {
+  dis: boolean;
+  supurme: boolean;
+  cam: boolean;
+  torpido: boolean;
+  jant: boolean;
+  kurulama: boolean;
+};
+
+/** Araba yıkama kartı. Fiyat araç başı; siparişte sunucu çarpar. */
+export type ProviderWash = {
+  id: string;
+  name: string;
+  description?: string | null;
+  job?: WashJob;
+  vehicle?: WashVehicle;
+  photoUrl?: string | null;
+  price: number;
+  includes: WashIncludes;
+  durationMin?: number | null;
+  maxPerDay?: number | null;
+  booking?: WashBooking;
+  location?: string | null;
+  workHours?: string | null;
+  materials?: WashMaterials;
+  notes?: string | null;
+  isActive?: boolean;
+};
+
 /** Teknoloji & kurulum kartı. Sabit/başlangıç fiyatta sunucu çarpar; inceleme sonrası 0 ise sipariş yok. */
 export type ProviderTech = {
   id: string;
@@ -189,6 +222,7 @@ export type Provider = {
   services?: ProviderService[];
   repairs?: ProviderRepair[];
   techs?: ProviderTech[];
+  washes?: ProviderWash[];
 };
 
 export type DropPoint = {
@@ -227,7 +261,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji";
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba";
   pieces: number;
   express: boolean;
   drop: DropMethod;

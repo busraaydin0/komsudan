@@ -220,6 +220,15 @@ function ensureColumns(db: Database.Database) {
       is_active = 1,
       sort_order = 5
     WHERE id = 'teknoloji';
+    INSERT OR IGNORE INTO service_categories (id, name, fulfillment_mode, pricing_model)
+    VALUES ('araba', 'Araba Yıkama', 'delivery', 'fixed');
+    UPDATE service_categories SET
+      name = 'Araba Yıkama',
+      icon = 'car',
+      blurb = 'Dış yıkama, iç temizlik — getir, al',
+      is_active = 1,
+      sort_order = 6
+    WHERE id = 'araba';
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS provider_services (
@@ -306,6 +315,34 @@ function ensureColumns(db: Database.Database) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_tech_provider ON provider_tech(provider_id);
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_washes (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL REFERENCES provider_profiles(user_id),
+      name TEXT NOT NULL,
+      description TEXT,
+      job TEXT NOT NULL DEFAULT 'dis',
+      vehicle TEXT NOT NULL DEFAULT 'otomobil',
+      photo_url TEXT,
+      price INTEGER NOT NULL DEFAULT 0,
+      include_dis INTEGER NOT NULL DEFAULT 0,
+      include_supurme INTEGER NOT NULL DEFAULT 0,
+      include_cam INTEGER NOT NULL DEFAULT 0,
+      include_torpido INTEGER NOT NULL DEFAULT 0,
+      include_jant INTEGER NOT NULL DEFAULT 0,
+      include_kurulama INTEGER NOT NULL DEFAULT 0,
+      duration_min INTEGER,
+      max_per_day INTEGER,
+      booking TEXT NOT NULL DEFAULT 'musait',
+      location TEXT,
+      work_hours TEXT,
+      materials TEXT NOT NULL DEFAULT 'provider',
+      notes TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_washes_provider ON provider_washes(provider_id);
   `);
   addColumn(db, "orders", "product_id", "product_id TEXT");
   addColumn(db, "orders", "product_name", "product_name TEXT");

@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -217,6 +217,42 @@ export const techCreateSchema = z
   });
 
 export const techPatchSchema = techCreateSchema;
+
+const washIncludesSchema = z.object({
+  dis: z.boolean(),
+  supurme: z.boolean(),
+  cam: z.boolean(),
+  torpido: z.boolean(),
+  jant: z.boolean(),
+  kurulama: z.boolean(),
+});
+
+export const washCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    description: z.string().trim().max(400).optional().nullable(),
+    job: z.enum(["dis", "ic", "icdis"]).optional(),
+    vehicle: z.enum(["otomobil", "suv", "ticari", "diger"]).optional(),
+    price: z.number({ error: "Fiyat gerekli." }).int().min(1, "Fiyat 1–50.000 ₺.").max(50_000, "Fiyat 1–50.000 ₺."),
+    includes: washIncludesSchema.optional(),
+    durationMin: z.number().int().min(0).max(480).optional().nullable(),
+    maxPerDay: z.number().int().min(1).max(80).optional().nullable(),
+    booking: z.enum(["randevu", "musait"]).optional(),
+    location: z.string().trim().max(120).optional().nullable(),
+    workHours: z.string().trim().max(80).optional().nullable(),
+    materials: z.enum(["provider", "customer"]).optional(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (!val.includes) return;
+    const i = val.includes;
+    if (!i.dis && !i.supurme && !i.cam && !i.torpido && !i.jant && !i.kurulama) {
+      ctx.addIssue({ code: "custom", message: "En az bir dahil kalem seç.", path: ["includes"] });
+    }
+  });
+
+export const washPatchSchema = washCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

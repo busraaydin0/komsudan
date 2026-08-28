@@ -52,6 +52,15 @@ import {
   updateTech,
   type TechWrite,
 } from "@/lib/db/tech";
+import {
+  countWashes,
+  deactivateWash,
+  insertWash,
+  listWashes,
+  toPublicWash,
+  updateWash,
+  type WashWrite,
+} from "@/lib/db/washes";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -124,6 +133,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     services: listServices(row.user_id).map(toPublicService),
     repairs: listRepairs(row.user_id).map(toPublicRepair),
     techs: listTechs(row.user_id).map(toPublicTech),
+    washes: listWashes(row.user_id).map(toPublicWash),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -199,7 +209,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -490,10 +500,25 @@ export function ensureTeknolojiOffer(
   });
 }
 
+export function ensureArabaOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Araba yıkama. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "araba",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -513,6 +538,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "teknoloji") {
     return ensureTeknolojiOffer(user, input);
+  }
+  if (categoryId === "araba") {
+    return ensureArabaOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -800,6 +828,67 @@ export function patchMyTech(user: AuthUser, techId: string, input: TechWrite) {
 export function removeMyTech(user: AuthUser, techId: string) {
   requireProvider(user);
   if (!deactivateTech(techId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_WASHES = 12;
+
+function assertWashWrite(input: WashWrite) {
+  if (input.price < 1) {
+    throw new ApiError(400, "Fiyat 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
+  }
+  const i = input.includes;
+  if (i && !i.dis && !i.supurme && !i.cam && !i.torpido && !i.jant && !i.kurulama) {
+    throw new ApiError(400, "En az bir dahil kalem seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyWashes(user: AuthUser) {
+  requireProvider(user);
+  return listWashes(user.id, false).map(toPublicWash);
+}
+
+export function addMyWash(user: AuthUser, input: WashWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "araba") {
+    throw new ApiError(400, "Yıkama kartı yalnızca Araba Yıkama alanında.", "VALIDATION_ERROR");
+  }
+  assertWashWrite(input);
+  if (countWashes(user.id, false) >= MAX_WASHES) {
+    throw new ApiError(400, `En fazla ${MAX_WASHES} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicWash(
+    insertWash(user.id, {
+      ...input,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      location: input.location?.trim() || null,
+      notes: input.notes?.trim() || null,
+      workHours: input.workHours?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyWash(user: AuthUser, washId: string, input: WashWrite) {
+  requireProvider(user);
+  assertWashWrite(input);
+  const row = updateWash(washId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    location: input.location?.trim() || null,
+    notes: input.notes?.trim() || null,
+    workHours: input.workHours?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicWash(row);
+}
+
+export function removeMyWash(user: AuthUser, washId: string) {
+  requireProvider(user);
+  if (!deactivateWash(washId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };

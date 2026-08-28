@@ -59,7 +59,7 @@ export const homeVisitStrategy: FulfillmentStrategy = {
 
 export function strategyFor(mode: FulfillmentMode, categoryId?: string): FulfillmentStrategy {
   if (mode === "home_visit") return homeVisitStrategy;
-  if (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji") {
+  if (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba") {
     return foodStrategy;
   }
   return deliveryStrategy;
