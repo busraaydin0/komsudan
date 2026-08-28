@@ -26,6 +26,15 @@ export const slotCreateSchema = z.object({
   deliveryMode: z.enum(["door", "point", "both"]),
 });
 
+export const productCreateSchema = z.object({
+  name: z.string().trim().min(2, "Ürün adı en az 2 karakter.").max(80),
+  pricePerPerson: z
+    .number({ error: "Kişi başı fiyat gerekli." })
+    .int()
+    .min(1, "Kişi başı fiyat 1–5000 ₺.")
+    .max(5000, "Kişi başı fiyat 1–5000 ₺."),
+});
+
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),
   lat: z.number().min(-90).max(90),

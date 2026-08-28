@@ -68,7 +68,13 @@ export function canTransition(from: ApiLifecycle, to: ApiLifecycle, packageId: P
   return true;
 }
 
-export function nextStatus(current: OrderStatus, packageId: PackageId): OrderStatus | null {
+export function nextStatus(current: OrderStatus, packageId: PackageId | "davet", food = false): OrderStatus | null {
+  if (food || packageId === "davet") {
+    if (current === "onay_bekliyor") return "teslim_alindi";
+    if (current === "teslim_alindi") return "hazir";
+    if (current === "hazir") return "teslim_edildi";
+    return null;
+  }
   if (current === "onay_bekliyor") return "teslim_alindi";
   if (current === "teslim_alindi") return "yikaniyor";
   if (current === "yikaniyor") return packageId === "tam" ? "utuleniyor" : "hazir";
@@ -92,7 +98,10 @@ export function canReview(status: OrderStatus) {
 export const PICKUP_CODE_LEN = 6;
 export const PICKUP_CODE_TRIES = 5;
 
-export function trackSteps(packageId: PackageId): OrderStatus[] {
+export function trackSteps(packageId: PackageId | "davet", food = false): OrderStatus[] {
+  if (food || packageId === "davet") {
+    return ["onay_bekliyor", "teslim_alindi", "hazir", "teslim_edildi"];
+  }
   if (packageId === "tam") {
     return ["onay_bekliyor", "teslim_alindi", "yikaniyor", "utuleniyor", "hazir", "teslim_edildi"];
   }

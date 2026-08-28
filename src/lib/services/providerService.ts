@@ -15,6 +15,7 @@ import {
   type ProfileRow,
   type SlotRow,
 } from "@/lib/db/providers";
+import { countProducts, deactivateProduct, insertProduct, listProducts, type ProductRow } from "@/lib/db/products";
 import { getCategory } from "@/lib/db/categories";
 import type { AuthUser } from "@/lib/auth/types";
 
@@ -58,6 +59,15 @@ function toSlot(row: SlotRow) {
   };
 }
 
+function toProduct(row: ProductRow) {
+  return {
+    id: row.id,
+    providerId: row.provider_id,
+    name: row.name,
+    pricePerPerson: row.price_per_person,
+  };
+}
+
 function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
   const provider = {
     id: row.user_id,
@@ -77,6 +87,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     commissionRate: row.commission_rate,
     categoryId: row.category_id ?? "camasir",
     packages: listPackages(row.user_id).map(toPackage),
+    products: listProducts(row.user_id).map(toProduct),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -189,4 +200,31 @@ export function listMyDropPoints(user: AuthUser) {
 export function addMyDropPoint(user: AuthUser, input: { label: string; lat: number; lng: number }) {
   requireProvider(user);
   return toDrop(insertDrop({ providerId: user.id, ...input }));
+}
+
+const MAX_PRODUCTS = 12;
+
+export function addMyProduct(user: AuthUser, input: { name: string; pricePerPerson: number }) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "davet") {
+    throw new ApiError(400, "Ürün yalnızca Davet hizmetinde. Kategorini Davet yap.", "VALIDATION_ERROR");
+  }
+  if (countProducts(user.id) >= MAX_PRODUCTS) {
+    throw new ApiError(400, `En fazla ${MAX_PRODUCTS} ürün.`, "VALIDATION_ERROR");
+  }
+  return toProduct(
+    insertProduct({
+      providerId: user.id,
+      name: input.name.trim(),
+      pricePerPerson: input.pricePerPerson,
+    }),
+  );
+}
+
+export function removeMyProduct(user: AuthUser, productId: string) {
+  requireProvider(user);
+  if (!deactivateProduct(productId, user.id)) {
+    throw new ApiError(404, "Ürün bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
 }

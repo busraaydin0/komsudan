@@ -30,6 +30,10 @@ export type OrderRow = {
   scheduled_window_start: string | null;
   scheduled_window_end: string | null;
   lifecycle: string | null;
+  product_id: string | null;
+  product_name: string | null;
+  guest_count: number | null;
+  allergy_note: string | null;
 };
 
 export type InsertOrderInput = {
@@ -54,6 +58,10 @@ export type InsertOrderInput = {
   delivery_mode: string;
   scheduled_window_start: string;
   lifecycle: string;
+  product_id?: string | null;
+  product_name?: string | null;
+  guest_count?: number | null;
+  allergy_note?: string | null;
 };
 
 export function getRemaining(providerId: string) {
@@ -115,16 +123,24 @@ export function insertOrderRow(input: InsertOrderInput) {
         slot, note, total, commission, status, created_at, updated_at,
         pickup_code, code_attempts, paid_at, payment_status, user_id,
         price_per_kg_snapshot, estimated_weight, actual_weight, estimated_price, final_price,
-        delivery_mode, scheduled_window_start, scheduled_window_end, lifecycle
+        delivery_mode, scheduled_window_start, scheduled_window_end, lifecycle,
+        product_id, product_name, guest_count, allergy_note
       ) VALUES (
         @id, @provider_id, @package_id, @pieces, @express, @drop_method, @drop_point_id,
         @slot, @note, @total, @commission, @status, @created_at, @updated_at,
         NULL, 0, NULL, 'authorized', @user_id,
         @price_per_kg_snapshot, @estimated_weight, NULL, @estimated_price, NULL,
-        @delivery_mode, @scheduled_window_start, NULL, @lifecycle
+        @delivery_mode, @scheduled_window_start, NULL, @lifecycle,
+        @product_id, @product_name, @guest_count, @allergy_note
       )`,
     )
-    .run(input);
+    .run({
+      product_id: null,
+      product_name: null,
+      guest_count: null,
+      allergy_note: null,
+      ...input,
+    });
 }
 
 export type HistoryRow = {

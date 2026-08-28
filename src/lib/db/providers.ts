@@ -91,8 +91,10 @@ export function upsertProfile(input: {
   ratingAvg: number;
   ratingCount: number;
   avatarUrl?: string | null;
+  categoryId?: string;
 }) {
   const now = new Date().toISOString();
+  const categoryId = input.categoryId ?? "camasir";
   db()
     .prepare(
       `INSERT INTO provider_profiles (
@@ -104,6 +106,8 @@ export function upsertProfile(input: {
          'verified', 'active', 0.10, @ratingAvg, @ratingCount, 0, @categoryId, @now
        )
        ON CONFLICT(user_id) DO UPDATE SET
+         bio = excluded.bio,
+         category_id = excluded.category_id,
          rating_avg = excluded.rating_avg,
          rating_count = excluded.rating_count,
          is_founder = excluded.is_founder,
@@ -118,9 +122,10 @@ export function upsertProfile(input: {
       avatarUrl: input.avatarUrl ?? null,
       hasDryer: input.hasDryer ? 1 : 0,
       isFounder: input.isFounder ? 1 : 0,
-      categoryId: "camasir",
+      categoryId,
       now,
     });
+  db().prepare("UPDATE providers SET category_id = ? WHERE id = ?").run(categoryId, input.userId);
 }
 
 export function getProfile(userId: string): ProfileRow | undefined {
@@ -200,6 +205,9 @@ export function updateProfileFields(
       categoryId: patch.categoryId ?? current.category_id ?? "camasir",
       now,
     });
+  db()
+    .prepare("UPDATE providers SET category_id = ? WHERE id = ?")
+    .run(patch.categoryId ?? current.category_id ?? "camasir", userId);
   return getProfile(userId);
 }
 

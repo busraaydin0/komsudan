@@ -1,5 +1,5 @@
 ---
-description: Çok kategorili genişleme — 6.6 keşif, 7 davet adı. Atlama.
+description: Çok kategorili genişleme — 7 davet menü. Atlama.
 alwaysApply: true
 ---
 
@@ -12,10 +12,8 @@ Kaynak: masaüstü `KOMSUDAN-ROADMAP-GENISLEME.md`. Faz atlama.
 
 ## Sıra
 
-6 Ödeme (bitti) → 6.5 kategori (bitti) → 6.6 keşif (bitti) → **7 davet (ad: kısır/pasta/kurabiye)** → 8 home-visit (Tip B) → 9+ review/dispute/log.
+6 Ödeme (bitti) → 6.5 kategori (bitti) → 6.6 keşif (bitti) → **7 davet (bitti: menü/kişi/alerji)** → 8 home-visit (Tip B) → 9+ review/dispute/log.
 
-Faz 6.6: rol + kategori (arama) + konum; tercih DB’de. **Her açılış/yenilemede keşif ekranı**; bu oturumda devam edince harita. Atlanabilir. State machine’e dokunma.
-
-Faz 7 (ad): keşifte **Davet** — kısır, pasta, kurabiye. Sipariş/sağlayıcı hâlâ çamaşır; davet pin’i yok.
+Faz 7: her aşçı kendi ürününü ve kişi başı fiyatını girer. Siparişte kaç kişilik + alerji. Tutar sunucuda. Çamaşır state machine aynen. Seed: Fatma kısır+kurabiye, Hatice pasta+kısır, Nurcan kurabiye.
 
 PWA’yı kırma. Tutar/status client’tan alma. Route’ta SQL yok.

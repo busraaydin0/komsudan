@@ -391,3 +391,22 @@ export async function postMyDropPoint(body: { label: string; lat: number; lng: n
     }),
   );
 }
+
+export async function postMyProduct(body: { name: string; pricePerPerson: number }) {
+  const data = unwrap(
+    await readJson<{ data?: { product: { id: string; name: string; pricePerPerson: number } }; product?: { id: string; name: string; pricePerPerson: number } }>(
+      await fetch("/api/providers/me/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.product!;
+}
+
+export async function deleteMyProduct(id: string) {
+  await readJson(
+    await fetch(`/api/providers/me/products/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}

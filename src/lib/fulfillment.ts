@@ -16,6 +16,26 @@ export const deliveryStrategy: FulfillmentStrategy = {
   canTransition: deliveryCanTransition,
 };
 
+/** Davet: yıkama/ütü yok. pending → accepted → ready → completed. */
+const FOOD_TRANSITIONS: Record<ApiLifecycle, ApiLifecycle[]> = {
+  pending: ["accepted", "rejected"],
+  accepted: ["ready", "cancelled"],
+  dropped_off: [],
+  washing: [],
+  ironing: [],
+  ready: ["completed"],
+  completed: [],
+  rejected: [],
+  cancelled: [],
+  disputed: [],
+};
+
+export const foodStrategy: FulfillmentStrategy = {
+  mode: "delivery",
+  ready: true,
+  canTransition: (from, to) => FOOD_TRANSITIONS[from].includes(to),
+};
+
 /**
  * Eve giden hizmet iskeleti. Adlar Faz 8'de netleşir; şu an geçiş yok.
  * pending → confirmed → on_the_way → in_progress → completed
@@ -37,6 +57,8 @@ export const homeVisitStrategy: FulfillmentStrategy = {
   canTransition: () => false,
 };
 
-export function strategyFor(mode: FulfillmentMode): FulfillmentStrategy {
-  return mode === "home_visit" ? homeVisitStrategy : deliveryStrategy;
+export function strategyFor(mode: FulfillmentMode, categoryId?: string): FulfillmentStrategy {
+  if (mode === "home_visit") return homeVisitStrategy;
+  if (categoryId === "davet") return foodStrategy;
+  return deliveryStrategy;
 }

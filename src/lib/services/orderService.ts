@@ -1,7 +1,8 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { estimateFor, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
+import { estimateFood, estimateFor, GUESTS_MAX, GUESTS_MIN, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { loyaltyRate } from "@/lib/loyalty";
 import { getCategoryForProvider } from "@/lib/db/categories";
+import { getProduct } from "@/lib/db/products";
 import { strategyFor } from "@/lib/fulfillment";
 import {
   canAddPhotos,
@@ -88,13 +89,17 @@ function toOrder(row: OrderRow): Order {
   return {
     id: row.id,
     providerId: row.provider_id,
-    packageId: row.package_id as PackageId,
+    packageId: (row.package_id === "davet" ? "davet" : row.package_id) as Order["packageId"],
     pieces: row.pieces,
     express: Boolean(row.express),
     drop,
     dropPointId: row.drop_point_id,
     slot: row.slot,
     note: row.note,
+    productId: row.product_id,
+    productName: row.product_name,
+    guestCount: row.guest_count,
+    allergyNote: row.allergy_note,
     total: row.total,
     commission: row.commission,
     status,
@@ -157,23 +162,16 @@ export function listOrdersFor(user: AuthUser): Order[] {
 }
 
 export function createOrder(input: CreateOrderInput, userId: string): Order {
-  const pieces = Math.round(input.pieces);
-  if (!Number.isFinite(pieces) || pieces < PIECES_MIN || pieces > PIECES_MAX) {
-    throw new ApiError(400, `Parça sayısı ${PIECES_MIN}–${PIECES_MAX} olmalı.`, "VALIDATION_ERROR");
-  }
-
   const provider = getProvider(input.providerId);
   if (!provider) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
+  const cat = getCategoryForProvider(provider.id);
   assertFulfillmentReady(provider.id);
 
-  const pack = provider.packages.find((p) => p.id === input.packageId);
-  if (!pack) throw new ApiError(400, "Bu paket bu komşuda yok.", "VALIDATION_ERROR");
+  if (cat.id === "davet") return createDavetOrder(input, userId, provider);
+  return createLaundryOrder(input, userId, provider);
+}
 
-  const express = Boolean(input.express) && provider.express;
-  if (input.express && !provider.express) {
-    throw new ApiError(400, "Bu komşu aynı gün almıyor.", "VALIDATION_ERROR");
-  }
-
+function validateDropAndSlot(provider: NonNullable<ReturnType<typeof getProvider>>, input: CreateOrderInput) {
   if (!provider.drops.includes(input.drop)) {
     throw new ApiError(400, "Bu teslimat yöntemi kapalı.", "VALIDATION_ERROR");
   }
@@ -189,46 +187,61 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
   if (!provider.slots.includes(input.slot)) {
     throw new ApiError(400, "Saat dilimi geçersiz.", "VALIDATION_ERROR");
   }
+  return dropPointId;
+}
 
-  const quote = estimateFor(
-    provider,
-    pieces,
-    input.packageId,
-    express,
-    loyaltyRate(deliveredCount(userId)),
-  );
+function insertPendingOrder(args: {
+  providerId: string;
+  packageId: string;
+  pieces: number;
+  express: boolean;
+  drop: DropMethod;
+  dropPointId: string | null;
+  slot: string;
+  note: string;
+  quote: { total: number; commission: number; perPiece: number };
+  userId: string;
+  productId?: string | null;
+  productName?: string | null;
+  guestCount?: number | null;
+  allergyNote?: string | null;
+}) {
   const now = new Date().toISOString();
   const id = `k-${randomUUID().slice(0, 8)}`;
-
+  const capacityLabel = args.productId ? "kişilik yer" : "parça yer";
   runOrderTx(() => {
-    const remaining = getRemaining(provider.id);
+    const remaining = getRemaining(args.providerId);
     if (remaining == null) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
-    if (remaining < pieces) {
-      throw new ApiError(409, `Bugün yalnızca ${remaining} parça yer var.`, "CAPACITY");
+    if (remaining < args.pieces) {
+      throw new ApiError(409, `Bugün yalnızca ${remaining} ${capacityLabel} var.`, "CAPACITY");
     }
-    addRemaining(provider.id, -pieces);
+    addRemaining(args.providerId, -args.pieces);
     insertOrderRow({
       id,
-      provider_id: provider.id,
-      package_id: input.packageId,
-      pieces,
-      express: express ? 1 : 0,
-      drop_method: input.drop,
-      drop_point_id: dropPointId,
-      slot: input.slot,
-      note: (input.note ?? "").trim().slice(0, 500),
-      total: quote.total,
-      commission: quote.commission,
+      provider_id: args.providerId,
+      package_id: args.packageId,
+      pieces: args.pieces,
+      express: args.express ? 1 : 0,
+      drop_method: args.drop,
+      drop_point_id: args.dropPointId,
+      slot: args.slot,
+      note: args.note,
+      total: args.quote.total,
+      commission: args.quote.commission,
       status: "onay_bekliyor",
       created_at: now,
       updated_at: now,
-      user_id: userId,
-      price_per_kg_snapshot: quote.perPiece,
-      estimated_weight: pieces,
-      estimated_price: quote.total,
-      delivery_mode: deliveryMode(input.drop),
-      scheduled_window_start: input.slot,
+      user_id: args.userId,
+      price_per_kg_snapshot: args.quote.perPiece,
+      estimated_weight: args.pieces,
+      estimated_price: args.quote.total,
+      delivery_mode: deliveryMode(args.drop),
+      scheduled_window_start: args.slot,
       lifecycle: "pending",
+      product_id: args.productId ?? null,
+      product_name: args.productName ?? null,
+      guest_count: args.guestCount ?? null,
+      allergy_note: args.allergyNote ?? null,
     });
     recordTransition({
       orderId: id,
@@ -236,18 +249,60 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
       toStatus: "onay_bekliyor",
       fromLifecycle: null,
       toLifecycle: "pending",
-      actorId: userId,
+      actorId: args.userId,
       actorRole: "customer",
       at: now,
     });
     authorizePayment({
       orderId: id,
-      amount: quote.total,
-      commission: quote.commission,
+      amount: args.quote.total,
+      commission: args.quote.commission,
       at: now,
     });
   });
+  return id;
+}
 
+function createLaundryOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
+  const pieces = Math.round(input.pieces ?? NaN);
+  if (!Number.isFinite(pieces) || pieces < PIECES_MIN || pieces > PIECES_MAX) {
+    throw new ApiError(400, `Parça sayısı ${PIECES_MIN}–${PIECES_MAX} olmalı.`, "VALIDATION_ERROR");
+  }
+  if (!input.packageId) {
+    throw new ApiError(400, "Paket seç.", "VALIDATION_ERROR");
+  }
+  if (input.productId) {
+    throw new ApiError(400, "Çamaşır siparişinde menü ürünü yok.", "VALIDATION_ERROR");
+  }
+
+  const pack = provider.packages.find((p) => p.id === input.packageId);
+  if (!pack) throw new ApiError(400, "Bu paket bu komşuda yok.", "VALIDATION_ERROR");
+
+  const express = Boolean(input.express) && provider.express;
+  if (input.express && !provider.express) {
+    throw new ApiError(400, "Bu komşu aynı gün almıyor.", "VALIDATION_ERROR");
+  }
+
+  const dropPointId = validateDropAndSlot(provider, input);
+  const quote = estimateFor(
+    provider,
+    pieces,
+    input.packageId,
+    express,
+    loyaltyRate(deliveredCount(userId)),
+  );
+  const id = insertPendingOrder({
+    providerId: provider.id,
+    packageId: input.packageId,
+    pieces,
+    express,
+    drop: input.drop,
+    dropPointId,
+    slot: input.slot,
+    note: (input.note ?? "").trim().slice(0, 500),
+    quote,
+    userId,
+  });
   const order = getOrder(id)!;
   notifyNewOrder({
     id,
@@ -258,13 +313,59 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
   return order;
 }
 
+function createDavetOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
+  const productId = (input.productId ?? "").trim();
+  if (!productId) throw new ApiError(400, "Ürün seç.", "VALIDATION_ERROR");
+  const product = getProduct(productId);
+  if (!product || product.provider_id !== provider.id || !product.is_active) {
+    throw new ApiError(400, "Bu ürün bu komşuda yok.", "VALIDATION_ERROR");
+  }
+
+  const guests = Math.round(input.guestCount ?? NaN);
+  if (!Number.isFinite(guests) || guests < GUESTS_MIN || guests > GUESTS_MAX) {
+    throw new ApiError(400, `Kişi sayısı ${GUESTS_MIN}–${GUESTS_MAX} olmalı.`, "VALIDATION_ERROR");
+  }
+
+  const allergy = (input.allergyNote ?? "").trim();
+  if (!allergy) {
+    throw new ApiError(400, "Alerji durumunu yaz. Yoksa “yok” de.", "VALIDATION_ERROR");
+  }
+
+  const dropPointId = validateDropAndSlot(provider, input);
+  const quote = estimateFood(guests, product.price_per_person, loyaltyRate(deliveredCount(userId)));
+  const id = insertPendingOrder({
+    providerId: provider.id,
+    packageId: "davet",
+    pieces: guests,
+    express: false,
+    drop: input.drop,
+    dropPointId,
+    slot: input.slot,
+    note: (input.note ?? "").trim().slice(0, 500),
+    quote,
+    userId,
+    productId: product.id,
+    productName: product.name,
+    guestCount: guests,
+    allergyNote: allergy.slice(0, 300),
+  });
+  const order = getOrder(id)!;
+  notifyNewOrder({
+    id,
+    provider_id: provider.id,
+    user_id: userId,
+    pieces: guests,
+  });
+  return order;
+}
+
 function currentLifecycle(row: OrderRow): ApiLifecycle {
   return lifecycleOf(row.status as OrderStatus, row.lifecycle);
 }
 
 function assertFulfillmentReady(providerId: string) {
   const cat = getCategoryForProvider(providerId);
-  const strat = strategyFor(cat.fulfillment_mode);
+  const strat = strategyFor(cat.fulfillment_mode, cat.id);
   if (!strat.ready) {
     throw new ApiError(409, "Bu hizmet tipi henüz açık değil.", "CATEGORY_NOT_READY");
   }
@@ -422,7 +523,7 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
     }
     next = "completed";
   } else {
-    const n = nextStatus(order.status, order.packageId);
+    const n = nextStatus(order.status, order.packageId, Boolean(order.productId));
     if (!n) throw new ApiError(409, "Daha ileri durum yok.", "INVALID_TRANSITION");
     if (n === "teslim_edildi") {
       throw new ApiError(409, "Teslim için müşterinin kodunu gir.", "INVALID_TRANSITION");

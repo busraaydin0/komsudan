@@ -6,6 +6,8 @@ export const COMMISSION = 0.1;
 export const EXPRESS_BUMP = 0.25;
 export const PIECES_MIN = 1;
 export const PIECES_MAX = 80;
+export const GUESTS_MIN = 1;
+export const GUESTS_MAX = 80;
 
 export function clampPieces(n: number, remaining?: number) {
   const cap = remaining && remaining > 0 ? Math.min(PIECES_MAX, remaining) : PIECES_MAX;
@@ -45,6 +47,23 @@ function quote(pieces: number, base: number, express: boolean, loyaltyRate = 0) 
     commission,
     providerNet: total - commission,
     perPiece: base,
+  };
+}
+
+/** Davet: kişi × kişi başı. Çamaşır MIN_ORDER 100 buraya girmez. */
+export function estimateFood(guests: number, pricePerPerson: number, loyaltyRate = 0) {
+  const count = Math.max(GUESTS_MIN, Math.round(guests));
+  const before = Math.max(1, Math.round(count * pricePerPerson));
+  const rate = Math.min(0.2, Math.max(0, loyaltyRate));
+  const total = Math.max(1, Math.round(before * (1 - rate)));
+  const commission = Math.round(total * COMMISSION);
+  return {
+    total,
+    before,
+    loyaltyRate: rate,
+    commission,
+    providerNet: total - commission,
+    perPiece: pricePerPerson,
   };
 }
 

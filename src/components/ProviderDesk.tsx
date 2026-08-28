@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { PACKAGES } from "@/lib/data";
-import { patchOrder, uploadOrderPhoto, useCatalog, useOrders } from "@/lib/api";
+import { patchOrder, uploadOrderPhoto, useCatalog, useOrders, useSession, postMyProduct, deleteMyProduct } from "@/lib/api";
 import { tl } from "@/lib/pricing";
 import { canAddPhotos, nextStatus } from "@/lib/status";
 import type { DropPoint, Order, OrderStatus, Provider } from "@/lib/types";
@@ -40,6 +40,7 @@ function monthLabel(key: string) {
 }
 
 export function ProviderDesk({ onOpenSetup }: { onOpenSetup?: () => void } = {}) {
+  const { account } = useSession();
   const { providers, dropPoints, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload } = useOrders();
   const wallet = orders
@@ -97,6 +98,11 @@ export function ProviderDesk({ onOpenSetup }: { onOpenSetup?: () => void } = {})
             <p className="font-[family-name:var(--font-display)] text-2xl tabular-nums">{open.length}</p>
           </div>
         </div>
+
+        <ProductEditor
+          me={providers.find((p) => p.id === account?.id)}
+          onChanged={reloadAll}
+        />
 
         <h2 className="k-rise mt-8 font-[family-name:var(--font-display)] text-xl">Gelen siparişler</h2>
         {!ready ? (
@@ -195,7 +201,12 @@ function OrderCard({
     p?.packages.find((x) => x.id === order.packageId) ??
     PACKAGES.find((x) => x.id === order.packageId);
   const drop = dropPoints.find((d) => d.id === order.dropPointId);
-  const next = nextStatus(order.status, order.packageId);
+  const food = Boolean(order.productId);
+  const next = nextStatus(order.status, order.packageId, food);
+  const foodLabel: Partial<Record<OrderStatus, string>> = {
+    teslim_alindi: "Hazırlanıyor",
+    hazir: "Hazır",
+  };
 
   async function act(action: "accept" | "reject" | "advance" | "deliver") {
     if (busy) return;
@@ -218,11 +229,17 @@ function OrderCard({
       style={{ animationDelay: `${delay}ms` }}
     >
       <p className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE[order.status]}`}>
-        {LABEL[order.status]}
+        {food && foodLabel[order.status] ? foodLabel[order.status] : LABEL[order.status]}
       </p>
       <p className="mt-2 font-medium">
-        {p?.name} · {order.pieces} parça · {pack?.title}
+        {p?.name} ·{" "}
+        {food
+          ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
+          : `${order.pieces} parça · ${pack?.title}`}
       </p>
+      {food && order.allergyNote && (
+        <p className="mt-1 text-sm text-[var(--muted)]">Alerji: {order.allergyNote}</p>
+      )}
       <p className="mt-1 text-sm text-[var(--muted)]">
         {new Date(order.createdAt).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
         {" · "}
@@ -264,7 +281,7 @@ function OrderCard({
             onClick={() => void act("advance")}
             className="k-press k-cta rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs text-[var(--paper)]"
           >
-            {busy ? "…" : LABEL[next]}
+            {busy ? "…" : food && next === "hazir" ? "Hazır" : LABEL[next]}
           </button>
         )}
         {canAddPhotos(order.status) && (
@@ -321,5 +338,109 @@ function OrderCard({
         </form>
       )}
     </li>
+  );
+}
+
+function ProductEditor({
+  me,
+  onChanged,
+}: {
+  me: Provider | undefined;
+  onChanged: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!me || me.categoryId !== "davet") return null;
+  const items = me.products ?? [];
+
+  async function add() {
+    const trimmed = name.trim();
+    const n = Number(price);
+    if (trimmed.length < 2 || !Number.isInteger(n) || n < 1) {
+      setErr("Ad ve kişi başı fiyat (tam sayı ₺) yaz.");
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    try {
+      await postMyProduct({ name: trimmed, pricePerPerson: n });
+      setName("");
+      setPrice("");
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Ürün eklenemedi.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: string) {
+    setBusy(true);
+    setErr("");
+    try {
+      await deleteMyProduct(id);
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Kaldırılamadı.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="k-rise mt-8 rounded-3xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]">
+      <h2 className="font-[family-name:var(--font-display)] text-xl">Ürünlerim</h2>
+      <p className="mt-1 text-xs text-[var(--muted)]">
+        Yalnızca yaptığın yemekleri ekle. Fiyat kişi başı; siparişte kaç kişilik olduğu sorulur.
+      </p>
+      <ul className="mt-3 space-y-2">
+        {items.length === 0 && (
+          <li className="text-sm text-[var(--muted)]">Henüz ürün yok.</li>
+        )}
+        {items.map((item) => (
+          <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
+            <span>
+              {item.name}
+              <span className="ml-2 tabular-nums text-[var(--muted)]">{tl(item.pricePerPerson)}/kişi</span>
+            </span>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void remove(item.id)}
+              className="text-xs text-[var(--clay)]"
+            >
+              Kaldır
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Kısır, pasta…"
+          maxLength={80}
+          className="min-w-[8rem] flex-1 rounded-full bg-[var(--paper)] px-3 py-2 text-sm ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
+        />
+        <input
+          inputMode="numeric"
+          value={price}
+          onChange={(e) => setPrice(e.target.value.replace(/\D/g, "").slice(0, 4))}
+          placeholder="₺/kişi"
+          className="w-24 rounded-full bg-[var(--paper)] px-3 py-2 text-sm tabular-nums ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
+        />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void add()}
+          className="k-press k-cta rounded-full bg-[var(--ink)] px-3 py-2 text-xs text-[var(--paper)]"
+        >
+          {busy ? "…" : "Ekle"}
+        </button>
+      </div>
+      {err && <p className="mt-2 text-sm text-[var(--clay)]">{err}</p>}
+    </div>
   );
 }

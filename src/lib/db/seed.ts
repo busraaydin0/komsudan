@@ -9,6 +9,7 @@ import {
   upsertProfile,
   upsertProviderUser,
 } from "./providers";
+import { upsertProduct } from "./products";
 
 const SEED_PHONES: Record<string, string> = {
   elif: "5321100001",
@@ -44,16 +45,27 @@ function seedProviderDirectory() {
       ratingAvg: p.rating,
       ratingCount: p.reviews,
       avatarUrl: p.avatarUrl,
+      categoryId: p.categoryId ?? "camasir",
     });
-    for (const pack of p.packages) {
-      upsertPackage({
-        id: `${p.id}:${pack.id}`,
+    if ((p.categoryId ?? "camasir") !== "davet") {
+      for (const pack of p.packages) {
+        upsertPackage({
+          id: `${p.id}:${pack.id}`,
+          provider_id: p.id,
+          name: pack.title,
+          price_per_kg: pack.pricePerPiece,
+          min_order_amount: MIN_ORDER,
+          express_available: p.express ? 1 : 0,
+          express_surcharge_pct: p.express ? EXPRESS_BUMP : 0,
+        });
+      }
+    }
+    for (const product of p.products ?? []) {
+      upsertProduct({
+        id: product.id,
         provider_id: p.id,
-        name: pack.title,
-        price_per_kg: pack.pricePerPiece,
-        min_order_amount: MIN_ORDER,
-        express_available: p.express ? 1 : 0,
-        express_surcharge_pct: p.express ? EXPRESS_BUMP : 0,
+        name: product.name,
+        price_per_person: product.pricePerPerson,
       });
     }
     if (p.drops.includes("nokta")) {
@@ -93,8 +105,8 @@ function seedProviderDirectory() {
 export function seedCatalog(database: Database.Database) {
   const upProvider = database.prepare(
     `INSERT INTO providers (id, payload, remaining, category_id)
-     VALUES (@id, @payload, @remaining, 'camasir')
-     ON CONFLICT(id) DO UPDATE SET payload = excluded.payload`,
+     VALUES (@id, @payload, @remaining, @categoryId)
+     ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, category_id = excluded.category_id`,
   );
   const upDrop = database.prepare(
     `INSERT INTO drop_points (id, payload) VALUES (@id, @payload)
@@ -115,6 +127,7 @@ export function seedCatalog(database: Database.Database) {
         id: p.id,
         payload: JSON.stringify({ ...rest, remaining }),
         remaining,
+        categoryId: p.categoryId ?? "camasir",
       });
     }
     for (const d of DROP_POINTS) {

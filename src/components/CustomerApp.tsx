@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PILOT, trustLabel } from "@/lib/data";
 import { formatKm, kmBetween } from "@/lib/geo";
-import { estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
+import { estimateFood, estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN, GUESTS_MAX, GUESTS_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
 import { postOrder, postReview, patchOrder, useCatalog, useOrders } from "@/lib/api";
 import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
@@ -31,6 +31,11 @@ const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), 
 });
 
 const PIECES = [8, 12, 16, 24, 32];
+const GUESTS = [4, 8, 12, 16, 24];
+
+function isDavet(p: Pick<Provider, "categoryId">) {
+  return p.categoryId === "davet";
+}
 
 type Sheet = "list" | "provider" | "checkout" | "track";
 
@@ -73,7 +78,10 @@ export function CustomerApp({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
   const [pkg, setPkg] = useState<PackageId>("tam");
+  const [productId, setProductId] = useState<string | null>(null);
   const [pieces, setPieces] = useState(16);
+  const [guests, setGuests] = useState(8);
+  const [allergy, setAllergy] = useState("");
   const [express, setExpress] = useState(false);
   const [drop, setDrop] = useState<DropMethod>("nokta");
   const [slot, setSlot] = useState("");
@@ -90,7 +98,7 @@ export function CustomerApp({
   const origin = user ?? home ?? PILOT.center;
   const ranked = useMemo(() => {
     return providers
-      .filter((p) => (dryerOnly ? p.hasDryer : true))
+      .filter((p) => (isDavet(p) ? true : dryerOnly ? p.hasDryer : true))
       .map((p) => ({ p, km: kmBetween(origin, p.loc) }))
       .sort((a, b) => a.km - b.km);
   }, [origin, dryerOnly, providers]);
@@ -98,8 +106,12 @@ export function CustomerApp({
 
   const selected = selectedId ? providers.find((p) => p.id === selectedId) : undefined;
   const active = orders.find((o) => o.id === activeId) ?? orders[0];
+  const davet = selected ? isDavet(selected) : false;
+  const product = selected?.products?.find((x) => x.id === productId) ?? selected?.products?.[0];
   const quote = selected
-    ? estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
+    ? davet && product
+      ? estimateFood(guests, product.pricePerPerson, loyaltyRate)
+      : estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
     : { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 };
 
   useEffect(() => {
@@ -143,10 +155,16 @@ export function CustomerApp({
 
   useEffect(() => {
     if (selected) {
-      setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : selected.packages[0].id);
+      if (isDavet(selected)) {
+        const first = selected.products?.[0]?.id ?? null;
+        setProductId(selected.products?.some((x) => x.id === productId) ? productId : first);
+      } else {
+        setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
+      }
       setSlot(selected.slots[0] ?? "");
       setDrop(selected.drops.includes("kapi") ? "kapi" : "nokta");
       setExpress(false);
+      setAllergy("");
       if (!selected.drops.includes("nokta")) setDropId(null);
       else if (!dropId) setDropId(dropPoints[0]?.id ?? null);
     }
@@ -187,16 +205,35 @@ export function CustomerApp({
     setErr("");
     setPlacing(true);
     try {
-      const order = await postOrder({
-        providerId: selected.id,
-        packageId: pkg,
-        pieces,
-        express: express && selected.express,
-        drop,
-        dropPointId: drop === "nokta" ? dropId : null,
-        slot,
-        note,
-      });
+      const davetOrder = isDavet(selected);
+      if (davetOrder && !allergy.trim()) {
+        setErr("Alerji durumunu yaz. Yoksa “yok” de.");
+        setPlacing(false);
+        return;
+      }
+      const order = await postOrder(
+        davetOrder
+          ? {
+              providerId: selected.id,
+              productId: product?.id,
+              guestCount: guests,
+              allergyNote: allergy,
+              drop,
+              dropPointId: drop === "nokta" ? dropId : null,
+              slot,
+              note,
+            }
+          : {
+              providerId: selected.id,
+              packageId: pkg,
+              pieces,
+              express: express && selected.express,
+              drop,
+              dropPointId: drop === "nokta" ? dropId : null,
+              slot,
+              note,
+            },
+      );
       await Promise.all([reloadOrders(), reloadCatalog()]);
       setActiveId(order.id);
       setSheet("track");
@@ -268,6 +305,7 @@ export function CustomerApp({
       {pane === "map" && (
       <div className="pointer-events-none absolute top-[calc(env(safe-area-inset-top)+5rem)] left-3 z-10">
         <div className="k-rise pointer-events-auto flex flex-wrap gap-1.5" style={{ animationDelay: "90ms" }}>
+          {!(categoryIds?.length === 1 && categoryIds[0] === "davet") && (
           <button
             type="button"
             onClick={() => setDryerOnly((v) => !v)}
@@ -279,6 +317,7 @@ export function CustomerApp({
           >
             Kurutucu var
           </button>
+          )}
           {categoryIds && categoryIds.length > 0 && (
             <span className="k-glass inline-flex items-center rounded-full px-2.5 py-1.5 text-xs ring-1 ring-[var(--line)]">
               Seçili hizmet
@@ -321,7 +360,9 @@ export function CustomerApp({
                 kişi şu anda müsait.
               </h1>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak.
+                {categoryIds?.length === 1 && categoryIds[0] === "davet"
+                  ? "Eve kimse girmez. Yemek kapıda veya nötr noktada teslim."
+                  : "Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak."}
               </p>
               <button
                 type="button"
@@ -394,12 +435,18 @@ export function CustomerApp({
                 km={kmBetween(origin, selected.loc)}
                 pkg={pkg}
                 onPkg={setPkg}
+                productId={productId}
+                onProduct={setProductId}
                 onBack={() => {
                   setSheet("list");
                   setSelectedId(null);
                 }}
                 onNext={() => {
-                  setPieces((n) => clampPieces(n, selected.remaining));
+                  if (isDavet(selected)) {
+                    setGuests((n) => Math.min(selected.remaining > 0 ? selected.remaining : GUESTS_MAX, Math.max(GUESTS_MIN, n)));
+                  } else {
+                    setPieces((n) => clampPieces(n, selected.remaining));
+                  }
                   setSheet("checkout");
                 }}
               />
@@ -409,6 +456,11 @@ export function CustomerApp({
                 p={selected}
                 pieces={pieces}
                 onPieces={(n) => setPieces(clampPieces(n, selected.remaining))}
+                guests={guests}
+                onGuests={setGuests}
+                allergy={allergy}
+                onAllergy={setAllergy}
+                productName={product?.name}
                 express={express}
                 onExpress={setExpress}
                 drop={drop}
@@ -545,7 +597,13 @@ function List({
                     <span className="block font-medium">{p.name}</span>
                     <span className="mt-0.5 block text-xs text-[var(--muted)]">
                       {p.neighborhood} · {formatKm(km)} · {trustLabel(p.trust)}
-                      {p.hasDryer ? " · kurutucu" : ""}
+                      {isDavet(p)
+                        ? (p.products ?? []).length
+                          ? ` · ${(p.products ?? []).map((x) => x.name).join(", ")}`
+                          : " · menü yok"
+                        : p.hasDryer
+                          ? " · kurutucu"
+                          : ""}
                       {load ? (
                         <span className={tag}>
                           {" · "}
@@ -563,11 +621,14 @@ function List({
                   <span className="shrink-0 text-right text-sm">
                     <span className="block tabular-nums">{p.rating.toFixed(1)}</span>
                     <span className="text-xs text-[var(--muted)]">
-                      {tl(
-                        p.packages.find((x) => x.id === "tam")?.pricePerPiece ??
-                          p.packages.at(-1)!.pricePerPiece,
-                      )}
-                      /parça
+                      {isDavet(p)
+                        ? (p.products ?? []).length
+                          ? `${tl(Math.min(...(p.products ?? []).map((x) => x.pricePerPerson)))}/kişi`
+                          : "menü yok"
+                        : `${tl(
+                            p.packages.find((x) => x.id === "tam")?.pricePerPiece ??
+                              p.packages.at(-1)!.pricePerPiece,
+                          )}/parça`}
                     </span>
                   </span>
                 </button>
@@ -585,6 +646,8 @@ function ProviderPane({
   km,
   pkg,
   onPkg,
+  productId,
+  onProduct,
   onBack,
   onNext,
 }: {
@@ -592,10 +655,15 @@ function ProviderPane({
   km: number;
   pkg: PackageId;
   onPkg: (id: PackageId) => void;
+  productId: string | null;
+  onProduct: (id: string) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
   const tone = seatTone(p.remaining, p.capacity);
+  const davet = isDavet(p);
+  const items = davet ? (p.products ?? []) : p.packages;
+  const canNext = davet ? items.length > 0 : p.packages.length > 0;
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
@@ -616,7 +684,11 @@ function ProviderPane({
                     : ""
               }
             >
-              {p.remaining <= 0 ? "bugün dolu" : `bugün ${p.remaining} parça yer`}
+              {p.remaining <= 0
+                ? "bugün dolu"
+                : davet
+                  ? `bugün ${p.remaining} kişilik yer`
+                  : `bugün ${p.remaining} parça yer`}
             </span>
           </p>
         </div>
@@ -630,31 +702,53 @@ function ProviderPane({
         </>
       )}
       <div className="mt-4 grid gap-2">
-        {p.packages.map((pack) => (
-          <button
-            key={pack.id}
-            type="button"
-            onClick={() => onPkg(pack.id)}
-            className={`k-chip rounded-2xl px-3 py-3 text-left ring-1 ${
-              pkg === pack.id
-                ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
-                : "bg-[var(--paper)] ring-[var(--line)]"
-            }`}
-          >
-            <span className="flex justify-between font-medium">
-              {pack.title}
-              <span className="tabular-nums">{tl(pack.pricePerPiece)}/parça</span>
-            </span>
-            <span className="mt-0.5 block text-xs text-[var(--muted)]">{pack.blurb}</span>
-          </button>
-        ))}
+        {davet
+          ? (p.products ?? []).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onProduct(item.id)}
+                className={`k-chip rounded-2xl px-3 py-3 text-left ring-1 ${
+                  productId === item.id
+                    ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
+                    : "bg-[var(--paper)] ring-[var(--line)]"
+                }`}
+              >
+                <span className="flex justify-between font-medium">
+                  {item.name}
+                  <span className="tabular-nums">{tl(item.pricePerPerson)}/kişi</span>
+                </span>
+              </button>
+            ))
+          : p.packages.map((pack) => (
+              <button
+                key={pack.id}
+                type="button"
+                onClick={() => onPkg(pack.id)}
+                className={`k-chip rounded-2xl px-3 py-3 text-left ring-1 ${
+                  pkg === pack.id
+                    ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
+                    : "bg-[var(--paper)] ring-[var(--line)]"
+                }`}
+              >
+                <span className="flex justify-between font-medium">
+                  {pack.title}
+                  <span className="tabular-nums">{tl(pack.pricePerPiece)}/parça</span>
+                </span>
+                <span className="mt-0.5 block text-xs text-[var(--muted)]">{pack.blurb}</span>
+              </button>
+            ))}
+        {davet && (p.products ?? []).length === 0 && (
+          <p className="text-sm text-[var(--muted)]">Bu komşu henüz menü eklemedi.</p>
+        )}
       </div>
       <button
         type="button"
+        disabled={!canNext}
         onClick={onNext}
-        className="k-press k-cta mt-4 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.22)]"
+        className="k-press k-cta mt-4 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.22)] disabled:opacity-40"
       >
-        Devam · parça ve teslimat
+        {davet ? "Devam · kişi sayısı ve alerji" : "Devam · parça ve teslimat"}
       </button>
     </div>
   );
@@ -664,6 +758,11 @@ function Checkout({
   p,
   pieces,
   onPieces,
+  guests,
+  onGuests,
+  allergy,
+  onAllergy,
+  productName,
   express,
   onExpress,
   drop,
@@ -685,6 +784,11 @@ function Checkout({
   p: Provider;
   pieces: number;
   onPieces: (n: number) => void;
+  guests: number;
+  onGuests: (n: number) => void;
+  allergy: string;
+  onAllergy: (s: string) => void;
+  productName?: string;
   express: boolean;
   onExpress: (v: boolean) => void;
   drop: DropMethod;
@@ -703,38 +807,54 @@ function Checkout({
   onBack: () => void;
   onPlace: () => void;
 }) {
-  const cap = Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
-  const [draft, setDraft] = useState(String(pieces));
+  const davet = isDavet(p);
+  const cap = Math.min(davet ? GUESTS_MAX : PIECES_MAX, p.remaining > 0 ? p.remaining : davet ? GUESTS_MAX : PIECES_MAX);
+  const [draft, setDraft] = useState(String(davet ? guests : pieces));
 
   useEffect(() => {
-    setDraft(String(pieces));
-  }, [pieces]);
+    setDraft(String(davet ? guests : pieces));
+  }, [davet, guests, pieces]);
 
-  function typePieces(raw: string) {
+  function clampGuests(n: number) {
+    const max = p.remaining > 0 ? Math.min(GUESTS_MAX, p.remaining) : GUESTS_MAX;
+    if (!Number.isFinite(n)) return GUESTS_MIN;
+    return Math.min(max, Math.max(GUESTS_MIN, Math.round(n)));
+  }
+
+  function typeCount(raw: string) {
     const digits = raw.replace(/\D/g, "").slice(0, 2);
     setDraft(digits);
-    if (digits) onPieces(clampPieces(Number(digits), p.remaining));
+    if (!digits) return;
+    if (davet) onGuests(clampGuests(Number(digits)));
+    else onPieces(clampPieces(Number(digits), p.remaining));
   }
 
-  function commitPieces() {
-    onPieces(clampPieces(Number(draft) || PIECES_MIN, p.remaining));
+  function commitCount() {
+    if (davet) onGuests(clampGuests(Number(draft) || GUESTS_MIN));
+    else onPieces(clampPieces(Number(draft) || PIECES_MIN, p.remaining));
   }
+
+  const count = davet ? guests : pieces;
 
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
-        ← Paket
+        {davet ? "← Menü" : "← Paket"}
       </button>
-      <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Kaç parça?</h2>
+      <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">
+        {davet ? "Kaç kişilik?" : "Kaç parça?"}
+      </h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        Gömlek, pantolon, tişört birer parça. Nevresim / yorgan iki sayılır. Sen yaz, 1–{cap}.
+        {davet
+          ? `${productName ?? "Seçili yemek"} · kişi başı fiyat, sunucu çarpar. 1–${cap} kişi.`
+          : `Gömlek, pantolon, tişört birer parça. Nevresim / yorgan iki sayılır. Sen yaz, 1–${cap}.`}
       </p>
       <div className="mt-3 flex items-center gap-2">
         <button
           type="button"
-          aria-label="Bir parça azalt"
-          disabled={pieces <= PIECES_MIN}
-          onClick={() => onPieces(pieces - 1)}
+          aria-label={davet ? "Bir kişi azalt" : "Bir parça azalt"}
+          disabled={count <= (davet ? GUESTS_MIN : PIECES_MIN)}
+          onClick={() => (davet ? onGuests(count - 1) : onPieces(count - 1))}
           className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
         >
           −
@@ -742,31 +862,31 @@ function Checkout({
         <input
           inputMode="numeric"
           pattern="[0-9]*"
-          aria-label="Parça sayısı"
+          aria-label={davet ? "Kişi sayısı" : "Parça sayısı"}
           value={draft}
-          onChange={(e) => typePieces(e.target.value)}
-          onBlur={commitPieces}
+          onChange={(e) => typeCount(e.target.value)}
+          onBlur={commitCount}
           className="h-11 w-20 rounded-2xl bg-[var(--paper)] text-center font-[family-name:var(--font-display)] text-2xl tabular-nums ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
         />
         <button
           type="button"
-          aria-label="Bir parça ekle"
-          disabled={pieces >= cap}
-          onClick={() => onPieces(pieces + 1)}
+          aria-label={davet ? "Bir kişi ekle" : "Bir parça ekle"}
+          disabled={count >= cap}
+          onClick={() => (davet ? onGuests(count + 1) : onPieces(count + 1))}
           className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
         >
           +
         </button>
-        <span className="text-sm text-[var(--muted)]">parça</span>
+        <span className="text-sm text-[var(--muted)]">{davet ? "kişi" : "parça"}</span>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {PIECES.filter((n) => n <= cap).map((n) => (
+        {(davet ? GUESTS : PIECES).filter((n) => n <= cap).map((n) => (
           <button
             key={n}
             type="button"
-            onClick={() => onPieces(n)}
+            onClick={() => (davet ? onGuests(n) : onPieces(n))}
             className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
-              pieces === n
+              count === n
                 ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]"
                 : "ring-[var(--line)]"
             }`}
@@ -775,10 +895,24 @@ function Checkout({
           </button>
         ))}
       </div>
-      {p.remaining > 0 && p.remaining < PIECES_MAX && (
-        <p className="mt-2 text-xs text-[var(--muted)]">Bugün en fazla {p.remaining} parça yer var.</p>
+      {p.remaining > 0 && p.remaining < (davet ? GUESTS_MAX : PIECES_MAX) && (
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          Bugün en fazla {p.remaining} {davet ? "kişilik" : "parça"} yer var.
+        </p>
       )}
-      {p.express && (
+      {davet && (
+        <label className="mt-4 block">
+          <span className="text-sm font-medium">Alerji var mı?</span>
+          <input
+            value={allergy}
+            onChange={(e) => onAllergy(e.target.value)}
+            placeholder='Yoksa “yok” yaz. Gluten, fındık, laktoz…'
+            maxLength={300}
+            className="mt-1 w-full rounded-2xl bg-[var(--paper)] px-3 py-2 text-sm ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
+          />
+        </label>
+      )}
+      {!davet && p.express && (
         <label className="mt-4 flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -840,7 +974,7 @@ function Checkout({
       <textarea
         value={note}
         onChange={(e) => onNote(e.target.value)}
-        placeholder="Nevresim, leke, hassas kumaş, kapı kodu…"
+        placeholder={davet ? "Kapı kodu, teslim notu…" : "Nevresim, leke, hassas kumaş, kapı kodu…"}
         className="mt-4 w-full resize-none rounded-2xl bg-[var(--paper)] px-3 py-2 text-sm ring-1 ring-[var(--line)] outline-none transition-[box-shadow] duration-200 focus:ring-[var(--teal)]"
         rows={2}
       />
@@ -848,7 +982,9 @@ function Checkout({
       <p className="text-xs text-[var(--muted)]">
         {quote.loyaltyRate > 0
           ? `${loyaltyLabel} · %${Math.round(quote.loyaltyRate * 100)} indirim, önce ${tl(quote.before)}. `
-          : `Min. ${tl(100)}. `}
+          : davet
+            ? "Kişi × kişi başı. "
+            : `Min. ${tl(100)}. `}
         Siparişte karttan ön otorizasyon; teslim kodu doğrulanınca tahsilat.
       </p>
       {err && <p className="k-rise mt-2 text-sm text-[var(--clay)]">{err}</p>}
@@ -887,7 +1023,8 @@ function Track({
   onBack: () => void;
   onReload: () => void;
 }) {
-  const steps = trackSteps(order.packageId);
+  const food = Boolean(order.productId);
+  const steps = trackSteps(order.packageId, food);
   const idx = steps.indexOf(order.status);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -898,8 +1035,15 @@ function Track({
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Sipariş {order.id}</h2>
       <p className="text-sm text-[var(--muted)]">
-        {provider?.name} · {order.pieces} parça · {tl(order.total)}
+        {provider?.name} ·{" "}
+        {food
+          ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
+          : `${order.pieces} parça`}{" "}
+        · {tl(order.total)}
       </p>
+      {food && order.allergyNote && (
+        <p className="mt-1 text-sm text-[var(--muted)]">Alerji: {order.allergyNote}</p>
+      )}
       {order.status === "iptal" && (
         <p className="mt-3 text-sm text-[var(--clay)]">
           Sipariş iptal edildi. Ön otorizasyon çözüldü, para çekilmedi.
@@ -965,7 +1109,7 @@ function Track({
                   current || done ? "text-[var(--ink)]" : "text-[var(--muted)]"
                 } ${current ? "font-medium" : ""}`}
               >
-                {STEP_LABEL[s]}
+                {food && s === "teslim_alindi" ? "Hazırlanıyor" : STEP_LABEL[s]}
               </span>
             </li>
           );

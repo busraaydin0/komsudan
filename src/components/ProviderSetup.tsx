@@ -75,7 +75,10 @@ export function ProviderSetup({
     <>
       <h1 className="font-[family-name:var(--font-display)] text-2xl">Hizmet veren profili</h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        {account.name}. Mevcut paket, müsaitlik ve nokta uçları bu adımda birleşir. Yeni doğrulama yok.
+        {account.name}.{" "}
+        {categoryId === "davet"
+          ? "Menünü (kısır, pasta, kurabiye ve fiyat) masadan kendin eklersin. Herkes her şeyi sunmaz."
+          : "Mevcut paket, müsaitlik ve nokta uçları bu adımda birleşir. Yeni doğrulama yok."}
       </p>
       <label className="mt-4 block text-xs text-[var(--muted)]">Kısa tanıtım</label>
       <textarea

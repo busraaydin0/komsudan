@@ -194,6 +194,10 @@ function ensureColumns(db: Database.Database) {
       sort_order = 2
     WHERE id = 'davet';
   `);
+  addColumn(db, "orders", "product_id", "product_id TEXT");
+  addColumn(db, "orders", "product_name", "product_name TEXT");
+  addColumn(db, "orders", "guest_count", "guest_count INTEGER");
+  addColumn(db, "orders", "allergy_note", "allergy_note TEXT");
 }
 
 export function migrate(db: Database.Database) {

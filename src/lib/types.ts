@@ -21,6 +21,13 @@ export type ServicePackage = {
   pricePerPiece: number;
 };
 
+/** Davet menü kalemi. Fiyat kişi başı; siparişte sunucu çarpar. */
+export type ProviderProduct = {
+  id: string;
+  name: string;
+  pricePerPerson: number;
+};
+
 export type OrderPhotoKind = "dropoff" | "pickup" | "damage";
 
 export type WorkPhoto = {
@@ -71,6 +78,7 @@ export type Provider = {
   workPhotos: WorkPhoto[];
   recentReviews: Review[];
   categoryId?: string;
+  products?: ProviderProduct[];
 };
 
 export type DropPoint = {
@@ -109,13 +117,17 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId;
+  packageId: PackageId | "davet";
   pieces: number;
   express: boolean;
   drop: DropMethod;
   dropPointId: string | null;
   slot: string;
   note: string;
+  productId?: string | null;
+  productName?: string | null;
+  guestCount?: number | null;
+  allergyNote?: string | null;
   total: number;
   commission: number;
   status: OrderStatus;
@@ -139,13 +151,16 @@ export type Order = {
 
 export type CreateOrderInput = {
   providerId: string;
-  packageId: PackageId;
-  pieces: number;
-  express: boolean;
+  packageId?: PackageId;
+  pieces?: number;
+  express?: boolean;
   drop: DropMethod;
   dropPointId: string | null;
   slot: string;
   note: string;
+  productId?: string;
+  guestCount?: number;
+  allergyNote?: string;
 };
 
 export type AppNotification = {
