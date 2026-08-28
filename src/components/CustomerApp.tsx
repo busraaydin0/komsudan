@@ -1633,7 +1633,8 @@ function ProviderPane({
             : p.packages;
   const canNext = unitCatalog ? items.length > 0 : p.packages.length > 0;
   return (
-    <div className="p-4 pt-2">
+    <div className="flex min-h-full flex-col">
+      <div className="flex-1 p-4 pt-2 pb-3">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
         ← Liste
       </button>
@@ -2230,14 +2231,17 @@ function ProviderPane({
           <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
         )}
       </div>
-      <button
-        type="button"
-        disabled={!canNext}
-        onClick={onNext}
-        className="k-press k-cta mt-4 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.22)] disabled:opacity-40"
-      >
-        {davet ? "Devam · miktar ve alerji" : unitCatalog ? "Devam · miktar ve teslimat" : "Devam · parça ve teslimat"}
-      </button>
+      </div>
+      <div className="sticky bottom-0 z-10 border-t border-[var(--line)] bg-[var(--card)] px-4 pb-4 pt-3">
+        <button
+          type="button"
+          disabled={!canNext}
+          onClick={onNext}
+          className="k-press k-cta w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.22)] disabled:opacity-40"
+        >
+          {davet ? "Devam · miktar ve alerji" : unitCatalog ? "Devam · miktar ve teslimat" : "Devam · parça ve teslimat"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -2492,7 +2496,8 @@ function Checkout({
     unit.id === "kisi" ? "Kaç kişilik?" : unit.id === "kg" ? "Kaç kg?" : `Kaç ${unit.qty}?`;
 
   return (
-    <div className="p-4 pt-2">
+    <div className="flex min-h-full flex-col">
+      <div className="flex-1 p-4 pt-2 pb-3">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
         {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti || kislik || hali || odev || dil || mezar ? "← Hizmet" : "← Paket"}
       </button>
@@ -3127,28 +3132,31 @@ function Checkout({
         className="mt-4 w-full resize-none rounded-2xl bg-[var(--paper)] px-3 py-2 text-sm ring-1 ring-[var(--line)] outline-none transition-[box-shadow] duration-200 focus:ring-[var(--teal)]"
         rows={2}
       />
-      <p className="mt-4 font-[family-name:var(--font-display)] text-2xl tabular-nums">
-        {canPlace ? tl(quote.total) : "İnceleme sonrası"}
-      </p>
-      <p className="text-xs text-[var(--muted)]">
-        {!canPlace
-          ? "Bu hizmette sipariş yok; fiyat cihazı görünce netleşir. "
-          : quote.loyaltyRate > 0
-          ? `${loyaltyLabel} · %${Math.round(quote.loyaltyRate * 100)} indirim, önce ${tl(quote.before)}. `
-          : unitPriced
-            ? `${unit.qty} × ${unit.label.toLowerCase()} fiyatı. `
-            : `Min. ${tl(100)}. `}
-        {canPlace ? "Siparişte karttan ön otorizasyon; teslim kodu doğrulanınca tahsilat." : ""}
-      </p>
       {err && <p className="k-rise mt-2 text-sm text-[var(--clay)]">{err}</p>}
-      <button
-        type="button"
-        disabled={placing || !canPlace}
-        onClick={onPlace}
-        className="k-press k-cta mt-3 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.22)] disabled:opacity-40"
-      >
-        {placing ? "Gönderiliyor…" : canPlace ? "Siparişi bırak" : "Sipariş yok · inceleme"}
-      </button>
+      </div>
+      <div className="sticky bottom-0 z-10 border-t border-[var(--line)] bg-[var(--card)] px-4 pb-4 pt-3">
+        <p className="font-[family-name:var(--font-display)] text-2xl tabular-nums">
+          {canPlace ? tl(quote.total) : "İnceleme sonrası"}
+        </p>
+        <p className="text-xs text-[var(--muted)]">
+          {!canPlace
+            ? "Bu hizmette sipariş yok; fiyat cihazı görünce netleşir. "
+            : quote.loyaltyRate > 0
+            ? `${loyaltyLabel} · %${Math.round(quote.loyaltyRate * 100)} indirim, önce ${tl(quote.before)}. `
+            : unitPriced
+              ? `${unit.qty} × ${unit.label.toLowerCase()} fiyatı. `
+              : `Min. ${tl(100)}. `}
+          {canPlace ? "Siparişte karttan ön otorizasyon; teslim kodu doğrulanınca tahsilat." : ""}
+        </p>
+        <button
+          type="button"
+          disabled={placing || !canPlace}
+          onClick={onPlace}
+          className="k-press k-cta mt-3 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.22)] disabled:opacity-40"
+        >
+          {placing ? "Gönderiliyor…" : canPlace ? "Siparişi bırak" : "Sipariş yok · inceleme"}
+        </button>
+      </div>
     </div>
   );
 }

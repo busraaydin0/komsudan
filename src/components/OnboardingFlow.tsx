@@ -240,15 +240,15 @@ export function OnboardingFlow({
 
   return (
     <div className="flex h-dvh flex-col bg-[var(--paper)] px-5 pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col overflow-y-auto">
-        <p className="flex items-center gap-1.5 font-[family-name:var(--font-display)] text-3xl">
+      <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col">
+        <p className="flex shrink-0 items-center gap-1.5 font-[family-name:var(--font-display)] text-3xl">
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
           Komşudan
         </p>
-        <p className="mt-3 font-[family-name:var(--font-display)] text-xl leading-snug">
+        <p className="mt-3 shrink-0 font-[family-name:var(--font-display)] text-xl leading-snug">
           Ne arıyorsun, ne sunuyorsun — harita ona göre açılsın.
         </p>
-        <ol className="mt-6 flex gap-2 text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
+        <ol className="mt-6 flex shrink-0 gap-2 text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
           {labels.map((label, i) => (
             <li key={label} className={order.indexOf(step) >= i ? "text-[var(--teal)]" : undefined}>
               {label}
@@ -256,7 +256,8 @@ export function OnboardingFlow({
           ))}
         </ol>
 
-        <div className="k-rise mt-6 rounded-3xl bg-[var(--card)] p-5 shadow-[var(--shadow-card)] ring-1 ring-[var(--line)]">
+        <div className="k-rise mt-6 flex min-h-0 flex-1 flex-col rounded-3xl bg-[var(--card)] p-5 shadow-[var(--shadow-card)] ring-1 ring-[var(--line)]">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {step === "role" && (
             <>
               <h1 className="font-[family-name:var(--font-display)] text-2xl">Nasıl başlayalım?</h1>
@@ -282,14 +283,6 @@ export function OnboardingFlow({
                   }}
                 />
               </div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void nextFromRole()}
-                className="k-press k-cta mt-4 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white"
-              >
-                Devam
-              </button>
             </>
           )}
 
@@ -432,14 +425,6 @@ export function OnboardingFlow({
                   )}
                 </>
               )}
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void nextFromCategory()}
-                className="k-press k-cta mt-4 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white"
-              >
-                Devam
-              </button>
             </>
           )}
 
@@ -474,21 +459,46 @@ export function OnboardingFlow({
                   </button>
                 ))}
               </div>
+            </>
+          )}
+          </div>
+
+          <div className="shrink-0 border-t border-[var(--line)] pt-3">
+            {err && <p className="mb-3 text-sm text-[var(--load-full)]">{err}</p>}
+            {step === "role" && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void nextFromRole()}
+                className="k-press k-cta w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white"
+              >
+                Devam
+              </button>
+            )}
+            {step === "category" && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void nextFromCategory()}
+                className="k-press k-cta w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white"
+              >
+                Devam
+              </button>
+            )}
+            {step === "location" && (
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => void finishCustomer()}
-                className="k-press k-cta mt-4 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white"
+                className="k-press k-cta w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white"
               >
                 {busy ? "Kaydediliyor…" : "Haritaya geç"}
               </button>
-            </>
-          )}
-
-          {err && <p className="mt-3 text-sm text-[var(--load-full)]">{err}</p>}
-          <button type="button" disabled={busy} onClick={() => void skip()} className="mt-3 w-full text-xs text-[var(--muted)]">
-            Şimdi değil
-          </button>
+            )}
+            <button type="button" disabled={busy} onClick={() => void skip()} className="mt-3 w-full text-xs text-[var(--muted)]">
+              Şimdi değil
+            </button>
+          </div>
         </div>
       </div>
     </div>
