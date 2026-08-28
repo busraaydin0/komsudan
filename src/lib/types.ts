@@ -22,11 +22,25 @@ export type ServicePackage = {
   pricePerPiece: number;
 };
 
-/** Davet menü kalemi. Fiyat kişi başı; siparişte sunucu çarpar. */
+export type FoodCategory = "kisir" | "pasta" | "kurabiye" | "borek" | "salata" | "tatli" | "diger";
+export type FoodPriceUnit = "porsiyon" | "kg" | "adet" | "tepsi" | "kisi";
+export type FoodDelivery = "kapi" | "nokta" | "ikisi";
+
+/** Davet menü kalemi. Fiyat seçilen birim başı; siparişte sunucu çarpar. */
 export type ProviderProduct = {
   id: string;
   name: string;
   pricePerPerson: number;
+  photoUrl?: string | null;
+  description?: string | null;
+  foodCategory?: FoodCategory | null;
+  priceUnit?: FoodPriceUnit;
+  minOrder?: number;
+  maxQty?: number | null;
+  leadHours?: number | null;
+  delivery?: FoodDelivery;
+  allergens?: string | null;
+  isActive?: boolean;
 };
 
 export type OrderPhotoKind = "dropoff" | "pickup" | "damage";

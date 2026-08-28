@@ -4,8 +4,9 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PILOT, trustLabel } from "@/lib/data";
 import { dryingListLabel } from "@/lib/drying";
+import { dropsForFood, foodCategoryLabel, foodLeadLabel, foodQtyBounds, foodUnitMeta } from "@/lib/food";
 import { formatKm, kmBetween } from "@/lib/geo";
-import { estimateFood, estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN, GUESTS_MAX, GUESTS_MIN } from "@/lib/pricing";
+import { estimateFood, estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
 import { postOrder, postReview, patchOrder, useCatalog, useOrders } from "@/lib/api";
 import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
@@ -20,6 +21,7 @@ import type {
   Order,
   PackageId,
   Provider,
+  ProviderProduct,
 } from "@/lib/types";
 
 const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), {
@@ -32,7 +34,6 @@ const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), 
 });
 
 const PIECES = [8, 12, 16, 24, 32];
-const GUESTS = [4, 8, 12, 16, 24];
 
 function isDavet(p: Pick<Provider, "categoryId">) {
   return p.categoryId === "davet";
@@ -486,7 +487,12 @@ export function CustomerApp({
                 }}
                 onNext={() => {
                   if (isDavet(selected)) {
-                    setGuests((n) => Math.min(selected.remaining > 0 ? selected.remaining : GUESTS_MAX, Math.max(GUESTS_MIN, n)));
+                    const prod =
+                      selected.products?.find((x) => x.id === productId) ?? selected.products?.[0];
+                    const { min, max } = foodQtyBounds(prod, selected.remaining);
+                    setGuests((n) => Math.min(max, Math.max(min, n)));
+                    const allowed = dropsForFood(prod, selected.drops);
+                    setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
                   } else {
                     setPieces((n) => clampPieces(n, selected.remaining));
                   }
@@ -503,6 +509,7 @@ export function CustomerApp({
                 onGuests={setGuests}
                 allergy={allergy}
                 onAllergy={setAllergy}
+                product={product}
                 productName={product?.name}
                 express={express}
                 onExpress={setExpress}
@@ -775,23 +782,39 @@ function ProviderPane({
       )}
       <div className="mt-4 grid gap-2">
         {davet
-          ? (p.products ?? []).map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onProduct(item.id)}
-                className={`k-chip rounded-2xl px-3 py-3 text-left ring-1 ${
-                  productId === item.id
-                    ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
-                    : "bg-[var(--paper)] ring-[var(--line)]"
-                }`}
-              >
-                <span className="flex justify-between font-medium">
-                  {item.name}
-                  <span className="tabular-nums">{tl(item.pricePerPerson)}/kişi</span>
-                </span>
-              </button>
-            ))
+          ? (p.products ?? []).map((item) => {
+              const unit = foodUnitMeta(item.priceUnit);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onProduct(item.id)}
+                  className={`k-chip flex w-full gap-3 rounded-2xl px-3 py-3 text-left ring-1 ${
+                    productId === item.id
+                      ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
+                      : "bg-[var(--paper)] ring-[var(--line)]"
+                  }`}
+                >
+                  {item.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                  ) : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex justify-between font-medium">
+                      {item.name}
+                      <span className="tabular-nums">
+                        {tl(item.pricePerPerson)}/{unit.label}
+                      </span>
+                    </span>
+                    {(item.description || foodCategoryLabel(item.foodCategory)) && (
+                      <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                        {[foodCategoryLabel(item.foodCategory), item.description].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              );
+            })
           : p.packages.map((pack) => (
               <button
                 key={pack.id}
@@ -820,7 +843,7 @@ function ProviderPane({
         onClick={onNext}
         className="k-press k-cta mt-4 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.22)] disabled:opacity-40"
       >
-        {davet ? "Devam · kişi sayısı ve alerji" : "Devam · parça ve teslimat"}
+        {davet ? "Devam · miktar ve alerji" : "Devam · parça ve teslimat"}
       </button>
     </div>
   );
@@ -834,6 +857,7 @@ function Checkout({
   onGuests,
   allergy,
   onAllergy,
+  product,
   productName,
   express,
   onExpress,
@@ -860,6 +884,7 @@ function Checkout({
   onGuests: (n: number) => void;
   allergy: string;
   onAllergy: (s: string) => void;
+  product?: ProviderProduct;
   productName?: string;
   express: boolean;
   onExpress: (v: boolean) => void;
@@ -880,7 +905,11 @@ function Checkout({
   onPlace: () => void;
 }) {
   const davet = isDavet(p);
-  const cap = Math.min(davet ? GUESTS_MAX : PIECES_MAX, p.remaining > 0 ? p.remaining : davet ? GUESTS_MAX : PIECES_MAX);
+  const unit = foodUnitMeta(product?.priceUnit);
+  const bounds = foodQtyBounds(product, p.remaining);
+  const cap = davet ? bounds.max : Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
+  const minCount = davet ? bounds.min : PIECES_MIN;
+  const foodDrops = davet ? dropsForFood(product, p.drops) : p.drops;
   const [draft, setDraft] = useState(String(davet ? guests : pieces));
 
   useEffect(() => {
@@ -888,9 +917,8 @@ function Checkout({
   }, [davet, guests, pieces]);
 
   function clampGuests(n: number) {
-    const max = p.remaining > 0 ? Math.min(GUESTS_MAX, p.remaining) : GUESTS_MAX;
-    if (!Number.isFinite(n)) return GUESTS_MIN;
-    return Math.min(max, Math.max(GUESTS_MIN, Math.round(n)));
+    if (!Number.isFinite(n)) return bounds.min;
+    return Math.min(bounds.max, Math.max(bounds.min, Math.round(n)));
   }
 
   function typeCount(raw: string) {
@@ -902,11 +930,13 @@ function Checkout({
   }
 
   function commitCount() {
-    if (davet) onGuests(clampGuests(Number(draft) || GUESTS_MIN));
+    if (davet) onGuests(clampGuests(Number(draft) || bounds.min));
     else onPieces(clampPieces(Number(draft) || PIECES_MIN, p.remaining));
   }
 
   const count = davet ? guests : pieces;
+  const qtyTitle =
+    unit.id === "kisi" ? "Kaç kişilik?" : unit.id === "kg" ? "Kaç kg?" : `Kaç ${unit.qty}?`;
 
   return (
     <div className="p-4 pt-2">
@@ -914,18 +944,18 @@ function Checkout({
         {davet ? "← Menü" : "← Paket"}
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">
-        {davet ? "Kaç kişilik?" : "Kaç parça?"}
+        {davet ? qtyTitle : "Kaç parça?"}
       </h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
         {davet
-          ? `${productName ?? "Seçili yemek"} · kişi başı fiyat, sunucu çarpar. 1–${cap} kişi.`
+          ? `${productName ?? "Seçili yemek"} · ${tl(product?.pricePerPerson ?? 0)}/${unit.label}. ${bounds.min}–${cap} ${unit.qty}.`
           : `Gömlek, pantolon, tişört birer parça. Nevresim / yorgan iki sayılır. Sen yaz, 1–${cap}.`}
       </p>
       <div className="mt-3 flex items-center gap-2">
         <button
           type="button"
-          aria-label={davet ? "Bir kişi azalt" : "Bir parça azalt"}
-          disabled={count <= (davet ? GUESTS_MIN : PIECES_MIN)}
+          aria-label={davet ? `Bir ${unit.qty} azalt` : "Bir parça azalt"}
+          disabled={count <= minCount}
           onClick={() => (davet ? onGuests(count - 1) : onPieces(count - 1))}
           className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
         >
@@ -934,7 +964,7 @@ function Checkout({
         <input
           inputMode="numeric"
           pattern="[0-9]*"
-          aria-label={davet ? "Kişi sayısı" : "Parça sayısı"}
+          aria-label={davet ? `${unit.qty} sayısı` : "Parça sayısı"}
           value={draft}
           onChange={(e) => typeCount(e.target.value)}
           onBlur={commitCount}
@@ -942,17 +972,19 @@ function Checkout({
         />
         <button
           type="button"
-          aria-label={davet ? "Bir kişi ekle" : "Bir parça ekle"}
+          aria-label={davet ? `Bir ${unit.qty} ekle` : "Bir parça ekle"}
           disabled={count >= cap}
           onClick={() => (davet ? onGuests(count + 1) : onPieces(count + 1))}
           className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
         >
           +
         </button>
-        <span className="text-sm text-[var(--muted)]">{davet ? "kişi" : "parça"}</span>
+        <span className="text-sm text-[var(--muted)]">{davet ? unit.qty : "parça"}</span>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {(davet ? GUESTS : PIECES).filter((n) => n <= cap).map((n) => (
+        {(davet ? [bounds.min, 4, 8, 12, 16, 24].filter((n, i, a) => n <= cap && a.indexOf(n) === i) : PIECES)
+          .filter((n) => n <= cap)
+          .map((n) => (
           <button
             key={n}
             type="button"
@@ -967,10 +999,18 @@ function Checkout({
           </button>
         ))}
       </div>
-      {p.remaining > 0 && p.remaining < (davet ? GUESTS_MAX : PIECES_MAX) && (
+      {p.remaining > 0 && p.remaining < (davet ? bounds.max : PIECES_MAX) && (
         <p className="mt-2 text-xs text-[var(--muted)]">
-          Bugün en fazla {p.remaining} {davet ? "kişilik" : "parça"} yer var.
+          Bugün en fazla {p.remaining} {davet ? unit.qty : "parça"} yer var.
         </p>
+      )}
+      {davet && foodLeadLabel(product?.leadHours) && (
+        <p className="mt-3 text-xs text-[var(--muted)]">
+          Sipariş için minimum süre: {foodLeadLabel(product?.leadHours)}.
+        </p>
+      )}
+      {davet && product?.allergens && (
+        <p className="mt-2 text-xs text-[var(--muted)]">İçerik / alerjen: {product.allergens}</p>
       )}
       {davet && (
         <label className="mt-4 block">
@@ -996,7 +1036,7 @@ function Checkout({
       )}
       <h3 className="mt-5 text-sm font-medium">Teslimat</h3>
       <div className="mt-2 flex gap-2">
-        {p.drops.map((d) => (
+        {foodDrops.map((d) => (
           <button
             key={d}
             type="button"
@@ -1055,7 +1095,7 @@ function Checkout({
         {quote.loyaltyRate > 0
           ? `${loyaltyLabel} · %${Math.round(quote.loyaltyRate * 100)} indirim, önce ${tl(quote.before)}. `
           : davet
-            ? "Kişi × kişi başı. "
+            ? `${unit.qty} × ${unit.label} fiyatı. `
             : `Min. ${tl(100)}. `}
         Siparişte karttan ön otorizasyon; teslim kodu doğrulanınca tahsilat.
       </p>

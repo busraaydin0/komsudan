@@ -24,7 +24,7 @@ import {
   type ProfileRow,
   type SlotRow,
 } from "@/lib/db/providers";
-import { countProducts, deactivateProduct, insertProduct, listProducts, type ProductRow } from "@/lib/db/products";
+import { countProducts, deactivateProduct, insertProduct, listProducts, toPublicProduct, updateProduct, type ProductRow, type ProductWrite } from "@/lib/db/products";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -71,12 +71,7 @@ function toSlot(row: SlotRow) {
 }
 
 function toProduct(row: ProductRow) {
-  return {
-    id: row.id,
-    providerId: row.provider_id,
-    name: row.name,
-    pricePerPerson: row.price_per_person,
-  };
+  return toPublicProduct(row);
 }
 
 function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
@@ -425,21 +420,49 @@ export function addMyDropPoint(user: AuthUser, input: { label: string; lat: numb
 
 const MAX_PRODUCTS = 12;
 
-export function addMyProduct(user: AuthUser, input: { name: string; pricePerPerson: number }) {
+function assertProductWrite(input: ProductWrite) {
+  const min = input.minOrder ?? 1;
+  const max = input.maxQty;
+  if (max != null && max < min) {
+    throw new ApiError(400, "Maksimum, minimum siparişten küçük olamaz.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyProducts(user: AuthUser) {
+  requireProvider(user);
+  return listProducts(user.id, false).map(toPublicProduct);
+}
+
+export function addMyProduct(user: AuthUser, input: ProductWrite) {
   const row = requireProvider(user);
   if ((row.category_id ?? "camasir") !== "davet") {
     throw new ApiError(400, "Ürün yalnızca Davet hizmetinde. Kategorini Davet yap.", "VALIDATION_ERROR");
   }
-  if (countProducts(user.id) >= MAX_PRODUCTS) {
+  assertProductWrite(input);
+  if (countProducts(user.id, false) >= MAX_PRODUCTS) {
     throw new ApiError(400, `En fazla ${MAX_PRODUCTS} ürün.`, "VALIDATION_ERROR");
   }
-  return toProduct(
-    insertProduct({
-      providerId: user.id,
+  return toPublicProduct(
+    insertProduct(user.id, {
+      ...input,
       name: input.name.trim(),
-      pricePerPerson: input.pricePerPerson,
+      description: input.description?.trim() || null,
+      allergens: input.allergens?.trim() || null,
     }),
   );
+}
+
+export function patchMyProduct(user: AuthUser, productId: string, input: ProductWrite) {
+  requireProvider(user);
+  assertProductWrite(input);
+  const row = updateProduct(productId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    allergens: input.allergens?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Ürün bulunamadı.", "NOT_FOUND");
+  return toPublicProduct(row);
 }
 
 export function removeMyProduct(user: AuthUser, productId: string) {

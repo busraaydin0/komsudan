@@ -1,5 +1,5 @@
 import type { DropPoint, Provider } from "@/lib/types";
-import { listProducts } from "./products";
+import { listProducts, toPublicProduct } from "./products";
 
 export function toProvider(row: {
   id: string;
@@ -9,11 +9,7 @@ export function toProvider(row: {
 }): Provider {
   const p = JSON.parse(row.payload) as Provider;
   const categoryId = row.category_id ?? p.categoryId ?? "camasir";
-  const products = listProducts(p.id).map((row) => ({
-    id: row.id,
-    name: row.name,
-    pricePerPerson: row.price_per_person,
-  }));
+  const products = listProducts(p.id).map(toPublicProduct);
   return {
     ...p,
     remaining: row.remaining,

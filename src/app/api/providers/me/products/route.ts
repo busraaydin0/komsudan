@@ -2,9 +2,18 @@ import { fail, ok } from "@/server/http";
 import { parseBody } from "@/lib/validation/parse";
 import { productCreateSchema } from "@/lib/validation/provider.schema";
 import { requireAuth } from "@/lib/auth/middleware";
-import { addMyProduct } from "@/lib/services/providerService";
+import { addMyProduct, listMyProducts } from "@/lib/services/providerService";
 
 export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
+  try {
+    const user = await requireAuth(req, "provider");
+    return ok({ products: listMyProducts(user) });
+  } catch (e) {
+    return fail(e);
+  }
+}
 
 export async function POST(req: Request) {
   try {

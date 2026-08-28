@@ -57,12 +57,23 @@ export const slotCreateSchema = z.object({
 
 export const productCreateSchema = z.object({
   name: z.string().trim().min(2, "Ürün adı en az 2 karakter.").max(80),
+  description: z.string().trim().max(400).optional().nullable(),
+  foodCategory: z.enum(["kisir", "pasta", "kurabiye", "borek", "salata", "tatli", "diger"]).optional().nullable(),
   pricePerPerson: z
-    .number({ error: "Kişi başı fiyat gerekli." })
+    .number({ error: "Fiyat gerekli." })
     .int()
-    .min(1, "Kişi başı fiyat 1–5000 ₺.")
-    .max(5000, "Kişi başı fiyat 1–5000 ₺."),
+    .min(1, "Fiyat 1–5000 ₺.")
+    .max(5000, "Fiyat 1–5000 ₺."),
+  priceUnit: z.enum(["porsiyon", "kg", "adet", "tepsi", "kisi"]).optional(),
+  minOrder: z.number().int().min(1).max(80).optional(),
+  maxQty: z.number().int().min(1).max(80).optional().nullable(),
+  leadHours: z.number().int().min(0).max(168).optional().nullable(),
+  delivery: z.enum(["kapi", "nokta", "ikisi"]).optional(),
+  allergens: z.string().trim().max(400).optional().nullable(),
+  isActive: z.boolean().optional(),
 });
+
+export const productPatchSchema = productCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

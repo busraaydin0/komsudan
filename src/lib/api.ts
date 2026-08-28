@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderProduct, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -415,9 +415,21 @@ export async function postMyDropPoint(body: { label: string; lat: number; lng: n
   );
 }
 
-export async function postMyProduct(body: { name: string; pricePerPerson: number }) {
+export async function postMyProduct(body: {
+  name: string;
+  pricePerPerson: number;
+  description?: string | null;
+  foodCategory?: "kisir" | "pasta" | "kurabiye" | "borek" | "salata" | "tatli" | "diger" | null;
+  priceUnit?: "porsiyon" | "kg" | "adet" | "tepsi" | "kisi";
+  minOrder?: number;
+  maxQty?: number | null;
+  leadHours?: number | null;
+  delivery?: "kapi" | "nokta" | "ikisi";
+  allergens?: string | null;
+  isActive?: boolean;
+}) {
   const data = unwrap(
-    await readJson<{ data?: { product: { id: string; name: string; pricePerPerson: number } }; product?: { id: string; name: string; pricePerPerson: number } }>(
+    await readJson<{ data?: { product: ProviderProduct }; product?: ProviderProduct }>(
       await fetch("/api/providers/me/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -426,6 +438,39 @@ export async function postMyProduct(body: { name: string; pricePerPerson: number
     ),
   );
   return data.product!;
+}
+
+export async function fetchMyProducts() {
+  const data = unwrap(
+    await readJson<{ data?: { products: ProviderProduct[] }; products?: ProviderProduct[] }>(
+      await fetch("/api/providers/me/products"),
+    ),
+  );
+  return data.products ?? [];
+}
+
+export async function patchMyProduct(id: string, body: Parameters<typeof postMyProduct>[0]) {
+  const data = unwrap(
+    await readJson<{ data?: { product: ProviderProduct }; product?: ProviderProduct }>(
+      await fetch(`/api/providers/me/products/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.product!;
+}
+
+export async function uploadMyProductPhoto(id: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = unwrap(
+    await readJson<{ data?: { photoUrl: string; product: ProviderProduct }; photoUrl?: string; product?: ProviderProduct }>(
+      await fetch(`/api/providers/me/products/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
+    ),
+  );
+  return data;
 }
 
 export async function deleteMyProduct(id: string) {

@@ -1,8 +1,9 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { estimateFood, estimateFor, GUESTS_MAX, GUESTS_MIN, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
+import { estimateFood, estimateFor, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { loyaltyRate } from "@/lib/loyalty";
 import { getCategoryForProvider } from "@/lib/db/categories";
-import { getProduct } from "@/lib/db/products";
+import { getProduct, toPublicProduct } from "@/lib/db/products";
+import { dropsForFood, foodQtyBounds, foodUnitMeta } from "@/lib/food";
 import { strategyFor } from "@/lib/fulfillment";
 import {
   canAddPhotos,
@@ -322,13 +323,21 @@ function createDavetOrder(input: CreateOrderInput, userId: string, provider: Non
   }
 
   const guests = Math.round(input.guestCount ?? NaN);
-  if (!Number.isFinite(guests) || guests < GUESTS_MIN || guests > GUESTS_MAX) {
-    throw new ApiError(400, `Kişi sayısı ${GUESTS_MIN}–${GUESTS_MAX} olmalı.`, "VALIDATION_ERROR");
+  const card = toPublicProduct(product);
+  const { min, max } = foodQtyBounds(card);
+  const unit = foodUnitMeta(card.priceUnit).qty;
+  if (!Number.isFinite(guests) || guests < min || guests > max) {
+    throw new ApiError(400, `Miktar ${min}–${max} ${unit} olmalı.`, "VALIDATION_ERROR");
   }
 
   const allergy = (input.allergyNote ?? "").trim();
   if (!allergy) {
     throw new ApiError(400, "Alerji durumunu yaz. Yoksa “yok” de.", "VALIDATION_ERROR");
+  }
+
+  const allowedDrops = dropsForFood(card, provider.drops);
+  if (!allowedDrops.includes(input.drop)) {
+    throw new ApiError(400, "Bu ürün için bu teslimat kapalı.", "VALIDATION_ERROR");
   }
 
   const dropPointId = validateDropAndSlot(provider, input);

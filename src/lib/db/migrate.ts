@@ -198,6 +198,15 @@ function ensureColumns(db: Database.Database) {
   addColumn(db, "orders", "product_name", "product_name TEXT");
   addColumn(db, "orders", "guest_count", "guest_count INTEGER");
   addColumn(db, "orders", "allergy_note", "allergy_note TEXT");
+  addColumn(db, "provider_products", "photo_url", "photo_url TEXT");
+  addColumn(db, "provider_products", "description", "description TEXT");
+  addColumn(db, "provider_products", "category", "category TEXT");
+  addColumn(db, "provider_products", "price_unit", "price_unit TEXT NOT NULL DEFAULT 'kisi'");
+  addColumn(db, "provider_products", "min_order", "min_order INTEGER NOT NULL DEFAULT 1");
+  addColumn(db, "provider_products", "max_qty", "max_qty INTEGER");
+  addColumn(db, "provider_products", "lead_hours", "lead_hours INTEGER");
+  addColumn(db, "provider_products", "delivery", "delivery TEXT NOT NULL DEFAULT 'ikisi'");
+  addColumn(db, "provider_products", "allergens", "allergens TEXT");
 }
 
 export function migrate(db: Database.Database) {
