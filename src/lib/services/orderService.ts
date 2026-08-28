@@ -3,7 +3,9 @@ import { estimateFood, estimateFor, PIECES_MAX, PIECES_MIN } from "@/lib/pricing
 import { loyaltyRate } from "@/lib/loyalty";
 import { getCategoryForProvider } from "@/lib/db/categories";
 import { getProduct, toPublicProduct } from "@/lib/db/products";
+import { getService, toPublicService } from "@/lib/db/services";
 import { dropsForFood, foodQtyBounds, foodUnitMeta } from "@/lib/food";
+import { dropsForSewing, sewingQtyBounds, sewingUnitMeta } from "@/lib/sewing";
 import { strategyFor } from "@/lib/fulfillment";
 import {
   canAddPhotos,
@@ -90,7 +92,7 @@ function toOrder(row: OrderRow): Order {
   return {
     id: row.id,
     providerId: row.provider_id,
-    packageId: (row.package_id === "davet" ? "davet" : row.package_id) as Order["packageId"],
+    packageId: row.package_id as Order["packageId"],
     pieces: row.pieces,
     express: Boolean(row.express),
     drop,
@@ -169,6 +171,7 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
   assertFulfillmentReady(provider.id);
 
   if (cat.id === "davet") return createDavetOrder(input, userId, provider);
+  if (cat.id === "dikis") return createDikisOrder(input, userId, provider);
   return createLaundryOrder(input, userId, provider);
 }
 
@@ -209,7 +212,8 @@ function insertPendingOrder(args: {
 }) {
   const now = new Date().toISOString();
   const id = `k-${randomUUID().slice(0, 8)}`;
-  const capacityLabel = args.productId ? "kişilik yer" : "parça yer";
+  const capacityLabel =
+    args.packageId === "davet" ? "kişilik yer" : args.packageId === "dikis" ? "adet yer" : "parça yer";
   runOrderTx(() => {
     const remaining = getRemaining(args.providerId);
     if (remaining == null) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
@@ -364,6 +368,54 @@ function createDavetOrder(input: CreateOrderInput, userId: string, provider: Non
     provider_id: provider.id,
     user_id: userId,
     pieces: guests,
+  });
+  return order;
+}
+
+function createDikisOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
+  const serviceId = (input.productId ?? "").trim();
+  if (!serviceId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
+  const row = getService(serviceId);
+  if (!row || row.provider_id !== provider.id || !row.is_active) {
+    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
+  }
+
+  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
+  const card = toPublicService(row);
+  const { min, max } = sewingQtyBounds(card);
+  const unit = sewingUnitMeta(card.priceUnit).qty;
+  if (!Number.isFinite(qty) || qty < min || qty > max) {
+    throw new ApiError(400, `Miktar ${min}–${max} ${unit} olmalı.`, "VALIDATION_ERROR");
+  }
+
+  const allowedDrops = dropsForSewing(card, provider.drops);
+  if (!allowedDrops.includes(input.drop)) {
+    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
+  }
+
+  const dropPointId = validateDropAndSlot(provider, input);
+  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
+  const id = insertPendingOrder({
+    providerId: provider.id,
+    packageId: "dikis",
+    pieces: qty,
+    express: false,
+    drop: input.drop,
+    dropPointId,
+    slot: input.slot,
+    note: (input.note ?? "").trim().slice(0, 500),
+    quote,
+    userId,
+    productId: row.id,
+    productName: row.name,
+    guestCount: qty,
+  });
+  const order = getOrder(id)!;
+  notifyNewOrder({
+    id,
+    provider_id: provider.id,
+    user_id: userId,
+    pieces: qty,
   });
   return order;
 }

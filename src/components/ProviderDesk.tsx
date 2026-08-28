@@ -9,6 +9,7 @@ import type { DropPoint, Order, OrderStatus, Provider } from "@/lib/types";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
 import { LaundryProfile } from "@/components/LaundryProfile";
 import { FoodMenuEditor } from "@/components/FoodMenuEditor";
+import { SewingServiceEditor } from "@/components/SewingServiceEditor";
 
 const LABEL: Record<OrderStatus, string> = {
   onay_bekliyor: "Bekliyor",
@@ -99,6 +100,8 @@ export function ProviderDesk() {
         <LaundryProfile me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
 
         <FoodMenuEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <SewingServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
 
         <h2 className="k-rise mt-8 font-[family-name:var(--font-display)] text-xl">Gelen siparişler</h2>
         {!ready ? (
@@ -197,8 +200,10 @@ function OrderCard({
     p?.packages.find((x) => x.id === order.packageId) ??
     PACKAGES.find((x) => x.id === order.packageId);
   const drop = dropPoints.find((d) => d.id === order.dropPointId);
-  const food = Boolean(order.productId);
-  const next = nextStatus(order.status, order.packageId, food);
+  const food = order.packageId === "davet";
+  const sewing = order.packageId === "dikis";
+  const catalog = food || sewing;
+  const next = nextStatus(order.status, order.packageId, catalog);
   const foodLabel: Partial<Record<OrderStatus, string>> = {
     teslim_alindi: "Hazırlanıyor",
     hazir: "Hazır",
@@ -225,13 +230,15 @@ function OrderCard({
       style={{ animationDelay: `${delay}ms` }}
     >
       <p className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE[order.status]}`}>
-        {food && foodLabel[order.status] ? foodLabel[order.status] : LABEL[order.status]}
+        {catalog && foodLabel[order.status] ? foodLabel[order.status] : LABEL[order.status]}
       </p>
       <p className="mt-2 font-medium">
         {p?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : `${order.pieces} parça · ${pack?.title}`}
+          : sewing
+            ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
+            : `${order.pieces} parça · ${pack?.title}`}
       </p>
       {food && order.allergyNote && (
         <p className="mt-1 text-sm text-[var(--muted)]">Alerji: {order.allergyNote}</p>

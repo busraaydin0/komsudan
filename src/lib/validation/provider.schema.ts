@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -93,6 +93,48 @@ export const productCreateSchema = z.object({
 });
 
 export const productPatchSchema = productCreateSchema;
+
+const sewingDeliverySchema = z.object({
+  adres: z.boolean(),
+  nokta: z.boolean(),
+  yakin: z.boolean(),
+});
+
+export const serviceCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    description: z.string().trim().max(400).optional().nullable(),
+    subcategory: z.enum(["kiyafet", "tamir", "ozel", "tekstil", "diger"]).optional(),
+    price: z
+      .number({ error: "Fiyat gerekli." })
+      .int()
+      .min(1, "Fiyat 1–50.000 ₺.")
+      .max(50_000, "Fiyat 1–50.000 ₺."),
+    priceUnit: z.enum(["adet", "cift", "metre", "kg", "parca", "saat", "proje"]).optional(),
+    minOrder: z.number().int().min(1).max(80).optional(),
+    leadDays: z.number().int().min(0).max(30).optional().nullable(),
+    maxPerWeek: z.number().int().min(1).max(80).optional().nullable(),
+    delivery: sewingDeliverySchema.optional(),
+    workRadiusKm: z.number().int().min(1).max(50).optional().nullable(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    material: z.enum(["customer", "provider", "either"]).optional(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (!val.delivery) return;
+    if (!val.delivery.adres && !val.delivery.nokta && !val.delivery.yakin) {
+      ctx.addIssue({ code: "custom", message: "En az bir teslim yöntemi seç.", path: ["delivery"] });
+    }
+    if (val.maxPerWeek != null && val.minOrder != null && val.maxPerWeek < val.minOrder) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Haftalık kapasite, minimum siparişten küçük olamaz.",
+        path: ["maxPerWeek"],
+      });
+    }
+  });
+
+export const servicePatchSchema = serviceCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

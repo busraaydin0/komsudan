@@ -118,7 +118,7 @@ export function OnboardingFlow({
       return;
     }
     await postMyOffer({
-      categoryId: "davet",
+      categoryId: offerCat === "dikis" ? "dikis" : "davet",
       lat,
       lng,
       neighborhood: neighborhoodName,
@@ -249,7 +249,7 @@ export function OnboardingFlow({
                 <RoleCard
                   on={seek}
                   title="Hizmet arıyorum"
-                  hint="Çamaşır yıkama, davet ikramlık — komşudan al"
+                  hint="Çamaşır, davet ikramlık, dikiş — komşudan al"
                   onClick={() => {
                     setSeek((v) => !v);
                     setErr("");
@@ -258,7 +258,7 @@ export function OnboardingFlow({
                 <RoleCard
                   on={offer}
                   title="Hizmet vermek istiyorum"
-                  hint="Çamaşır yıkama veya davet ikramlık — alanı sonra seçersin"
+                  hint="Çamaşır, davet veya dikiş — alanı sonra seçersin"
                   onClick={() => {
                     setOffer((v) => !v);
                     setLaundryAdded(false);
@@ -296,7 +296,7 @@ export function OnboardingFlow({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ara: çamaşır yıkama, davet ikramlık…"
+                placeholder="Ara: çamaşır, davet, dikiş…"
                 className="mt-4 w-full rounded-2xl bg-[var(--paper)] px-3 py-3 text-base ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
               />
               {seek && (
@@ -347,6 +347,11 @@ export function OnboardingFlow({
                   {offerCat === "davet" && (
                     <p className="mt-3 text-xs text-[var(--muted)]">
                       Menünü Hizmet sekmesinden ekleyeceksin: ürün, fiyat birimi, alerjen.
+                    </p>
+                  )}
+                  {offerCat === "dikis" && (
+                    <p className="mt-3 text-xs text-[var(--muted)]">
+                      Hizmetlerini Hizmet sekmesinden ekleyeceksin: fotoğraf, kategori, birim, teslim, malzeme.
                     </p>
                   )}
                 </>
@@ -437,7 +442,7 @@ function CategoryPick({
               }`}
             >
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--card)] text-lg" aria-hidden>
-                {c.icon === "feast" ? "🥧" : c.icon === "laundry" ? "🧺" : "•"}
+                {c.icon === "needle" ? "🧵" : c.icon === "feast" ? "🥧" : c.icon === "laundry" ? "🧺" : "•"}
               </span>
               <span>
                 <span className="block text-sm font-medium">{c.name}</span>

@@ -5,6 +5,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PILOT, trustLabel } from "@/lib/data";
 import { dryingListLabel } from "@/lib/drying";
 import { dropsForFood, foodCategoryLabel, foodLeadLabel, foodQtyBounds, foodUnitMeta } from "@/lib/food";
+import {
+  dropsForSewing,
+  sewingDropLabel,
+  sewingLeadLabel,
+  sewingMaterialLabel,
+  sewingQtyBounds,
+  sewingSubcategoryLabel,
+  sewingUnitMeta,
+} from "@/lib/sewing";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFood, estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
@@ -22,6 +31,7 @@ import type {
   PackageId,
   Provider,
   ProviderProduct,
+  ProviderService,
 } from "@/lib/types";
 
 const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), {
@@ -39,6 +49,15 @@ function isDavet(p: Pick<Provider, "categoryId">) {
   return p.categoryId === "davet";
 }
 
+function isDikis(p: Pick<Provider, "categoryId">) {
+  return p.categoryId === "dikis";
+}
+
+function laundryInFilter(ids?: string[]) {
+  if (!ids?.length) return true;
+  return ids.includes("camasir");
+}
+
 type NearbySort = "near" | "far" | "priceHigh" | "priceLow" | "rating" | "reviews" | "space";
 
 const NEARBY_SORTS: { id: NearbySort; label: string }[] = [
@@ -54,6 +73,10 @@ const NEARBY_SORTS: { id: NearbySort; label: string }[] = [
 function listPrice(p: Provider): number | null {
   if (isDavet(p)) {
     const prices = (p.products ?? []).map((x) => x.pricePerPerson);
+    return prices.length ? Math.min(...prices) : null;
+  }
+  if (isDikis(p)) {
+    const prices = (p.services ?? []).map((x) => x.price);
     return prices.length ? Math.min(...prices) : null;
   }
   return p.packages.find((x) => x.id === "tam")?.pricePerPiece ?? p.packages.at(-1)?.pricePerPiece ?? null;
@@ -141,7 +164,7 @@ export function CustomerApp({
   const origin = user ?? home ?? PILOT.center;
   const ranked = useMemo(() => {
     return providers
-      .filter((p) => (isDavet(p) ? true : dryerOnly ? p.hasDryer : true))
+      .filter((p) => (p.categoryId && p.categoryId !== "camasir" ? true : dryerOnly ? p.hasDryer : true))
       .map((p) => ({ p, km: kmBetween(origin, p.loc) }))
       .sort((a, b) => a.km - b.km);
   }, [origin, dryerOnly, providers]);
@@ -150,11 +173,15 @@ export function CustomerApp({
   const selected = selectedId ? providers.find((p) => p.id === selectedId) : undefined;
   const active = orders.find((o) => o.id === activeId) ?? orders[0];
   const davet = selected ? isDavet(selected) : false;
+  const dikis = selected ? isDikis(selected) : false;
   const product = selected?.products?.find((x) => x.id === productId) ?? selected?.products?.[0];
+  const service = selected?.services?.find((x) => x.id === productId) ?? selected?.services?.[0];
   const quote = selected
     ? davet && product
       ? estimateFood(guests, product.pricePerPerson, loyaltyRate)
-      : estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
+      : dikis && service
+        ? estimateFood(guests, service.price, loyaltyRate)
+        : estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
     : { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 };
 
   useEffect(() => {
@@ -201,6 +228,9 @@ export function CustomerApp({
       if (isDavet(selected)) {
         const first = selected.products?.[0]?.id ?? null;
         setProductId(selected.products?.some((x) => x.id === productId) ? productId : first);
+      } else if (isDikis(selected)) {
+        const first = selected.services?.[0]?.id ?? null;
+        setProductId(selected.services?.some((x) => x.id === productId) ? productId : first);
       } else {
         setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
       }
@@ -249,6 +279,7 @@ export function CustomerApp({
     setPlacing(true);
     try {
       const davetOrder = isDavet(selected);
+      const dikisOrder = isDikis(selected);
       if (davetOrder && !allergy.trim()) {
         setErr("Alerji durumunu yaz. Yoksa “yok” de.");
         setPlacing(false);
@@ -266,6 +297,16 @@ export function CustomerApp({
               slot,
               note,
             }
+          : dikisOrder
+            ? {
+                providerId: selected.id,
+                productId: service?.id,
+                guestCount: guests,
+                drop,
+                dropPointId: drop === "nokta" ? dropId : null,
+                slot,
+                note,
+              }
           : {
               providerId: selected.id,
               packageId: pkg,
@@ -348,7 +389,7 @@ export function CustomerApp({
       {pane === "map" && (
       <div className="pointer-events-none absolute top-[calc(env(safe-area-inset-top)+5rem)] left-3 z-10">
         <div className="k-rise pointer-events-auto flex flex-wrap gap-1.5" style={{ animationDelay: "90ms" }}>
-          {!(categoryIds?.length === 1 && categoryIds[0] === "davet") && (
+          {laundryInFilter(categoryIds) && (
           <button
             type="button"
             onClick={() => setDryerOnly((v) => !v)}
@@ -405,7 +446,9 @@ export function CustomerApp({
               <p className="mt-2 text-sm text-[var(--muted)]">
                 {categoryIds?.length === 1 && categoryIds[0] === "davet"
                   ? "Eve kimse girmez. Yemek kapıda veya nötr noktada teslim."
-                  : "Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak."}
+                  : categoryIds?.length === 1 && categoryIds[0] === "dikis"
+                    ? "Eve kimse girmez. Dikim kapıda, adresten veya noktada teslim."
+                    : "Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak."}
               </p>
               <button
                 type="button"
@@ -493,6 +536,13 @@ export function CustomerApp({
                     setGuests((n) => Math.min(max, Math.max(min, n)));
                     const allowed = dropsForFood(prod, selected.drops);
                     setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
+                  } else if (isDikis(selected)) {
+                    const svc =
+                      selected.services?.find((x) => x.id === productId) ?? selected.services?.[0];
+                    const { min, max } = sewingQtyBounds(svc, selected.remaining);
+                    setGuests((n) => Math.min(max, Math.max(min, n)));
+                    const allowed = dropsForSewing(svc, selected.drops);
+                    setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
                   } else {
                     setPieces((n) => clampPieces(n, selected.remaining));
                   }
@@ -510,7 +560,8 @@ export function CustomerApp({
                 allergy={allergy}
                 onAllergy={setAllergy}
                 product={product}
-                productName={product?.name}
+                service={service}
+                productName={dikis ? service?.name : product?.name}
                 express={express}
                 onExpress={setExpress}
                 drop={drop}
@@ -683,9 +734,13 @@ function List({
                         ? (p.products ?? []).length
                           ? ` · ${(p.products ?? []).map((x) => x.name).join(", ")}`
                           : " · menü yok"
-                        : dryingListLabel(p)
-                          ? ` · ${dryingListLabel(p)}`
-                          : ""}
+                        : isDikis(p)
+                          ? (p.services ?? []).length
+                            ? ` · ${(p.services ?? []).map((x) => x.name).join(", ")}`
+                            : " · hizmet yok"
+                          : dryingListLabel(p)
+                            ? ` · ${dryingListLabel(p)}`
+                            : ""}
                       {load ? (
                         <span className={tag}>
                           {" · "}
@@ -704,10 +759,14 @@ function List({
                     <span className="block tabular-nums">{p.rating.toFixed(1)}</span>
                     <span className="text-xs text-[var(--muted)]">
                       {price == null
-                        ? "menü yok"
+                        ? isDikis(p)
+                          ? "hizmet yok"
+                          : "menü yok"
                         : isDavet(p)
                           ? `${tl(price)}/kişi`
-                          : `${tl(price)}/parça`}
+                          : isDikis(p)
+                            ? `${tl(price)}'den`
+                            : `${tl(price)}/parça`}
                     </span>
                   </span>
                 </button>
@@ -741,8 +800,9 @@ function ProviderPane({
 }) {
   const tone = seatTone(p.remaining, p.capacity);
   const davet = isDavet(p);
-  const items = davet ? (p.products ?? []) : p.packages;
-  const canNext = davet ? items.length > 0 : p.packages.length > 0;
+  const dikis = isDikis(p);
+  const items = davet ? (p.products ?? []) : dikis ? (p.services ?? []) : p.packages;
+  const canNext = davet || dikis ? items.length > 0 : p.packages.length > 0;
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
@@ -767,7 +827,9 @@ function ProviderPane({
                 ? "bugün dolu"
                 : davet
                   ? `bugün ${p.remaining} kişilik yer`
-                  : `bugün ${p.remaining} parça yer`}
+                  : dikis
+                    ? `bugün ${p.remaining} yer`
+                    : `bugün ${p.remaining} parça yer`}
             </span>
           </p>
         </div>
@@ -815,6 +877,40 @@ function ProviderPane({
                 </button>
               );
             })
+          : dikis
+            ? (p.services ?? []).map((item) => {
+                const unit = sewingUnitMeta(item.priceUnit);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onProduct(item.id)}
+                    className={`k-chip flex w-full gap-3 rounded-2xl px-3 py-3 text-left ring-1 ${
+                      productId === item.id
+                        ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
+                        : "bg-[var(--paper)] ring-[var(--line)]"
+                    }`}
+                  >
+                    {item.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={item.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                    ) : null}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex justify-between font-medium">
+                        {item.name}
+                        <span className="tabular-nums">
+                          {tl(item.price)}/{unit.label.toLowerCase()}
+                        </span>
+                      </span>
+                      {(item.description || sewingSubcategoryLabel(item.subcategory)) && (
+                        <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                          {[sewingSubcategoryLabel(item.subcategory), item.description].filter(Boolean).join(" · ")}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })
           : p.packages.map((pack) => (
               <button
                 key={pack.id}
@@ -836,6 +932,9 @@ function ProviderPane({
         {davet && (p.products ?? []).length === 0 && (
           <p className="text-sm text-[var(--muted)]">Bu komşu henüz menü eklemedi.</p>
         )}
+        {dikis && (p.services ?? []).length === 0 && (
+          <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
+        )}
       </div>
       <button
         type="button"
@@ -843,7 +942,7 @@ function ProviderPane({
         onClick={onNext}
         className="k-press k-cta mt-4 w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.22)] disabled:opacity-40"
       >
-        {davet ? "Devam · miktar ve alerji" : "Devam · parça ve teslimat"}
+        {davet ? "Devam · miktar ve alerji" : dikis ? "Devam · miktar ve teslimat" : "Devam · parça ve teslimat"}
       </button>
     </div>
   );
@@ -858,6 +957,7 @@ function Checkout({
   allergy,
   onAllergy,
   product,
+  service,
   productName,
   express,
   onExpress,
@@ -885,6 +985,7 @@ function Checkout({
   allergy: string;
   onAllergy: (s: string) => void;
   product?: ProviderProduct;
+  service?: ProviderService;
   productName?: string;
   express: boolean;
   onExpress: (v: boolean) => void;
@@ -905,16 +1006,18 @@ function Checkout({
   onPlace: () => void;
 }) {
   const davet = isDavet(p);
-  const unit = foodUnitMeta(product?.priceUnit);
-  const bounds = foodQtyBounds(product, p.remaining);
-  const cap = davet ? bounds.max : Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
-  const minCount = davet ? bounds.min : PIECES_MIN;
-  const foodDrops = davet ? dropsForFood(product, p.drops) : p.drops;
-  const [draft, setDraft] = useState(String(davet ? guests : pieces));
+  const dikis = isDikis(p);
+  const unitPriced = davet || dikis;
+  const unit = dikis ? sewingUnitMeta(service?.priceUnit) : foodUnitMeta(product?.priceUnit);
+  const bounds = dikis ? sewingQtyBounds(service, p.remaining) : foodQtyBounds(product, p.remaining);
+  const cap = unitPriced ? bounds.max : Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
+  const minCount = unitPriced ? bounds.min : PIECES_MIN;
+  const foodDrops = dikis ? dropsForSewing(service, p.drops) : davet ? dropsForFood(product, p.drops) : p.drops;
+  const [draft, setDraft] = useState(String(unitPriced ? guests : pieces));
 
   useEffect(() => {
-    setDraft(String(davet ? guests : pieces));
-  }, [davet, guests, pieces]);
+    setDraft(String(unitPriced ? guests : pieces));
+  }, [unitPriced, guests, pieces]);
 
   function clampGuests(n: number) {
     if (!Number.isFinite(n)) return bounds.min;
@@ -925,38 +1028,39 @@ function Checkout({
     const digits = raw.replace(/\D/g, "").slice(0, 2);
     setDraft(digits);
     if (!digits) return;
-    if (davet) onGuests(clampGuests(Number(digits)));
+    if (unitPriced) onGuests(clampGuests(Number(digits)));
     else onPieces(clampPieces(Number(digits), p.remaining));
   }
 
   function commitCount() {
-    if (davet) onGuests(clampGuests(Number(draft) || bounds.min));
+    if (unitPriced) onGuests(clampGuests(Number(draft) || bounds.min));
     else onPieces(clampPieces(Number(draft) || PIECES_MIN, p.remaining));
   }
 
-  const count = davet ? guests : pieces;
+  const count = unitPriced ? guests : pieces;
+  const unitPrice = dikis ? (service?.price ?? 0) : (product?.pricePerPerson ?? 0);
   const qtyTitle =
     unit.id === "kisi" ? "Kaç kişilik?" : unit.id === "kg" ? "Kaç kg?" : `Kaç ${unit.qty}?`;
 
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
-        {davet ? "← Menü" : "← Paket"}
+        {davet ? "← Menü" : dikis ? "← Hizmet" : "← Paket"}
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">
-        {davet ? qtyTitle : "Kaç parça?"}
+        {unitPriced ? qtyTitle : "Kaç parça?"}
       </h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        {davet
-          ? `${productName ?? "Seçili yemek"} · ${tl(product?.pricePerPerson ?? 0)}/${unit.label}. ${bounds.min}–${cap} ${unit.qty}.`
+        {unitPriced
+          ? `${productName ?? (dikis ? "Seçili hizmet" : "Seçili yemek")} · ${tl(unitPrice)}/${unit.label.toLowerCase()}. ${bounds.min}–${cap} ${unit.qty}.`
           : `Gömlek, pantolon, tişört birer parça. Nevresim / yorgan iki sayılır. Sen yaz, 1–${cap}.`}
       </p>
       <div className="mt-3 flex items-center gap-2">
         <button
           type="button"
-          aria-label={davet ? `Bir ${unit.qty} azalt` : "Bir parça azalt"}
+          aria-label={unitPriced ? `Bir ${unit.qty} azalt` : "Bir parça azalt"}
           disabled={count <= minCount}
-          onClick={() => (davet ? onGuests(count - 1) : onPieces(count - 1))}
+          onClick={() => (unitPriced ? onGuests(count - 1) : onPieces(count - 1))}
           className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
         >
           −
@@ -964,7 +1068,7 @@ function Checkout({
         <input
           inputMode="numeric"
           pattern="[0-9]*"
-          aria-label={davet ? `${unit.qty} sayısı` : "Parça sayısı"}
+          aria-label={unitPriced ? `${unit.qty} sayısı` : "Parça sayısı"}
           value={draft}
           onChange={(e) => typeCount(e.target.value)}
           onBlur={commitCount}
@@ -972,23 +1076,23 @@ function Checkout({
         />
         <button
           type="button"
-          aria-label={davet ? `Bir ${unit.qty} ekle` : "Bir parça ekle"}
+          aria-label={unitPriced ? `Bir ${unit.qty} ekle` : "Bir parça ekle"}
           disabled={count >= cap}
-          onClick={() => (davet ? onGuests(count + 1) : onPieces(count + 1))}
+          onClick={() => (unitPriced ? onGuests(count + 1) : onPieces(count + 1))}
           className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
         >
           +
         </button>
-        <span className="text-sm text-[var(--muted)]">{davet ? unit.qty : "parça"}</span>
+        <span className="text-sm text-[var(--muted)]">{unitPriced ? unit.qty : "parça"}</span>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {(davet ? [bounds.min, 4, 8, 12, 16, 24].filter((n, i, a) => n <= cap && a.indexOf(n) === i) : PIECES)
+        {(unitPriced ? [bounds.min, 4, 8, 12, 16, 24].filter((n, i, a) => n <= cap && a.indexOf(n) === i) : PIECES)
           .filter((n) => n <= cap)
           .map((n) => (
           <button
             key={n}
             type="button"
-            onClick={() => (davet ? onGuests(n) : onPieces(n))}
+            onClick={() => (unitPriced ? onGuests(n) : onPieces(n))}
             className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
               count === n
                 ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]"
@@ -999,9 +1103,9 @@ function Checkout({
           </button>
         ))}
       </div>
-      {p.remaining > 0 && p.remaining < (davet ? bounds.max : PIECES_MAX) && (
+      {p.remaining > 0 && p.remaining < (unitPriced ? bounds.max : PIECES_MAX) && (
         <p className="mt-2 text-xs text-[var(--muted)]">
-          Bugün en fazla {p.remaining} {davet ? unit.qty : "parça"} yer var.
+          Bugün en fazla {p.remaining} {unitPriced ? unit.qty : "parça"} yer var.
         </p>
       )}
       {davet && foodLeadLabel(product?.leadHours) && (
@@ -1009,6 +1113,20 @@ function Checkout({
           Sipariş için minimum süre: {foodLeadLabel(product?.leadHours)}.
         </p>
       )}
+      {dikis && sewingLeadLabel(service?.leadDays) && (
+        <p className="mt-3 text-xs text-[var(--muted)]">
+          Tahmini hazırlama: {sewingLeadLabel(service?.leadDays)}.
+        </p>
+      )}
+      {dikis && sewingMaterialLabel(service?.material) && (
+        <p className="mt-2 text-xs text-[var(--muted)]">Malzeme: {sewingMaterialLabel(service?.material)}</p>
+      )}
+      {dikis && service?.workRadiusKm ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Çalışma alanı: {service.workRadiusKm} km</p>
+      ) : null}
+      {dikis && service?.notes ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{service.notes}</p>
+      ) : null}
       {davet && product?.allergens && (
         <p className="mt-2 text-xs text-[var(--muted)]">İçerik / alerjen: {product.allergens}</p>
       )}
@@ -1024,7 +1142,7 @@ function Checkout({
           />
         </label>
       )}
-      {!davet && p.express && (
+      {!unitPriced && p.express && (
         <label className="mt-4 flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -1035,7 +1153,7 @@ function Checkout({
         </label>
       )}
       <h3 className="mt-5 text-sm font-medium">Teslimat</h3>
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         {foodDrops.map((d) => (
           <button
             key={d}
@@ -1045,7 +1163,7 @@ function Checkout({
               drop === d ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
             }`}
           >
-            {d === "kapi" ? "Kapı" : "Nötr nokta"}
+            {dikis ? sewingDropLabel(d, service?.delivery) : d === "kapi" ? "Kapı" : "Nötr nokta"}
           </button>
         ))}
       </div>
@@ -1086,7 +1204,7 @@ function Checkout({
       <textarea
         value={note}
         onChange={(e) => onNote(e.target.value)}
-        placeholder={davet ? "Kapı kodu, teslim notu…" : "Nevresim, leke, hassas kumaş, kapı kodu…"}
+        placeholder={dikis ? "Ölçü, kumaş, kapı kodu…" : davet ? "Kapı kodu, teslim notu…" : "Nevresim, leke, hassas kumaş, kapı kodu…"}
         className="mt-4 w-full resize-none rounded-2xl bg-[var(--paper)] px-3 py-2 text-sm ring-1 ring-[var(--line)] outline-none transition-[box-shadow] duration-200 focus:ring-[var(--teal)]"
         rows={2}
       />
@@ -1094,8 +1212,8 @@ function Checkout({
       <p className="text-xs text-[var(--muted)]">
         {quote.loyaltyRate > 0
           ? `${loyaltyLabel} · %${Math.round(quote.loyaltyRate * 100)} indirim, önce ${tl(quote.before)}. `
-          : davet
-            ? `${unit.qty} × ${unit.label} fiyatı. `
+          : unitPriced
+            ? `${unit.qty} × ${unit.label.toLowerCase()} fiyatı. `
             : `Min. ${tl(100)}. `}
         Siparişte karttan ön otorizasyon; teslim kodu doğrulanınca tahsilat.
       </p>
@@ -1135,8 +1253,10 @@ function Track({
   onBack: () => void;
   onReload: () => void;
 }) {
-  const food = Boolean(order.productId);
-  const steps = trackSteps(order.packageId, food);
+  const food = order.packageId === "davet";
+  const sewing = order.packageId === "dikis";
+  const catalog = food || sewing;
+  const steps = trackSteps(order.packageId, catalog);
   const idx = steps.indexOf(order.status);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -1150,7 +1270,9 @@ function Track({
         {provider?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : `${order.pieces} parça`}{" "}
+          : sewing
+            ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
+            : `${order.pieces} parça`}{" "}
         · {tl(order.total)}
       </p>
       {food && order.allergyNote && (

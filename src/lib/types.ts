@@ -26,6 +26,30 @@ export type FoodCategory = "kisir" | "pasta" | "kurabiye" | "borek" | "salata" |
 export type FoodPriceUnit = "porsiyon" | "kg" | "adet" | "tepsi" | "kisi";
 export type FoodDelivery = "kapi" | "nokta" | "ikisi";
 
+export type SewingSubcategory = "kiyafet" | "tamir" | "ozel" | "tekstil" | "diger";
+export type SewingPriceUnit = "adet" | "cift" | "metre" | "kg" | "parca" | "saat" | "proje";
+export type SewingMaterial = "customer" | "provider" | "either";
+export type SewingDelivery = { adres: boolean; nokta: boolean; yakin: boolean };
+
+/** Dikiş & tadilat hizmet kartı. Fiyat seçilen birim başı; siparişte sunucu çarpar. */
+export type ProviderService = {
+  id: string;
+  name: string;
+  description?: string | null;
+  subcategory?: SewingSubcategory;
+  photoUrl?: string | null;
+  price: number;
+  priceUnit?: SewingPriceUnit;
+  minOrder?: number;
+  leadDays?: number | null;
+  maxPerWeek?: number | null;
+  delivery: SewingDelivery;
+  workRadiusKm?: number | null;
+  notes?: string | null;
+  material?: SewingMaterial;
+  isActive?: boolean;
+};
+
 /** Davet menü kalemi. Fiyat seçilen birim başı; siparişte sunucu çarpar. */
 export type ProviderProduct = {
   id: string;
@@ -96,6 +120,7 @@ export type Provider = {
   recentReviews: Review[];
   categoryId?: string;
   products?: ProviderProduct[];
+  services?: ProviderService[];
 };
 
 export type DropPoint = {
@@ -134,7 +159,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet";
+  packageId: PackageId | "davet" | "dikis";
   pieces: number;
   express: boolean;
   drop: DropMethod;

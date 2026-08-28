@@ -47,7 +47,7 @@ function seedProviderDirectory() {
       avatarUrl: p.avatarUrl,
       categoryId: p.categoryId ?? "camasir",
     });
-    if ((p.categoryId ?? "camasir") !== "davet") {
+    if ((p.categoryId ?? "camasir") === "camasir") {
       for (const pack of p.packages) {
         upsertPackage({
           id: `${p.id}:${pack.id}`,

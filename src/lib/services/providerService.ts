@@ -25,6 +25,15 @@ import {
   type SlotRow,
 } from "@/lib/db/providers";
 import { countProducts, deactivateProduct, insertProduct, listProducts, toPublicProduct, updateProduct, type ProductRow, type ProductWrite } from "@/lib/db/products";
+import {
+  countServices,
+  deactivateService,
+  insertService,
+  listServices,
+  toPublicService,
+  updateService,
+  type ServiceWrite,
+} from "@/lib/db/services";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -94,6 +103,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     categoryId: row.category_id ?? "camasir",
     packages: listPackages(row.user_id).map(toPackage),
     products: listProducts(row.user_id).map(toProduct),
+    services: listServices(row.user_id).map(toPublicService),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -169,8 +179,8 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && categoryId === "davet") {
-    throw new ApiError(400, "Davet menüsü ürünlerden oluşur, çamaşır paketi değil.", "VALIDATION_ERROR");
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis")) {
+    throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
     assertUniquePackages(patch.packages);
@@ -415,10 +425,25 @@ export function ensureDavetOffer(
   });
 }
 
+export function ensureDikisOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Dikiş ve tadilat. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "dikis",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet";
+    categoryId?: "camasir" | "davet" | "dikis";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -429,6 +454,9 @@ export function ensureServiceOffer(
   const categoryId = input.categoryId ?? "camasir";
   if (categoryId === "davet") {
     return ensureDavetOffer(user, input);
+  }
+  if (categoryId === "dikis") {
+    return ensureDikisOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -532,6 +560,65 @@ export function removeMyProduct(user: AuthUser, productId: string) {
   requireProvider(user);
   if (!deactivateProduct(productId, user.id)) {
     throw new ApiError(404, "Ürün bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_SERVICES = 12;
+
+function assertServiceWrite(input: ServiceWrite) {
+  const min = input.minOrder ?? 1;
+  const max = input.maxPerWeek;
+  if (max != null && max < min) {
+    throw new ApiError(400, "Haftalık kapasite, minimum siparişten küçük olamaz.", "VALIDATION_ERROR");
+  }
+  const d = input.delivery;
+  if (d && !d.adres && !d.nokta && !d.yakin) {
+    throw new ApiError(400, "En az bir teslim yöntemi seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyServices(user: AuthUser) {
+  requireProvider(user);
+  return listServices(user.id, false).map(toPublicService);
+}
+
+export function addMyService(user: AuthUser, input: ServiceWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "dikis") {
+    throw new ApiError(400, "Hizmet kartı yalnızca Dikiş & Tadilat’ta.", "VALIDATION_ERROR");
+  }
+  assertServiceWrite(input);
+  if (countServices(user.id, false) >= MAX_SERVICES) {
+    throw new ApiError(400, `En fazla ${MAX_SERVICES} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicService(
+    insertService(user.id, {
+      ...input,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      notes: input.notes?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyService(user: AuthUser, serviceId: string, input: ServiceWrite) {
+  requireProvider(user);
+  assertServiceWrite(input);
+  const row = updateService(serviceId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    notes: input.notes?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicService(row);
+}
+
+export function removeMyService(user: AuthUser, serviceId: string) {
+  requireProvider(user);
+  if (!deactivateService(serviceId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderProduct, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderProduct, ProviderService, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -372,7 +372,7 @@ export async function patchMyProviderProfile(body: {
 }
 
 export async function postMyOffer(body: {
-  categoryId: "camasir" | "davet";
+  categoryId: "camasir" | "davet" | "dikis";
   dryingType?: "makine" | "ip" | "ikisi";
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
@@ -477,5 +477,71 @@ export async function uploadMyProductPhoto(id: string, file: File) {
 export async function deleteMyProduct(id: string) {
   await readJson(
     await fetch(`/api/providers/me/products/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}
+
+export async function postMyService(body: {
+  name: string;
+  description?: string | null;
+  subcategory?: "kiyafet" | "tamir" | "ozel" | "tekstil" | "diger";
+  price: number;
+  priceUnit?: "adet" | "cift" | "metre" | "kg" | "parca" | "saat" | "proje";
+  minOrder?: number;
+  leadDays?: number | null;
+  maxPerWeek?: number | null;
+  delivery?: { adres: boolean; nokta: boolean; yakin: boolean };
+  workRadiusKm?: number | null;
+  notes?: string | null;
+  material?: "customer" | "provider" | "either";
+  isActive?: boolean;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { service: ProviderService }; service?: ProviderService }>(
+      await fetch("/api/providers/me/services", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.service!;
+}
+
+export async function fetchMyServices() {
+  const data = unwrap(
+    await readJson<{ data?: { services: ProviderService[] }; services?: ProviderService[] }>(
+      await fetch("/api/providers/me/services"),
+    ),
+  );
+  return data.services ?? [];
+}
+
+export async function patchMyService(id: string, body: Parameters<typeof postMyService>[0]) {
+  const data = unwrap(
+    await readJson<{ data?: { service: ProviderService }; service?: ProviderService }>(
+      await fetch(`/api/providers/me/services/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.service!;
+}
+
+export async function uploadMyServicePhoto(id: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = unwrap(
+    await readJson<{ data?: { photoUrl: string; service: ProviderService }; photoUrl?: string; service?: ProviderService }>(
+      await fetch(`/api/providers/me/services/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
+    ),
+  );
+  return data;
+}
+
+export async function deleteMyService(id: string) {
+  await readJson(
+    await fetch(`/api/providers/me/services/${encodeURIComponent(id)}`, { method: "DELETE" }),
   );
 }

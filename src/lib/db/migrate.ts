@@ -193,6 +193,39 @@ function ensureColumns(db: Database.Database) {
       is_active = 1,
       sort_order = 2
     WHERE id = 'davet';
+    INSERT OR IGNORE INTO service_categories (id, name, fulfillment_mode, pricing_model)
+    VALUES ('dikis', 'Dikiş & Tadilat', 'delivery', 'fixed');
+    UPDATE service_categories SET
+      name = 'Dikiş & Tadilat',
+      icon = 'needle',
+      blurb = 'Kıyafet tadilatı, tamir, özel dikim, ev tekstili',
+      is_active = 1,
+      sort_order = 3
+    WHERE id = 'dikis';
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_services (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL REFERENCES provider_profiles(user_id),
+      name TEXT NOT NULL,
+      description TEXT,
+      subcategory TEXT NOT NULL DEFAULT 'diger',
+      photo_url TEXT,
+      price INTEGER NOT NULL,
+      price_unit TEXT NOT NULL DEFAULT 'adet',
+      min_order INTEGER NOT NULL DEFAULT 1,
+      lead_days INTEGER,
+      max_per_week INTEGER,
+      delivery_adres INTEGER NOT NULL DEFAULT 1,
+      delivery_nokta INTEGER NOT NULL DEFAULT 1,
+      delivery_yakin INTEGER NOT NULL DEFAULT 0,
+      work_radius_km INTEGER,
+      notes TEXT,
+      material TEXT NOT NULL DEFAULT 'customer',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_services_provider ON provider_services(provider_id);
   `);
   addColumn(db, "orders", "product_id", "product_id TEXT");
   addColumn(db, "orders", "product_name", "product_name TEXT");
