@@ -1,9 +1,8 @@
 import type { ApiLifecycle, AppNotification } from "@/lib/types";
 import { ApiError } from "@/server/rules";
 import type { AuthUser } from "@/lib/auth/types";
-import type { OrderRow } from "@/lib/db/orders";
-import { customerHasOpenOrder } from "@/lib/db/orders";
-import { pickNudgeCopy } from "@/lib/nudgeCopy";
+import { customerHasOpenOrder, getOrderRow, type OrderRow } from "@/lib/db/orders";
+import { pickNudgeCopy, pickOrderNotice } from "@/lib/noticeCopy";
 import {
   countUnread,
   deleteNotificationsForUser,
@@ -48,11 +47,18 @@ function pushTo(userId: string | null | undefined, input: {
 
 export function notifyNewOrder(row: { id: string; provider_id: string; user_id: string | null; pieces: number }) {
   if (row.provider_id === row.user_id) return;
+  const order = getOrderRow(row.id);
+  const copy = pickOrderNotice("created", {
+    packageId: order?.package_id,
+    pieces: order?.guest_count ?? order?.pieces ?? row.pieces,
+    productName: order?.product_name,
+    orderId: row.id,
+  });
   pushTo(row.provider_id, {
     orderId: row.id,
     type: "order_created",
-    title: "Yeni sipariş",
-    body: `${row.pieces} parçalık sipariş geldi. Kabul veya red için Hizmet’e bak.`,
+    title: copy.title,
+    body: copy.body,
   });
 }
 
@@ -67,14 +73,22 @@ export function notifyStatusChange(input: {
   const customerId = row.user_id;
   const providerId = row.provider_id;
   const other = actorId === customerId ? providerId : customerId;
+  const ctx = {
+    packageId: row.package_id,
+    pieces: row.guest_count ?? row.pieces,
+    productName: row.product_name,
+    orderId: row.id,
+    pickupCode: pickupCode ?? undefined,
+  };
 
   if (next === "accepted" || (next === "dropped_off" && from === "pending")) {
     if (customerId && customerId !== actorId) {
+      const copy = pickOrderNotice("accepted", ctx);
       pushTo(customerId, {
         orderId: row.id,
         type: "order_accepted",
-        title: "Sipariş kabul edildi",
-        body: `${row.id} alındı. Yıkama sırasına girdi.`,
+        title: copy.title,
+        body: copy.body,
       });
     }
     return;
@@ -82,53 +96,61 @@ export function notifyStatusChange(input: {
   if (next === "dropped_off") return;
   if (next === "ready") {
     if (customerId && customerId !== actorId) {
-      const code = pickupCode ? ` Teslim kodun: ${pickupCode}.` : "";
+      const copy = pickOrderNotice("ready", ctx);
       pushTo(customerId, {
         orderId: row.id,
         type: "order_ready",
-        title: "Sipariş hazır",
-        body: `${row.id} teslime hazır.${code} (SMS simülasyonu, gerçek SMS yok.)`,
+        title: copy.title,
+        body: copy.body,
       });
     }
     return;
   }
   if (next === "rejected") {
     const byCustomer = actorId === customerId;
+    const copy = pickOrderNotice(byCustomer ? "cancelled" : "rejected", ctx);
     pushTo(other, {
       orderId: row.id,
       type: byCustomer ? "order_cancelled" : "order_rejected",
-      title: byCustomer ? "Sipariş iptal edildi" : "Sipariş reddedildi",
-      body: byCustomer
-        ? `${row.id} iptal. Ön otorizasyon çözüldü, para çekilmedi.`
-        : `${row.id} kabul edilmedi. Ön otorizasyon çözüldü.`,
+      title: copy.title,
+      body: copy.body,
     });
     return;
   }
   if (next === "cancelled") {
+    const copy = pickOrderNotice("cancelled", ctx);
     pushTo(other, {
       orderId: row.id,
       type: "order_cancelled",
-      title: "Sipariş iptal edildi",
-      body: `${row.id} iptal. Ön otorizasyon çözüldü, para çekilmedi.`,
+      title: copy.title,
+      body: copy.body,
     });
     return;
   }
   if (next === "completed") {
+    const copy = pickOrderNotice("completed", ctx);
     pushTo(other, {
       orderId: row.id,
       type: "order_completed",
-      title: "Teslim bitti",
-      body: `${row.id} teslim edildi. Ödeme alındı.`,
+      title: copy.title,
+      body: copy.body,
     });
   }
 }
 
 export function notifyPickupCodeRotated(row: OrderRow, code: string) {
+  const copy = pickOrderNotice("pickup", {
+    packageId: row.package_id,
+    pieces: row.guest_count ?? row.pieces,
+    productName: row.product_name,
+    orderId: row.id,
+    pickupCode: code,
+  });
   pushTo(row.user_id, {
     orderId: row.id,
     type: "pickup_code",
-    title: "Yeni teslim kodu",
-    body: `Beş hatalı deneme oldu. Yeni kod: ${code} (SMS simülasyonu, gerçek SMS yok.)`,
+    title: copy.title,
+    body: copy.body,
   });
 }
 
@@ -140,7 +162,7 @@ export function maybeEngagementNudge(user: AuthUser) {
   if (customerHasOpenOrder(user.id)) return;
   const last = latestNotificationOfType(user.id, "nudge");
   if (last && Date.now() - Date.parse(last.created_at) < NUDGE_GAP_MS) return;
-  const copy = pickNudgeCopy(last?.title);
+  const copy = pickNudgeCopy(last?.title, user.preferredCategoryIds);
   pushTo(user.id, {
     type: "nudge",
     title: copy.title,

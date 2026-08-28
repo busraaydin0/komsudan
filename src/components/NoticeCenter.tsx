@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { AppNotification } from "@/lib/types";
-import { markAllNotificationsRead, markNotificationRead, useNotifications } from "@/lib/api";
-import { pickNudgeCopy } from "@/lib/nudgeCopy";
+import { markAllNotificationsRead, markNotificationRead, useNotifications, useSession } from "@/lib/api";
+import { pickNudgeCopy } from "@/lib/noticeCopy";
 import { requestNotifications, showAppNotification } from "@/lib/permissions";
 
 function when(iso: string) {
@@ -17,6 +17,7 @@ function when(iso: string) {
 
 export function NoticeCenter({ onOpen }: { onOpen: (n: AppNotification) => void }) {
   const { notifications, unread, reload } = useNotifications();
+  const { account } = useSession();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sample, setSample] = useState<{ title: string; body: string } | null>(null);
@@ -54,7 +55,7 @@ export function NoticeCenter({ onOpen }: { onOpen: (n: AppNotification) => void 
   }
 
   async function trySample() {
-    const copy = pickNudgeCopy();
+    const copy = pickNudgeCopy(undefined, account?.preferredCategoryIds);
     await requestNotifications();
     showAppNotification(copy.title, copy.body, "komsu-demo");
     setSample(copy);
@@ -121,7 +122,7 @@ export function NoticeCenter({ onOpen }: { onOpen: (n: AppNotification) => void 
             <ul className="max-h-[min(58vh,24rem)] space-y-2 overflow-y-auto px-5 pb-[1.25rem]">
               {notifications.length === 0 ? (
                 <li className="rounded-2xl bg-[var(--paper)] px-4 py-6 text-sm text-[var(--muted)]">
-                  Henüz bildirim yok. Müşteri hesabında açık sipariş yoksa çamaşır hatırlatması düşer.
+                  Henüz bildirim yok. Müşteri hesabında açık sipariş yoksa seçtiğin alana göre hatırlatma düşer.
                 </li>
               ) : (
                 notifications.map((n) => (

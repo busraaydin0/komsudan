@@ -40,7 +40,7 @@ export function PermissionPrompt({
         Konum, bildirim ve kamera
       </h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Yakındaki komşular için konum, sipariş ve çamaşır hatırlatması için bildirim, iş fotoğrafı
+        Yakındaki komşular için konum, sipariş ve hatırlatma için bildirim, iş fotoğrafı
         için kamera. İstediğin zaman Hesap’tan değiştirirsin.
       </p>
       <button

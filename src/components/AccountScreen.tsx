@@ -299,7 +299,7 @@ export function AccountScreen({
             <div>
               <h2 className="font-[family-name:var(--font-display)] text-xl">Bildirimler</h2>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                Sipariş durumu ve çamaşır hatırlatmaları. İzin açıksa uygulama bildirimi de gider.
+                Sipariş durumu ve seçtiğin alana göre hatırlatmalar. İzin açıksa uygulama bildirimi de gider.
               </p>
             </div>
             {unread > 0 && (
