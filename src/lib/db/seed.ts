@@ -10,6 +10,8 @@ import {
   upsertProviderUser,
 } from "./providers";
 import { upsertProduct } from "./products";
+import { upsertService } from "./services";
+import { upsertRepair } from "./repairs";
 
 const SEED_PHONES: Record<string, string> = {
   elif: "5321100001",
@@ -20,6 +22,18 @@ const SEED_PHONES: Record<string, string> = {
   hatice: "5321100006",
   nurcan: "5321100007",
   gulsen: "5321100008",
+  selin: "5321100009",
+  burak: "5321100010",
+  leyla: "5321100011",
+  sevim: "5321100012",
+  dilek: "5321100013",
+  cemile: "5321100014",
+  guler: "5321100015",
+  nuran: "5321100016",
+  tulay: "5321100017",
+  hasan: "5321100018",
+  metin: "5321100019",
+  ozkan: "5321100020",
 };
 
 function deliveryMode(drops: Array<"kapi" | "nokta">): "door" | "point" | "both" {
@@ -66,6 +80,48 @@ function seedProviderDirectory() {
         provider_id: p.id,
         name: product.name,
         price_per_person: product.pricePerPerson,
+      });
+    }
+    for (const service of p.services ?? []) {
+      upsertService({
+        id: service.id,
+        provider_id: p.id,
+        name: service.name,
+        description: service.description,
+        subcategory: service.subcategory,
+        price: service.price,
+        priceUnit: service.priceUnit,
+        minOrder: service.minOrder,
+        leadDays: service.leadDays,
+        maxPerWeek: service.maxPerWeek,
+        delivery: service.delivery,
+        workRadiusKm: service.workRadiusKm,
+        notes: service.notes,
+        material: service.material,
+      });
+    }
+    for (const repair of p.repairs ?? []) {
+      upsertRepair({
+        id: repair.id,
+        provider_id: p.id,
+        name: repair.name,
+        description: repair.description,
+        kind: repair.kind,
+        item: repair.item,
+        job: repair.job,
+        price: repair.price,
+        priceType: repair.priceType,
+        priceUnit: repair.priceUnit,
+        parts: repair.parts,
+        leadDays: repair.leadDays,
+        maxPerWeek: repair.maxPerWeek,
+        delivery: repair.delivery,
+        workRadiusKm: repair.workRadiusKm,
+        inspectRequired: repair.inspectRequired,
+        quoteFrom: repair.quoteFrom,
+        warrantyDays: repair.warrantyDays,
+        notes: repair.notes,
+        workHours: repair.workHours,
       });
     }
     if (p.drops.includes("nokta")) {

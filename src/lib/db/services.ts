@@ -116,6 +116,71 @@ export function countServices(providerId: string, activeOnly = true) {
   return (db().prepare(sql).get(providerId) as { n: number }).n;
 }
 
+export function upsertService(row: {
+  id: string;
+  provider_id: string;
+  name: string;
+  description?: string | null;
+  subcategory?: SewingSubcategory;
+  price: number;
+  priceUnit?: SewingPriceUnit;
+  minOrder?: number;
+  leadDays?: number | null;
+  maxPerWeek?: number | null;
+  delivery?: SewingDelivery;
+  workRadiusKm?: number | null;
+  notes?: string | null;
+  material?: SewingMaterial;
+}) {
+  const now = new Date().toISOString();
+  const flags = deliveryFlags(row.delivery);
+  db()
+    .prepare(
+      `INSERT INTO provider_services (
+         id, provider_id, name, description, subcategory, photo_url, price, price_unit,
+         min_order, lead_days, max_per_week, delivery_adres, delivery_nokta, delivery_yakin,
+         work_radius_km, notes, material, is_active, created_at
+       ) VALUES (
+         @id, @provider_id, @name, @description, @subcategory, NULL, @price, @price_unit,
+         @min_order, @lead_days, @max_per_week, @delivery_adres, @delivery_nokta, @delivery_yakin,
+         @work_radius_km, @notes, @material, 1, @now
+       )
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         description = excluded.description,
+         subcategory = excluded.subcategory,
+         price = excluded.price,
+         price_unit = excluded.price_unit,
+         min_order = excluded.min_order,
+         lead_days = excluded.lead_days,
+         max_per_week = excluded.max_per_week,
+         delivery_adres = excluded.delivery_adres,
+         delivery_nokta = excluded.delivery_nokta,
+         delivery_yakin = excluded.delivery_yakin,
+         work_radius_km = excluded.work_radius_km,
+         notes = excluded.notes,
+         material = excluded.material,
+         is_active = 1`,
+    )
+    .run({
+      id: row.id,
+      provider_id: row.provider_id,
+      name: row.name,
+      description: row.description ?? null,
+      subcategory: row.subcategory ?? "diger",
+      price: row.price,
+      price_unit: row.priceUnit ?? "adet",
+      min_order: row.minOrder ?? 1,
+      lead_days: row.leadDays ?? null,
+      max_per_week: row.maxPerWeek ?? null,
+      ...flags,
+      work_radius_km: row.workRadiusKm ?? null,
+      notes: row.notes ?? null,
+      material: row.material ?? "customer",
+      now,
+    });
+}
+
 function deliveryFlags(input?: SewingDelivery) {
   return {
     delivery_adres: input?.adres === false ? 0 : 1,

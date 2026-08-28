@@ -159,6 +159,89 @@ export function countRepairs(providerId: string, activeOnly = true) {
   return (db().prepare(sql).get(providerId) as { n: number }).n;
 }
 
+export function upsertRepair(row: {
+  id: string;
+  provider_id: string;
+  name: string;
+  description?: string | null;
+  kind?: RepairKind;
+  item?: string | null;
+  job?: RepairJob;
+  price: number;
+  priceType?: RepairPriceType;
+  priceUnit?: RepairPriceUnit;
+  parts?: RepairParts;
+  leadDays?: number | null;
+  maxPerWeek?: number | null;
+  delivery?: RepairDelivery;
+  workRadiusKm?: number | null;
+  inspectRequired?: boolean;
+  quoteFrom?: RepairQuoteFrom;
+  warrantyDays?: number | null;
+  notes?: string | null;
+  workHours?: string | null;
+}) {
+  const now = new Date().toISOString();
+  const flags = deliveryFlags(row.delivery);
+  db()
+    .prepare(
+      `INSERT INTO provider_repairs (
+         id, provider_id, name, description, kind, item, job, photo_url, price, price_type,
+         price_unit, parts, lead_days, max_per_week, delivery_adres, delivery_nokta, delivery_yakin,
+         work_radius_km, inspect_required, quote_from, warranty_days, notes, work_hours, is_active, created_at
+       ) VALUES (
+         @id, @provider_id, @name, @description, @kind, @item, @job, NULL, @price, @price_type,
+         @price_unit, @parts, @lead_days, @max_per_week, @delivery_adres, @delivery_nokta, @delivery_yakin,
+         @work_radius_km, @inspect_required, @quote_from, @warranty_days, @notes, @work_hours, 1, @now
+       )
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         description = excluded.description,
+         kind = excluded.kind,
+         item = excluded.item,
+         job = excluded.job,
+         price = excluded.price,
+         price_type = excluded.price_type,
+         price_unit = excluded.price_unit,
+         parts = excluded.parts,
+         lead_days = excluded.lead_days,
+         max_per_week = excluded.max_per_week,
+         delivery_adres = excluded.delivery_adres,
+         delivery_nokta = excluded.delivery_nokta,
+         delivery_yakin = excluded.delivery_yakin,
+         work_radius_km = excluded.work_radius_km,
+         inspect_required = excluded.inspect_required,
+         quote_from = excluded.quote_from,
+         warranty_days = excluded.warranty_days,
+         notes = excluded.notes,
+         work_hours = excluded.work_hours,
+         is_active = 1`,
+    )
+    .run({
+      id: row.id,
+      provider_id: row.provider_id,
+      name: row.name,
+      description: row.description ?? null,
+      kind: row.kind ?? "diger",
+      item: row.item ?? null,
+      job: row.job ?? "onarim",
+      price: row.price,
+      price_type: row.priceType ?? "sabit",
+      price_unit: row.priceUnit ?? "adet",
+      parts: row.parts ?? "either",
+      lead_days: row.leadDays ?? null,
+      max_per_week: row.maxPerWeek ?? null,
+      ...flags,
+      work_radius_km: row.workRadiusKm ?? null,
+      inspect_required: row.inspectRequired ? 1 : 0,
+      quote_from: row.quoteFrom ?? "seen",
+      warranty_days: row.warrantyDays ?? null,
+      notes: row.notes ?? null,
+      work_hours: row.workHours ?? null,
+      now,
+    });
+}
+
 function deliveryFlags(input?: RepairDelivery) {
   return {
     delivery_adres: input?.adres === false ? 0 : 1,
