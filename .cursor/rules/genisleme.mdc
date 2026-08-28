@@ -14,7 +14,7 @@ Kaynak: masaüstü `KOMSUDAN-ROADMAP-GENISLEME.md`. Faz atlama.
 
 6 Ödeme (bitti) → 6.5 kategori (bitti) → **6.6 onboarding & keşif** → **7 ev yemeği (Tip A)** → 8 home-visit (Tip B) → 9+ review/dispute/log.
 
-Faz 6.6: rol + kategori (arama) + konum; tercih DB’de (`preferred_category_ids`, `onboarding_completed_at`); harita `category_id` ile. Atlanabilir. Yeni kategori yok. State machine’e dokunma.
+Faz 6.6: rol + kategori (arama) + konum; tercih DB’de. **Her açılış/yenilemede keşif ekranı**; bu oturumda devam edince harita. Atlanabilir. Yeni kategori yok. State machine’e dokunma.
 
 Faz 7 (sonra): ev yemeği / davet — kısır, pasta, kurabiye gibi çeşitler. Bu fazda seed/UI yok.
 

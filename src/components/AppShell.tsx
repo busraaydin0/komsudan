@@ -26,6 +26,7 @@ export function AppShell() {
   const [tab, setTab] = useState<AppTab | null>(null);
   const [askPerms, setAskPerms] = useState(false);
   const [editDiscovery, setEditDiscovery] = useState(false);
+  const [discoveryDone, setDiscoveryDone] = useState(false);
   const { account, loyalty, ready, reload } = useSession();
 
   useEffect(() => {
@@ -34,6 +35,12 @@ export function AppShell() {
       void navigator.serviceWorker.register("/sw.js");
     }
   }, [account?.preferredIntent]);
+
+  useEffect(() => {
+    if (!account?.identityVerified || !account.passkeyEnabled) {
+      setDiscoveryDone(false);
+    }
+  }, [account?.identityVerified, account?.passkeyEnabled]);
 
   useEffect(() => {
     if (!ready || !account?.identityVerified || !account.passkeyEnabled) return;
@@ -61,12 +68,13 @@ export function AppShell() {
     return <LoginGate account={account} onReady={reload} />;
   }
 
-  if (!account.onboardingCompletedAt || editDiscovery) {
+  if (!discoveryDone || editDiscovery) {
     return (
       <OnboardingFlow
         account={account}
         onDone={async (intent) => {
           setEditDiscovery(false);
+          setDiscoveryDone(true);
           await reload();
           const next = intent === "offer" ? "hizmet" : "harita";
           setTab(next);
