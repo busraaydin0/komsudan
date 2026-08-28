@@ -352,6 +352,7 @@ export async function patchMyProviderProfile(body: {
   lng?: number;
   neighborhood?: string;
   hasDryer?: boolean;
+  dryingType?: "makine" | "ip" | "ikisi";
   status?: "active" | "paused";
   categoryId?: string;
   express?: boolean;
@@ -362,6 +363,25 @@ export async function patchMyProviderProfile(body: {
     await readJson<{ data?: { provider: Record<string, unknown> }; provider?: Record<string, unknown> }>(
       await fetch("/api/providers/me/profile", {
         method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.provider!;
+}
+
+export async function postMyLaundryOffer(body: {
+  dryingType: "makine" | "ip" | "ikisi";
+  packages: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
+  lat: number;
+  lng: number;
+  neighborhood: string;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { provider: Record<string, unknown> }; provider?: Record<string, unknown> }>(
+      await fetch("/api/providers/me/offer", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),

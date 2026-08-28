@@ -212,8 +212,32 @@ export function updateProfileFields(
     bio: patch.bio ?? current.bio ?? "",
     hasDryer: patch.hasDryer ?? Boolean(current.has_dryer),
     neighborhood: patch.neighborhood ?? current.neighborhood ?? "",
+    ...(patch.lat != null && patch.lng != null ? { loc: { lat: patch.lat, lng: patch.lng } } : {}),
   });
   return getProfile(userId);
+}
+
+export function catalogProviderExists(id: string) {
+  return Boolean(db().prepare("SELECT 1 AS ok FROM providers WHERE id = ?").get(id));
+}
+
+export function insertCatalogProvider(input: {
+  id: string;
+  payload: object;
+  remaining: number;
+  categoryId: string;
+}) {
+  db()
+    .prepare(
+      `INSERT INTO providers (id, payload, remaining, category_id)
+       VALUES (@id, @payload, @remaining, @categoryId)`,
+    )
+    .run({
+      id: input.id,
+      payload: JSON.stringify(input.payload),
+      remaining: input.remaining,
+      categoryId: input.categoryId,
+    });
 }
 
 export function patchCatalogPayload(id: string, patch: Record<string, unknown>) {

@@ -97,6 +97,15 @@ export function setPasskey(id: string, credentialId: string) {
   return getUserById(id)!;
 }
 
+export function setUserRole(id: string, role: UserRole) {
+  if (role === "admin") return getUserById(id)!;
+  const now = new Date().toISOString();
+  db()
+    .prepare("UPDATE users SET role = ?, updated_at = ? WHERE id = ? AND role != 'admin'")
+    .run(role, now, id);
+  return getUserById(id)!;
+}
+
 export function setUserAvatar(id: string, url: string | null) {
   const now = new Date().toISOString();
   db().prepare("UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?").run(url, now, id);

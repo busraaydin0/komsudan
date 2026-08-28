@@ -1,8 +1,13 @@
 import { ApiError } from "@/server/rules";
 import { PACKAGES, PILOT } from "@/lib/data";
+import { dryingBlurb, hasDryerFrom } from "@/lib/drying";
 import { haversineKm } from "@/lib/geo/distance";
+import { setUserRole } from "@/lib/db/auth";
 import {
+  catalogProviderExists,
+  countSlots,
   getProfile,
+  insertCatalogProvider,
   insertDrop,
   insertSlot,
   listDrops,
@@ -12,6 +17,7 @@ import {
   patchCatalogPayload,
   updateProfileFields,
   upsertPackage,
+  upsertProfile,
   deactivateOtherPackages,
   type DropRow,
   type PackageRow,
@@ -21,7 +27,7 @@ import {
 import { countProducts, deactivateProduct, insertProduct, listProducts, type ProductRow } from "@/lib/db/products";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
-import type { DropMethod, PackageId, ServicePackage } from "@/lib/types";
+import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
 import type { AuthUser } from "@/lib/auth/types";
 
 export type NearbyQuery = {
@@ -155,6 +161,7 @@ export function patchMyProfile(
     lng?: number;
     neighborhood?: string;
     hasDryer?: boolean;
+    dryingType?: DryingType;
     status?: "active" | "paused";
     categoryId?: string;
     express?: boolean;
@@ -171,12 +178,11 @@ export function patchMyProfile(
     throw new ApiError(400, "Davet menüsü ürünlerden oluşur, çamaşır paketi değil.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
-    const ids = new Set(patch.packages.map((p) => p.id));
-    if (ids.size !== patch.packages.length) {
-      throw new ApiError(400, "Aynı paket iki kez seçilemez.", "VALIDATION_ERROR");
-    }
+    assertUniquePackages(patch.packages);
   }
-  const row = updateProfileFields(user.id, patch);
+  const hasDryer =
+    patch.hasDryer ?? (patch.dryingType !== undefined ? hasDryerFrom(patch.dryingType) : undefined);
+  const row = updateProfileFields(user.id, { ...patch, hasDryer });
   if (!row) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
 
   if (patch.packages) {
@@ -210,7 +216,171 @@ export function patchMyProfile(
     ...(catalogPacks ? { packages: catalogPacks } : {}),
     ...(patch.express !== undefined ? { express: patch.express } : {}),
     ...(patch.drops ? { drops: patch.drops } : {}),
+    ...(patch.dryingType
+      ? { dryingType: patch.dryingType, hasDryer: hasDryerFrom(patch.dryingType) }
+      : {}),
   });
+  return toPublic(row);
+}
+
+function assertUniquePackages(packages: { id: PackageId }[]) {
+  const ids = new Set(packages.map((p) => p.id));
+  if (ids.size !== packages.length) {
+    throw new ApiError(400, "Aynı paket iki kez seçilemez.", "VALIDATION_ERROR");
+  }
+}
+
+const DEFAULT_SLOTS = [
+  "Bugün 18:00–19:00",
+  "Bugün 19:00–20:00",
+  "Yarın 09:00–10:00",
+  "Yarın 12:00–13:00",
+  "Yarın 18:00–19:00",
+];
+
+export function ensureLaundryOffer(
+  user: AuthUser,
+  input: {
+    dryingType: DryingType;
+    packages: { id: PackageId; pricePerPiece: number }[];
+    lat: number;
+    lng: number;
+    neighborhood: string;
+  },
+) {
+  assertUniquePackages(input.packages);
+  const catalogPacks: ServicePackage[] = input.packages.map((pack) => {
+    const meta = PACKAGES.find((p) => p.id === pack.id);
+    if (!meta) throw new ApiError(400, "Paket bulunamadı.", "VALIDATION_ERROR");
+    return { id: pack.id, title: meta.title, blurb: meta.blurb, pricePerPiece: pack.pricePerPiece };
+  });
+  const hasDryer = hasDryerFrom(input.dryingType);
+  const neighborhood = input.neighborhood.trim() || PILOT.label;
+  const blurb = dryingBlurb(input.dryingType);
+
+  if (user.role !== "admin") {
+    setUserRole(user.id, "provider");
+  }
+
+  const existing = getProfile(user.id);
+  const bio = existing?.bio?.trim() ? existing.bio : blurb;
+  if (!existing) {
+    upsertProfile({
+      userId: user.id,
+      bio,
+      lat: input.lat,
+      lng: input.lng,
+      neighborhood,
+      hasDryer,
+      isFounder: false,
+      ratingAvg: 0,
+      ratingCount: 0,
+      avatarUrl: user.avatarUrl,
+      categoryId: "camasir",
+    });
+  } else {
+    updateProfileFields(user.id, {
+      bio,
+      lat: input.lat,
+      lng: input.lng,
+      neighborhood,
+      hasDryer,
+      categoryId: "camasir",
+    });
+  }
+
+  const drops: DropMethod[] = ["kapi", "nokta"];
+  const payload: Provider = {
+    id: user.id,
+    name: user.name || "Komşu",
+    neighborhood,
+    loc: { lat: input.lat, lng: input.lng },
+    rating: 0,
+    reviews: 0,
+    packages: catalogPacks,
+    capacity: 24,
+    remaining: 24,
+    hasDryer,
+    dryingType: input.dryingType,
+    express: false,
+    trust: "yeni",
+    drops,
+    slots: DEFAULT_SLOTS,
+    bio,
+    avatarUrl: user.avatarUrl,
+    workPhotos: [],
+    recentReviews: [],
+    categoryId: "camasir",
+  };
+
+  if (!catalogProviderExists(user.id)) {
+    insertCatalogProvider({
+      id: user.id,
+      payload: { ...payload },
+      remaining: 24,
+      categoryId: "camasir",
+    });
+  } else {
+    patchCatalogPayload(user.id, {
+      packages: catalogPacks,
+      hasDryer,
+      dryingType: input.dryingType,
+      loc: payload.loc,
+      neighborhood,
+      bio,
+      name: payload.name,
+      drops,
+      categoryId: "camasir",
+    });
+  }
+
+  for (const pack of input.packages) {
+    const meta = PACKAGES.find((p) => p.id === pack.id)!;
+    upsertPackage({
+      id: `${user.id}:${pack.id}`,
+      provider_id: user.id,
+      name: meta.title,
+      price_per_kg: pack.pricePerPiece,
+      min_order_amount: MIN_ORDER,
+      express_available: 0,
+      express_surcharge_pct: 0,
+      is_active: 1,
+    });
+  }
+  deactivateOtherPackages(
+    user.id,
+    input.packages.map((p) => `${user.id}:${p.id}`),
+  );
+
+  if (countSlots(user.id) === 0) {
+    for (const day of [1, 2, 3, 4, 5]) {
+      insertSlot({
+        providerId: user.id,
+        dayOfWeek: day,
+        startTime: "18:00",
+        endTime: "19:00",
+        deliveryMode: "both",
+      });
+      insertSlot({
+        providerId: user.id,
+        dayOfWeek: day,
+        startTime: "19:00",
+        endTime: "20:00",
+        deliveryMode: "both",
+      });
+    }
+  }
+  if (listDrops(user.id).length === 0) {
+    insertDrop({
+      providerId: user.id,
+      label: neighborhood,
+      lat: input.lat,
+      lng: input.lng,
+    });
+  }
+
+  const row = getProfile(user.id);
+  if (!row) throw new ApiError(500, "Profil oluşturulamadı.", "INTERNAL");
   return toPublic(row);
 }
 

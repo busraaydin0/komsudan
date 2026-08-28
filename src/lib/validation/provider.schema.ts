@@ -15,6 +15,7 @@ export const profilePatchSchema = z.object({
   lng: z.number().min(-180).max(180).optional(),
   neighborhood: z.string().max(80).optional(),
   hasDryer: z.boolean().optional(),
+  dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
   status: z.enum(["active", "paused"]).optional(),
   categoryId: z.string().trim().min(1).max(80).optional(),
   express: z.boolean().optional(),
@@ -29,6 +30,22 @@ export const profilePatchSchema = z.object({
     .min(1, "En az bir paket seç.")
     .max(3)
     .optional(),
+});
+
+export const laundryOfferSchema = z.object({
+  dryingType: z.enum(["makine", "ip", "ikisi"]),
+  packages: z
+    .array(
+      z.object({
+        id: z.enum(["yikama", "katlama", "tam"]),
+        pricePerPiece: z.number().int().min(1, "Parça fiyatı 1–80 ₺.").max(80, "Parça fiyatı 1–80 ₺."),
+      }),
+    )
+    .min(1, "En az bir paket seç.")
+    .max(3),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  neighborhood: z.string().trim().min(1).max(80),
 });
 
 export const slotCreateSchema = z.object({

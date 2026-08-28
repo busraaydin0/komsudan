@@ -1,5 +1,6 @@
 export type PackageId = "yikama" | "katlama" | "tam";
 export type DropMethod = "kapi" | "nokta";
+export type DryingType = "makine" | "ip" | "ikisi";
 export type MapMode = "2d" | "3d";
 export type TrustTier = "yeni" | "kurucu" | "guvenilir";
 
@@ -69,6 +70,8 @@ export type Provider = {
   capacity: number;
   remaining: number;
   hasDryer: boolean;
+  /** Yoksa müşteri `hasDryer` ile kurutucu / boş görür. */
+  dryingType?: DryingType;
   express: boolean;
   trust: TrustTier;
   drops: DropMethod[];

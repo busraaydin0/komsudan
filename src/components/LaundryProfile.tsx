@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { PACKAGES, trustLabel } from "@/lib/data";
+import { DRYING_OPTIONS, dryingFromProvider } from "@/lib/drying";
 import { patchMyProviderProfile } from "@/lib/api";
 import { tl } from "@/lib/pricing";
 import { seatTone } from "@/lib/seat";
 import { Avatar } from "@/components/Avatar";
 import { PhotoStrip, ReviewList } from "@/components/Photos";
-import type { DropMethod, PackageId, Provider } from "@/lib/types";
+import type { DropMethod, DryingType, PackageId, Provider } from "@/lib/types";
 
 export function LaundryProfile({
   me,
@@ -17,7 +18,7 @@ export function LaundryProfile({
   onChanged: () => void;
 }) {
   const [bio, setBio] = useState("");
-  const [hasDryer, setHasDryer] = useState(false);
+  const [dryingType, setDryingType] = useState<DryingType>("makine");
   const [express, setExpress] = useState(false);
   const [drops, setDrops] = useState<DropMethod[]>(["nokta"]);
   const [offered, setOffered] = useState<PackageId[]>(["yikama", "katlama", "tam"]);
@@ -33,7 +34,7 @@ export function LaundryProfile({
   useEffect(() => {
     if (!me || me.categoryId === "davet") return;
     setBio(me.bio);
-    setHasDryer(me.hasDryer);
+    setDryingType(dryingFromProvider(me));
     setExpress(me.express);
     setDrops(me.drops.length ? me.drops : ["nokta"]);
     const ids = me.packages.map((p) => p.id);
@@ -76,7 +77,8 @@ export function LaundryProfile({
     try {
       await patchMyProviderProfile({
         bio: bio.trim(),
-        hasDryer,
+        dryingType,
+        hasDryer: dryingType !== "ip",
         express,
         drops,
         packages: offered.map((id) => ({ id, pricePerPiece: prices[id] })),
@@ -176,18 +178,21 @@ export function LaundryProfile({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setHasDryer((v) => !v);
-            setOk("");
-          }}
-          className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
-            hasDryer ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
-          }`}
-        >
-          Kurutucu var
-        </button>
+        {DRYING_OPTIONS.map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => {
+              setDryingType(opt.id);
+              setOk("");
+            }}
+            className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
+              dryingType === opt.id ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
         <button
           type="button"
           onClick={() => {

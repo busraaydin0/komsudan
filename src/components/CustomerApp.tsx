@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PILOT, trustLabel } from "@/lib/data";
+import { dryingListLabel } from "@/lib/drying";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFood, estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN, GUESTS_MAX, GUESTS_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
@@ -675,8 +676,8 @@ function List({
                         ? (p.products ?? []).length
                           ? ` · ${(p.products ?? []).map((x) => x.name).join(", ")}`
                           : " · menü yok"
-                        : p.hasDryer
-                          ? " · kurutucu"
+                        : dryingListLabel(p)
+                          ? ` · ${dryingListLabel(p)}`
                           : ""}
                       {load ? (
                         <span className={tag}>
