@@ -12,7 +12,12 @@ export async function GET(req: Request, ctx: Ctx) {
   try {
     const user = await requireAuth(req);
     const { id } = await ctx.params;
-    return ok({ order: getOrderFor(user, id), history: listOrderHistory(user, id) });
+    const order = getOrderFor(user, id);
+    return ok({
+      order,
+      history: listOrderHistory(user, id),
+      payment: order.payment ?? null,
+    });
   } catch (e) {
     return fail(e);
   }

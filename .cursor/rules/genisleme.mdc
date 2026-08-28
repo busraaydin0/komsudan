@@ -1,0 +1,19 @@
+---
+description: Çok kategorili genişleme — Faz 6 ödeme, sonra 6.5 kategori. Atlama.
+alwaysApply: true
+---
+
+# Genişleme sırası (Faz 6 → 9)
+
+Kaynak: masaüstü `KOMSUDAN-ROADMAP-GENISLEME.md`. Faz atlama.
+
+- **Tip A delivery:** çamaşır, sonra ev yemeği. Evde hazırla, kapı/nokta teslim.
+- **Tip B home_visit:** tamir, klima vb. Eve git, randevu. Faz 8’e kadar doldurma.
+
+## Sıra
+
+6 Ödeme (`payments`, authorize/capture/void, iyzico id simüle) → **6.5** kategori soyutlaması (`camasir` seed, PWA değişmez) → 7 ev yemeği → 8 home-visit → 9+ review/dispute/log.
+
+Faz 6 kategoriye göre dallanmaz. Faz 6.5’te yeni kategori/UI yok; home_visit yalnız iskelet.
+
+PWA’yı kırma. Tutar/status client’tan alma. Route’ta SQL yok.

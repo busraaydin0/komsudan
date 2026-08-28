@@ -81,6 +81,17 @@ export type DropPoint = {
 
 export type PaymentStatus = "authorized" | "captured" | "voided";
 
+export type AppPayment = {
+  id: string;
+  orderId: string;
+  amount: number;
+  commission: number;
+  status: PaymentStatus;
+  providerReference: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** Hedef JSON API yaşam döngüsü. PWA hâlâ Türkçe `OrderStatus` saklar. */
 export type ApiLifecycle =
   | "pending"
@@ -114,6 +125,7 @@ export type Order = {
   pickupCode: string | null;
   paymentStatus: PaymentStatus;
   paidAt: string | null;
+  payment?: AppPayment;
   customerId?: string | null;
   lifecycle?: ApiLifecycle;
   deliveryMode?: "door" | "point";

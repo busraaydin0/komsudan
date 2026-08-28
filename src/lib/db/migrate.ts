@@ -61,6 +61,41 @@ function backfillHistory(db: Database.Database) {
   `);
 }
 
+function backfillPayments(db: Database.Database) {
+  const tables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'payments'")
+    .get() as { name: string } | undefined;
+  if (!tables) return;
+  const done = db.prepare("SELECT id FROM _migrations WHERE id = '0007_payments.backfill'").get() as
+    | { id: string }
+    | undefined;
+  if (done) return;
+  db.exec(`
+    INSERT INTO payments (
+      id, order_id, amount, commission, status, provider_reference, created_at, updated_at
+    )
+    SELECT
+      'pay-bf-' || o.id,
+      o.id,
+      o.total,
+      o.commission,
+      CASE o.payment_status
+        WHEN 'captured' THEN 'captured'
+        WHEN 'voided' THEN 'voided'
+        ELSE 'authorized'
+      END,
+      'sim-backfill-' || o.id,
+      o.created_at,
+      COALESCE(o.updated_at, o.created_at)
+    FROM orders o
+    WHERE NOT EXISTS (SELECT 1 FROM payments p WHERE p.order_id = o.id);
+  `);
+  db.prepare("INSERT INTO _migrations (id, applied_at) VALUES (?, ?)").run(
+    "0007_payments.backfill",
+    new Date().toISOString(),
+  );
+}
+
 function ensureColumns(db: Database.Database) {
   addColumn(db, "orders", "pickup_code", "pickup_code TEXT");
   addColumn(db, "orders", "code_attempts", "code_attempts INTEGER NOT NULL DEFAULT 0");
@@ -116,6 +151,7 @@ function ensureColumns(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(user_id);
   `);
   backfillHistory(db);
+  backfillPayments(db);
 }
 
 export function migrate(db: Database.Database) {

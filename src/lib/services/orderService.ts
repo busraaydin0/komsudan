@@ -52,6 +52,7 @@ import {
   notifyPickupCodeRotated,
   notifyStatusChange,
 } from "@/lib/services/notificationService";
+import { authorizePayment, capturePayment, paymentForOrder, voidPayment } from "@/lib/services/paymentService";
 
 export type OrderAction = "accept" | "reject" | "advance" | "deliver";
 
@@ -81,6 +82,8 @@ function toOrder(row: OrderRow): Order {
   ensurePickupCode(row);
   const drop = row.drop_method as DropMethod;
   const status = row.status as OrderStatus;
+  const pay = paymentForOrder(row.id);
+  const payStatus = (pay?.status ?? row.payment_status) as PaymentStatus;
   return {
     id: row.id,
     providerId: row.provider_id,
@@ -98,8 +101,9 @@ function toOrder(row: OrderRow): Order {
     photos: photosForOrder(row.id),
     review: reviewForOrder(row.id),
     pickupCode: status === "hazir" ? row.pickup_code : null,
-    paymentStatus: (row.payment_status as PaymentStatus) || "authorized",
-    paidAt: row.paid_at,
+    paymentStatus: payStatus,
+    paidAt: payStatus === "captured" ? (pay?.updatedAt ?? row.paid_at) : row.paid_at,
+    payment: pay,
     customerId: row.user_id,
     lifecycle: lifecycleOf(status, row.lifecycle),
     deliveryMode: (row.delivery_mode as "door" | "point" | null) ?? deliveryMode(drop),
@@ -234,6 +238,12 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
       actorRole: "customer",
       at: now,
     });
+    authorizePayment({
+      orderId: id,
+      amount: quote.total,
+      commission: quote.commission,
+      at: now,
+    });
   });
 
   const order = getOrder(id)!;
@@ -359,6 +369,8 @@ export function applyStatus(
       at: now,
     });
     if (voidPay) addRemaining(row.provider_id, row.pieces);
+    if (capture) capturePayment(id, now);
+    if (voidPay) voidPayment(id, now);
   });
 
   const order = getOrder(id)!;
