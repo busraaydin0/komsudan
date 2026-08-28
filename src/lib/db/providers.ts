@@ -208,7 +208,38 @@ export function updateProfileFields(
   db()
     .prepare("UPDATE providers SET category_id = ? WHERE id = ?")
     .run(patch.categoryId ?? current.category_id ?? "camasir", userId);
+  patchCatalogPayload(userId, {
+    bio: patch.bio ?? current.bio ?? "",
+    hasDryer: patch.hasDryer ?? Boolean(current.has_dryer),
+    neighborhood: patch.neighborhood ?? current.neighborhood ?? "",
+  });
   return getProfile(userId);
+}
+
+export function patchCatalogPayload(id: string, patch: Record<string, unknown>) {
+  const row = db()
+    .prepare("SELECT payload FROM providers WHERE id = ?")
+    .get(id) as { payload: string } | undefined;
+  if (!row) return false;
+  const current = JSON.parse(row.payload) as Record<string, unknown>;
+  db()
+    .prepare("UPDATE providers SET payload = ? WHERE id = ?")
+    .run(JSON.stringify({ ...current, ...patch }), id);
+  return true;
+}
+
+export function deactivateOtherPackages(providerId: string, keepIds: string[]) {
+  if (keepIds.length === 0) {
+    db().prepare("UPDATE service_packages SET is_active = 0 WHERE provider_id = ?").run(providerId);
+    return;
+  }
+  const placeholders = keepIds.map(() => "?").join(",");
+  db()
+    .prepare(
+      `UPDATE service_packages SET is_active = 0
+       WHERE provider_id = ? AND id NOT IN (${placeholders})`,
+    )
+    .run(providerId, ...keepIds);
 }
 
 export function upsertPackage(row: Omit<PackageRow, "is_active" | "category_id"> & {
@@ -229,7 +260,8 @@ export function upsertPackage(row: Omit<PackageRow, "is_active" | "category_id">
          price_per_kg = excluded.price_per_kg,
          min_order_amount = excluded.min_order_amount,
          express_available = excluded.express_available,
-         express_surcharge_pct = excluded.express_surcharge_pct`,
+         express_surcharge_pct = excluded.express_surcharge_pct,
+         is_active = excluded.is_active`,
     )
     .run({ is_active: 1, category_id: "camasir", ...row });
 }

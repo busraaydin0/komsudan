@@ -354,6 +354,9 @@ export async function patchMyProviderProfile(body: {
   hasDryer?: boolean;
   status?: "active" | "paused";
   categoryId?: string;
+  express?: boolean;
+  drops?: ("kapi" | "nokta")[];
+  packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
 }) {
   const data = unwrap(
     await readJson<{ data?: { provider: Record<string, unknown> }; provider?: Record<string, unknown> }>(

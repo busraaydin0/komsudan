@@ -114,9 +114,9 @@ export function AppShell() {
           onBackToMap={() => go("harita")}
         />
       </div>
-      {tab === "hizmet" && (
+          {tab === "hizmet" && (
         <div className="relative z-10 h-full overflow-y-auto">
-          <ProviderDesk onOpenSetup={() => setEditDiscovery(true)} />
+          <ProviderDesk />
         </div>
       )}
       {tab === "hesap" && (

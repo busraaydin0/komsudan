@@ -17,6 +17,18 @@ export const profilePatchSchema = z.object({
   hasDryer: z.boolean().optional(),
   status: z.enum(["active", "paused"]).optional(),
   categoryId: z.string().trim().min(1).max(80).optional(),
+  express: z.boolean().optional(),
+  drops: z.array(z.enum(["kapi", "nokta"])).min(1).max(2).optional(),
+  packages: z
+    .array(
+      z.object({
+        id: z.enum(["yikama", "katlama", "tam"]),
+        pricePerPiece: z.number().int().min(1, "Parça fiyatı 1–80 ₺.").max(80, "Parça fiyatı 1–80 ₺."),
+      }),
+    )
+    .min(1, "En az bir paket seç.")
+    .max(3)
+    .optional(),
 });
 
 export const slotCreateSchema = z.object({

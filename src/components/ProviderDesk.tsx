@@ -7,6 +7,7 @@ import { tl } from "@/lib/pricing";
 import { canAddPhotos, nextStatus } from "@/lib/status";
 import type { DropPoint, Order, OrderStatus, Provider } from "@/lib/types";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
+import { LaundryProfile } from "@/components/LaundryProfile";
 
 const LABEL: Record<OrderStatus, string> = {
   onay_bekliyor: "Bekliyor",
@@ -39,7 +40,7 @@ function monthLabel(key: string) {
   return label.charAt(0).toLocaleUpperCase("tr-TR") + label.slice(1);
 }
 
-export function ProviderDesk({ onOpenSetup }: { onOpenSetup?: () => void } = {}) {
+export function ProviderDesk() {
   const { account } = useSession();
   const { providers, dropPoints, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload } = useOrders();
@@ -74,11 +75,6 @@ export function ProviderDesk({ onOpenSetup }: { onOpenSetup?: () => void } = {})
           </p>
           <p className="text-xs text-[var(--muted)]">Çukurambar pilotu</p>
         </div>
-        {onOpenSetup && (
-          <button type="button" onClick={onOpenSetup} className="text-xs text-[var(--clay)]">
-            Kurulum
-          </button>
-        )}
       </header>
 
       <main className="mx-auto max-w-lg px-5 pb-[calc(var(--tabbar)+1.5rem)]">
@@ -98,6 +94,8 @@ export function ProviderDesk({ onOpenSetup }: { onOpenSetup?: () => void } = {})
             <p className="font-[family-name:var(--font-display)] text-2xl tabular-nums">{open.length}</p>
           </div>
         </div>
+
+        <LaundryProfile me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
 
         <ProductEditor
           me={providers.find((p) => p.id === account?.id)}

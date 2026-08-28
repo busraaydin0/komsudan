@@ -1,5 +1,5 @@
 import { ApiError } from "@/server/rules";
-import { PILOT } from "@/lib/data";
+import { PACKAGES, PILOT } from "@/lib/data";
 import { haversineKm } from "@/lib/geo/distance";
 import {
   getProfile,
@@ -9,7 +9,10 @@ import {
   listPackages,
   listProfilesInBox,
   listSlots,
+  patchCatalogPayload,
   updateProfileFields,
+  upsertPackage,
+  deactivateOtherPackages,
   type DropRow,
   type PackageRow,
   type ProfileRow,
@@ -17,6 +20,8 @@ import {
 } from "@/lib/db/providers";
 import { countProducts, deactivateProduct, insertProduct, listProducts, type ProductRow } from "@/lib/db/products";
 import { getCategory } from "@/lib/db/categories";
+import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
+import type { DropMethod, PackageId, ServicePackage } from "@/lib/types";
 import type { AuthUser } from "@/lib/auth/types";
 
 export type NearbyQuery = {
@@ -152,14 +157,60 @@ export function patchMyProfile(
     hasDryer?: boolean;
     status?: "active" | "paused";
     categoryId?: string;
+    express?: boolean;
+    drops?: DropMethod[];
+    packages?: { id: PackageId; pricePerPiece: number }[];
   },
 ) {
   if (patch.categoryId && !getCategory(patch.categoryId)) {
     throw new ApiError(400, "Kategori bulunamadı.", "VALIDATION_ERROR");
   }
-  requireProvider(user);
+  const profile = requireProvider(user);
+  const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
+  if (patch.packages && categoryId === "davet") {
+    throw new ApiError(400, "Davet menüsü ürünlerden oluşur, çamaşır paketi değil.", "VALIDATION_ERROR");
+  }
+  if (patch.packages) {
+    const ids = new Set(patch.packages.map((p) => p.id));
+    if (ids.size !== patch.packages.length) {
+      throw new ApiError(400, "Aynı paket iki kez seçilemez.", "VALIDATION_ERROR");
+    }
+  }
   const row = updateProfileFields(user.id, patch);
   if (!row) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
+
+  if (patch.packages) {
+    const express = patch.express ?? false;
+    for (const pack of patch.packages) {
+      const meta = PACKAGES.find((p) => p.id === pack.id)!;
+      upsertPackage({
+        id: `${user.id}:${pack.id}`,
+        provider_id: user.id,
+        name: meta.title,
+        price_per_kg: pack.pricePerPiece,
+        min_order_amount: MIN_ORDER,
+        express_available: express ? 1 : 0,
+        express_surcharge_pct: express ? EXPRESS_BUMP : 0,
+        is_active: 1,
+      });
+    }
+    deactivateOtherPackages(
+      user.id,
+      patch.packages.map((p) => `${user.id}:${p.id}`),
+    );
+  }
+
+  const catalogPacks: ServicePackage[] | undefined = patch.packages
+    ? patch.packages.map((p) => {
+        const meta = PACKAGES.find((x) => x.id === p.id)!;
+        return { id: p.id, title: meta.title, blurb: meta.blurb, pricePerPiece: p.pricePerPiece };
+      })
+    : undefined;
+  patchCatalogPayload(user.id, {
+    ...(catalogPacks ? { packages: catalogPacks } : {}),
+    ...(patch.express !== undefined ? { express: patch.express } : {}),
+    ...(patch.drops ? { drops: patch.drops } : {}),
+  });
   return toPublic(row);
 }
 

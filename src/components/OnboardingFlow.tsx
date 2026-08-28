@@ -4,10 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { NEIGHBORHOODS, PILOT } from "@/lib/data";
 import { fetchCategories, patchPreferences, type ServiceCategory } from "@/lib/api";
 import { readLocationIfGranted, requestLocation } from "@/lib/permissions";
-import { ProviderSetup } from "@/components/ProviderSetup";
 import type { Account, PreferredIntent } from "@/lib/types";
 
-type Step = "role" | "category" | "location" | "provider";
+type Step = "role" | "category" | "location";
 
 export function OnboardingFlow({
   account,
@@ -139,8 +138,7 @@ export function OnboardingFlow({
     setBusy(true);
     try {
       await persist({ completed: true });
-      if (offer && account.role === "provider") setStep("provider");
-      else onDone(intent);
+      onDone(intent);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Kaydedilemedi.");
     } finally {
@@ -148,12 +146,8 @@ export function OnboardingFlow({
     }
   }
 
-  const labels = offer && account.role === "provider"
-    ? (["Rol", "Alan", "Konum", "Profil"] as const)
-    : (["Rol", "Alan", "Konum"] as const);
-  const order: Step[] = offer && account.role === "provider"
-    ? ["role", "category", "location", "provider"]
-    : ["role", "category", "location"];
+  const labels = ["Rol", "Alan", "Konum"] as const;
+  const order: Step[] = ["role", "category", "location"];
 
   return (
     <div className="flex h-dvh flex-col bg-[var(--paper)] px-5 pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
@@ -306,22 +300,10 @@ export function OnboardingFlow({
             </>
           )}
 
-          {step === "provider" && (
-            <ProviderSetup
-              account={account}
-              categoryId={picked[0] ?? null}
-              home={home}
-              onDone={() => onDone(intent)}
-              onSkip={() => onDone(intent)}
-            />
-          )}
-
           {err && <p className="mt-3 text-sm text-[var(--load-full)]">{err}</p>}
-          {step !== "provider" && (
-            <button type="button" disabled={busy} onClick={() => void skip()} className="mt-3 w-full text-xs text-[var(--muted)]">
-              Şimdi değil
-            </button>
-          )}
+          <button type="button" disabled={busy} onClick={() => void skip()} className="mt-3 w-full text-xs text-[var(--muted)]">
+            Şimdi değil
+          </button>
         </div>
       </div>
     </div>
