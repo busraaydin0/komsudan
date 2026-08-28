@@ -64,11 +64,13 @@ export function AccountScreen({
   loyalty,
   onLogout,
   onRefresh,
+  onOpenMap,
 }: {
   account: Account;
   loyalty: Loyalty | null;
   onLogout: () => void;
   onRefresh: () => Promise<void> | void;
+  onOpenMap?: () => void;
 }) {
   const [name, setName] = useState(account.name);
   const [sms, setSms] = useState(true);
@@ -282,7 +284,7 @@ export function AccountScreen({
             <div>
               <h2 className="font-[family-name:var(--font-display)] text-xl">Bildirimler</h2>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                Sipariş durumu uygulama içinde. SMS simülasyonu; gerçek SMS veya push yok.
+                Sipariş durumu ve çamaşır hatırlatmaları. İzin açıksa uygulama bildirimi de gider.
               </p>
             </div>
             {unread > 0 && (
@@ -302,12 +304,16 @@ export function AccountScreen({
             <ul className="mt-3 divide-y divide-[var(--line)]">
               {notifications.map((n) => {
                 const unreadItem = !n.readAt;
+                const toMap = n.type === "nudge";
                 return (
                   <li key={n.id}>
                     <button
                       type="button"
-                      disabled={!unreadItem || inboxBusy}
-                      onClick={() => void readOne(n.id, !unreadItem)}
+                      disabled={(!unreadItem && !toMap) || inboxBusy}
+                      onClick={() => {
+                        if (unreadItem) void readOne(n.id, false);
+                        if (toMap) onOpenMap?.();
+                      }}
                       className={`flex w-full items-start gap-2 py-2.5 text-left first:pt-0 last:pb-0 ${
                         unreadItem ? "" : "opacity-70"
                       }`}
@@ -395,7 +401,7 @@ export function AccountScreen({
             />
             <PermRow
               title="Bildirim"
-              hint="Sipariş durumu"
+              hint="Sipariş ve hatırlatma"
               state={push}
               busy={permBusy === "push"}
               onAsk={() => void ask("push")}

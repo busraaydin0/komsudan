@@ -81,3 +81,12 @@ export function markAllNotificationsRead(userId: string, at: string) {
 export function deleteNotificationsForUser(userId: string) {
   db().prepare("DELETE FROM notifications WHERE user_id = ?").run(userId);
 }
+
+export function latestNotificationOfType(userId: string, type: string): NotificationRow | undefined {
+  return db()
+    .prepare(
+      `SELECT * FROM notifications WHERE user_id = ? AND type = ?
+       ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(userId, type) as NotificationRow | undefined;
+}

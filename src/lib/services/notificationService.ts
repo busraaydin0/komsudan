@@ -2,11 +2,14 @@ import type { ApiLifecycle, AppNotification } from "@/lib/types";
 import { ApiError } from "@/server/rules";
 import type { AuthUser } from "@/lib/auth/types";
 import type { OrderRow } from "@/lib/db/orders";
+import { customerHasOpenOrder } from "@/lib/db/orders";
+import { pickNudgeCopy } from "@/lib/nudgeCopy";
 import {
   countUnread,
   deleteNotificationsForUser,
   getNotification,
   insertNotification,
+  latestNotificationOfType,
   listNotificationsForUser,
   markAllNotificationsRead,
   markNotificationRead,
@@ -30,7 +33,7 @@ function toPublic(row: NotificationRow): AppNotification {
 }
 
 function pushTo(userId: string | null | undefined, input: {
-  orderId: string;
+  orderId?: string | null;
   type: string;
   title: string;
   body: string;
@@ -129,7 +132,24 @@ export function notifyPickupCodeRotated(row: OrderRow, code: string) {
   });
 }
 
-export function listMyNotifications(user: AuthUser, unreadOnly = false) {
+/** Açık siparişi yoksa günde ~bir hatırlatma. GET kutusu açılınca yazılır. */
+const NUDGE_GAP_MS = 18 * 60 * 60 * 1000;
+
+export function maybeEngagementNudge(user: AuthUser) {
+  if (user.role !== "customer") return;
+  if (customerHasOpenOrder(user.id)) return;
+  const last = latestNotificationOfType(user.id, "nudge");
+  if (last && Date.now() - Date.parse(last.created_at) < NUDGE_GAP_MS) return;
+  const copy = pickNudgeCopy(last?.title);
+  pushTo(user.id, {
+    type: "nudge",
+    title: copy.title,
+    body: copy.body,
+  });
+}
+
+export function listMyNotifications(user: AuthUser, unreadOnly = false, withNudge = true) {
+  if (withNudge) maybeEngagementNudge(user);
   return {
     notifications: listNotificationsForUser(user.id, unreadOnly).map(toPublic),
     unread: countUnread(user.id),
@@ -142,10 +162,10 @@ export function readNotification(user: AuthUser, id: string) {
     throw new ApiError(404, "Bildirim yok.", "NOT_FOUND");
   }
   markNotificationRead(id, user.id, new Date().toISOString());
-  return listMyNotifications(user);
+  return listMyNotifications(user, false, false);
 }
 
 export function readAllNotifications(user: AuthUser) {
   markAllNotificationsRead(user.id, new Date().toISOString());
-  return listMyNotifications(user);
+  return listMyNotifications(user, false, false);
 }

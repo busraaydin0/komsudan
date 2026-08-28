@@ -141,3 +141,23 @@ export function permLabel(state: PermState) {
   if (state === "unsupported") return "Yok";
   return "İstenmedi";
 }
+
+export function showAppNotification(title: string, body: string, tag?: string) {
+  if (typeof Notification === "undefined") return false;
+  if (Notification.permission !== "granted") return false;
+  try {
+    const opts: NotificationOptions = { body, tag: tag ?? "komsudan", icon: "/icon" };
+    if (navigator.serviceWorker?.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: "notify",
+        title,
+        ...opts,
+      });
+      return true;
+    }
+    new Notification(title, opts);
+    return true;
+  } catch {
+    return false;
+  }
+}

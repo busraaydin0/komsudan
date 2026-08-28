@@ -86,6 +86,17 @@ export function listOrderRowsForCustomer(userId: string): OrderRow[] {
     .all(userId) as OrderRow[];
 }
 
+export function customerHasOpenOrder(userId: string) {
+  const row = db()
+    .prepare(
+      `SELECT 1 AS n FROM orders
+       WHERE user_id = ? AND status NOT IN ('teslim_edildi', 'iptal')
+       LIMIT 1`,
+    )
+    .get(userId) as { n: number } | undefined;
+  return Boolean(row);
+}
+
 export function listOrderRowsForProvider(userId: string): OrderRow[] {
   return db()
     .prepare(
