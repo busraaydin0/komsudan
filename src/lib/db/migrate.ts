@@ -283,6 +283,15 @@ function ensureColumns(db: Database.Database) {
       is_active = 1,
       sort_order = 12
     WHERE id = 'hali';
+    INSERT OR IGNORE INTO service_categories (id, name, fulfillment_mode, pricing_model)
+    VALUES ('odev', 'İlkokul / Ortaokul Ödev Eşliği', 'delivery', 'fixed');
+    UPDATE service_categories SET
+      name = 'İlkokul / Ortaokul Ödev Eşliği',
+      icon = 'book',
+      blurb = 'Ödev, okuma — evde, ortak alanda veya online',
+      is_active = 1,
+      sort_order = 13
+    WHERE id = 'odev';
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS provider_services (
@@ -611,6 +620,48 @@ function ensureColumns(db: Database.Database) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_carpets_provider ON provider_carpets(provider_id);
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_lessons (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL REFERENCES provider_profiles(user_id),
+      name TEXT NOT NULL,
+      description TEXT,
+      photo_url TEXT,
+      kind_takip INTEGER NOT NULL DEFAULT 0,
+      kind_okuma INTEGER NOT NULL DEFAULT 0,
+      kind_eslik INTEGER NOT NULL DEFAULT 0,
+      kind_tekrar INTEGER NOT NULL DEFAULT 0,
+      kind_sinav INTEGER NOT NULL DEFAULT 0,
+      kind_other INTEGER NOT NULL DEFAULT 0,
+      level_ilkokul INTEGER NOT NULL DEFAULT 0,
+      level_ortaokul INTEGER NOT NULL DEFAULT 0,
+      level_lise INTEGER NOT NULL DEFAULT 0,
+      sub_turkce INTEGER NOT NULL DEFAULT 0,
+      sub_matematik INTEGER NOT NULL DEFAULT 0,
+      sub_fen INTEGER NOT NULL DEFAULT 0,
+      sub_sosyal INTEGER NOT NULL DEFAULT 0,
+      sub_ingilizce INTEGER NOT NULL DEFAULT 0,
+      sub_all INTEGER NOT NULL DEFAULT 0,
+      sub_other INTEGER NOT NULL DEFAULT 0,
+      subject_other TEXT,
+      dur_30 INTEGER NOT NULL DEFAULT 0,
+      dur_45 INTEGER NOT NULL DEFAULT 0,
+      dur_60 INTEGER NOT NULL DEFAULT 0,
+      dur_90 INTEGER NOT NULL DEFAULT 0,
+      price INTEGER NOT NULL DEFAULT 0,
+      place_ev INTEGER NOT NULL DEFAULT 0,
+      place_ortak INTEGER NOT NULL DEFAULT 0,
+      place_online INTEGER NOT NULL DEFAULT 0,
+      weekly INTEGER NOT NULL DEFAULT 1,
+      mat_student INTEGER NOT NULL DEFAULT 0,
+      mat_provider INTEGER NOT NULL DEFAULT 0,
+      mat_none INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_lessons_provider ON provider_lessons(provider_id);
   `);
   addColumn(db, "orders", "product_id", "product_id TEXT");
   addColumn(db, "orders", "product_name", "product_name TEXT");

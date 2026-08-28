@@ -19,6 +19,7 @@ import { CargoServiceEditor } from "@/components/CargoServiceEditor";
 import { PrintServiceEditor } from "@/components/PrintServiceEditor";
 import { PreserveServiceEditor } from "@/components/PreserveServiceEditor";
 import { CarpetServiceEditor } from "@/components/CarpetServiceEditor";
+import { LessonServiceEditor } from "@/components/LessonServiceEditor";
 
 const LABEL: Record<OrderStatus, string> = {
   onay_bekliyor: "Bekliyor",
@@ -130,6 +131,8 @@ export function ProviderDesk() {
 
         <CarpetServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
 
+        <LessonServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
         <h2 className="k-rise mt-8 font-[family-name:var(--font-display)] text-xl">Gelen siparişler</h2>
         {!ready ? (
           <ul className="mt-3 space-y-3">
@@ -238,7 +241,8 @@ function OrderCard({
   const print = order.packageId === "cikti";
   const preserve = order.packageId === "kislik";
   const hali = order.packageId === "hali";
-  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali;
+  const odev = order.packageId === "odev";
+  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev;
   const next = nextStatus(order.status, order.packageId, catalog);
   const foodLabel: Partial<Record<OrderStatus, string>> = {
     teslim_alindi: "Hazırlanıyor",
@@ -272,7 +276,7 @@ function OrderCard({
         {p?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali
+          : sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev
             ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
             : `${order.pieces} parça · ${pack?.title}`}
       </p>

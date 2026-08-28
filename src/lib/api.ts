@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -372,7 +372,7 @@ export async function patchMyProviderProfile(body: {
 }
 
 export async function postMyOffer(body: {
-  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali";
+  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev";
   dryingType?: "makine" | "ip" | "ikisi";
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
@@ -1214,5 +1214,86 @@ export async function uploadMyCarpetPhoto(id: string, file: File) {
 export async function deleteMyCarpet(id: string) {
   await readJson(
     await fetch(`/api/providers/me/carpets/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}
+
+export async function postMyLesson(body: {
+  name: string;
+  description?: string | null;
+  kinds?: {
+    takip: boolean;
+    okuma: boolean;
+    eslik: boolean;
+    tekrar: boolean;
+    sinav: boolean;
+    other: boolean;
+  };
+  levels?: { ilkokul: boolean; ortaokul: boolean; lise: boolean };
+  subjects?: {
+    turkce: boolean;
+    matematik: boolean;
+    fen: boolean;
+    sosyal: boolean;
+    ingilizce: boolean;
+    all: boolean;
+    other: boolean;
+  };
+  subjectOther?: string | null;
+  durations?: { m30: boolean; m45: boolean; m60: boolean; m90: boolean };
+  price: number;
+  place?: { ev: boolean; ortak: boolean; online: boolean };
+  weekly?: number;
+  materials?: { student: boolean; provider: boolean; none: boolean };
+  notes?: string | null;
+  isActive?: boolean;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { lesson: ProviderLesson }; lesson?: ProviderLesson }>(
+      await fetch("/api/providers/me/lessons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.lesson!;
+}
+
+export async function fetchMyLessons() {
+  const data = unwrap(
+    await readJson<{ data?: { lessons: ProviderLesson[] }; lessons?: ProviderLesson[] }>(
+      await fetch("/api/providers/me/lessons"),
+    ),
+  );
+  return data.lessons ?? [];
+}
+
+export async function patchMyLesson(id: string, body: Parameters<typeof postMyLesson>[0]) {
+  const data = unwrap(
+    await readJson<{ data?: { lesson: ProviderLesson }; lesson?: ProviderLesson }>(
+      await fetch(`/api/providers/me/lessons/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.lesson!;
+}
+
+export async function uploadMyLessonPhoto(id: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = unwrap(
+    await readJson<{ data?: { photoUrl: string }; photoUrl?: string }>(
+      await fetch(`/api/providers/me/lessons/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
+    ),
+  );
+  return data.photoUrl!;
+}
+
+export async function deleteMyLesson(id: string) {
+  await readJson(
+    await fetch(`/api/providers/me/lessons/${encodeURIComponent(id)}`, { method: "DELETE" }),
   );
 }

@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti", "kislik", "hali"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti", "kislik", "hali", "odev"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -632,6 +632,96 @@ export const carpetCreateSchema = z
   });
 
 export const carpetPatchSchema = carpetCreateSchema;
+
+const lessonKindSchema = z.object({
+  takip: z.boolean(),
+  okuma: z.boolean(),
+  eslik: z.boolean(),
+  tekrar: z.boolean(),
+  sinav: z.boolean(),
+  other: z.boolean(),
+});
+const lessonLevelSchema = z.object({
+  ilkokul: z.boolean(),
+  ortaokul: z.boolean(),
+  lise: z.boolean(),
+});
+const lessonSubjectSchema = z.object({
+  turkce: z.boolean(),
+  matematik: z.boolean(),
+  fen: z.boolean(),
+  sosyal: z.boolean(),
+  ingilizce: z.boolean(),
+  all: z.boolean(),
+  other: z.boolean(),
+});
+const lessonDurationSchema = z.object({
+  m30: z.boolean(),
+  m45: z.boolean(),
+  m60: z.boolean(),
+  m90: z.boolean(),
+});
+const lessonPlaceSchema = z.object({
+  ev: z.boolean(),
+  ortak: z.boolean(),
+  online: z.boolean(),
+});
+const lessonMaterialsSchema = z.object({
+  student: z.boolean(),
+  provider: z.boolean(),
+  none: z.boolean(),
+});
+
+export const lessonCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    description: z.string().trim().max(400).optional().nullable(),
+    kinds: lessonKindSchema.optional(),
+    levels: lessonLevelSchema.optional(),
+    subjects: lessonSubjectSchema.optional(),
+    subjectOther: z.string().trim().max(80).optional().nullable(),
+    durations: lessonDurationSchema.optional(),
+    price: z.number({ error: "Fiyat gerekli." }).int().min(1, "Fiyat 1–10.000 ₺.").max(10_000, "Fiyat 1–10.000 ₺."),
+    place: lessonPlaceSchema.optional(),
+    weekly: z.number().int().min(1, "Haftalık ders 1–20.").max(20, "Haftalık ders 1–20.").optional(),
+    materials: lessonMaterialsSchema.optional(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.kinds && !val.kinds.takip && !val.kinds.okuma && !val.kinds.eslik && !val.kinds.tekrar && !val.kinds.sinav && !val.kinds.other) {
+      ctx.addIssue({ code: "custom", message: "En az bir hizmet türü seç.", path: ["kinds"] });
+    }
+    if (val.levels && !val.levels.ilkokul && !val.levels.ortaokul && !val.levels.lise) {
+      ctx.addIssue({ code: "custom", message: "En az bir eğitim seviyesi seç.", path: ["levels"] });
+    }
+    if (
+      val.subjects &&
+      !val.subjects.turkce &&
+      !val.subjects.matematik &&
+      !val.subjects.fen &&
+      !val.subjects.sosyal &&
+      !val.subjects.ingilizce &&
+      !val.subjects.all &&
+      !val.subjects.other
+    ) {
+      ctx.addIssue({ code: "custom", message: "En az bir ders / alan seç.", path: ["subjects"] });
+    }
+    if (val.subjects?.other && !val.subjectOther?.trim()) {
+      ctx.addIssue({ code: "custom", message: "Diğer dersi yaz.", path: ["subjectOther"] });
+    }
+    if (val.durations && !val.durations.m30 && !val.durations.m45 && !val.durations.m60 && !val.durations.m90) {
+      ctx.addIssue({ code: "custom", message: "En az bir ders süresi seç.", path: ["durations"] });
+    }
+    if (val.place && !val.place.ev && !val.place.ortak && !val.place.online) {
+      ctx.addIssue({ code: "custom", message: "En az bir ders yeri seç.", path: ["place"] });
+    }
+    if (val.materials && !val.materials.student && !val.materials.provider && !val.materials.none) {
+      ctx.addIssue({ code: "custom", message: "En az bir malzeme seçeneği seç.", path: ["materials"] });
+    }
+  });
+
+export const lessonPatchSchema = lessonCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

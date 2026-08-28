@@ -70,7 +70,7 @@ export function canTransition(from: ApiLifecycle, to: ApiLifecycle, packageId: P
 
 export function nextStatus(
   current: OrderStatus,
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali",
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev",
   food = false,
 ): OrderStatus | null {
   if (
@@ -85,7 +85,8 @@ export function nextStatus(
     packageId === "kargo" ||
     packageId === "cikti" ||
     packageId === "kislik" ||
-    packageId === "hali"
+    packageId === "hali" ||
+    packageId === "odev"
   ) {
     if (current === "onay_bekliyor") return "teslim_alindi";
     if (current === "teslim_alindi") return "hazir";
@@ -116,7 +117,7 @@ export const PICKUP_CODE_LEN = 6;
 export const PICKUP_CODE_TRIES = 5;
 
 export function trackSteps(
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali",
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev",
   food = false,
 ): OrderStatus[] {
   if (
@@ -131,7 +132,8 @@ export function trackSteps(
     packageId === "kargo" ||
     packageId === "cikti" ||
     packageId === "kislik" ||
-    packageId === "hali"
+    packageId === "hali" ||
+    packageId === "odev"
   ) {
     return ["onay_bekliyor", "teslim_alindi", "hazir", "teslim_edildi"];
   }

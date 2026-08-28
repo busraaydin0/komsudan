@@ -115,6 +115,15 @@ import {
   updateCarpet,
   type CarpetWrite,
 } from "@/lib/db/carpets";
+import {
+  countLessons,
+  deactivateLesson,
+  insertLesson,
+  listLessons,
+  toPublicLesson,
+  updateLesson,
+  type LessonWrite,
+} from "@/lib/db/lessons";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -194,6 +203,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     prints: listPrints(row.user_id).map(toPublicPrint),
     preserves: listPreserves(row.user_id).map(toPublicPreserve),
     carpets: listCarpets(row.user_id).map(toPublicCarpet),
+    lessons: listLessons(row.user_id).map(toPublicLesson),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -269,7 +279,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti" || categoryId === "kislik" || categoryId === "hali")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti" || categoryId === "kislik" || categoryId === "hali" || categoryId === "odev")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -665,10 +675,25 @@ export function ensureHaliOffer(
   });
 }
 
+export function ensureOdevOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Ödev eşliği. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "odev",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -709,6 +734,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "hali") {
     return ensureHaliOffer(user, input);
+  }
+  if (categoryId === "odev") {
+    return ensureOdevOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -1524,6 +1552,88 @@ export function patchMyCarpet(user: AuthUser, carpetId: string, input: CarpetWri
 export function removeMyCarpet(user: AuthUser, carpetId: string) {
   requireProvider(user);
   if (!deactivateCarpet(carpetId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_LESSONS = 12;
+
+function assertLessonWrite(input: LessonWrite) {
+  if (input.price < 1) {
+    throw new ApiError(400, "Fiyat 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
+  }
+  const k = input.kinds;
+  if (k && !k.takip && !k.okuma && !k.eslik && !k.tekrar && !k.sinav && !k.other) {
+    throw new ApiError(400, "En az bir hizmet türü seç.", "VALIDATION_ERROR");
+  }
+  const l = input.levels;
+  if (l && !l.ilkokul && !l.ortaokul && !l.lise) {
+    throw new ApiError(400, "En az bir eğitim seviyesi seç.", "VALIDATION_ERROR");
+  }
+  const s = input.subjects;
+  if (s && !s.turkce && !s.matematik && !s.fen && !s.sosyal && !s.ingilizce && !s.all && !s.other) {
+    throw new ApiError(400, "En az bir ders / alan seç.", "VALIDATION_ERROR");
+  }
+  if (s?.other && !input.subjectOther?.trim()) {
+    throw new ApiError(400, "Diğer dersi yaz.", "VALIDATION_ERROR");
+  }
+  const d = input.durations;
+  if (d && !d.m30 && !d.m45 && !d.m60 && !d.m90) {
+    throw new ApiError(400, "En az bir ders süresi seç.", "VALIDATION_ERROR");
+  }
+  const p = input.place;
+  if (p && !p.ev && !p.ortak && !p.online) {
+    throw new ApiError(400, "En az bir ders yeri seç.", "VALIDATION_ERROR");
+  }
+  const m = input.materials;
+  if (m && !m.student && !m.provider && !m.none) {
+    throw new ApiError(400, "En az bir malzeme seçeneği seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyLessons(user: AuthUser) {
+  requireProvider(user);
+  return listLessons(user.id, false).map(toPublicLesson);
+}
+
+export function addMyLesson(user: AuthUser, input: LessonWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "odev") {
+    throw new ApiError(400, "Ödev kartı yalnızca İlkokul / Ortaokul Ödev Eşliği alanında.", "VALIDATION_ERROR");
+  }
+  assertLessonWrite(input);
+  if (countLessons(user.id, false) >= MAX_LESSONS) {
+    throw new ApiError(400, `En fazla ${MAX_LESSONS} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicLesson(
+    insertLesson(user.id, {
+      ...input,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      subjectOther: input.subjectOther?.trim() || null,
+      notes: input.notes?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyLesson(user: AuthUser, lessonId: string, input: LessonWrite) {
+  requireProvider(user);
+  assertLessonWrite(input);
+  const row = updateLesson(lessonId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    subjectOther: input.subjectOther?.trim() || null,
+    notes: input.notes?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicLesson(row);
+}
+
+export function removeMyLesson(user: AuthUser, lessonId: string) {
+  requireProvider(user);
+  if (!deactivateLesson(lessonId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };

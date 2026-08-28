@@ -20,6 +20,7 @@ import { upsertCargo } from "./cargos";
 import { upsertPrint } from "./prints";
 import { upsertPreserve } from "./preserves";
 import { upsertCarpet } from "./carpets";
+import { upsertLesson } from "./lessons";
 
 const SEED_PHONES: Record<string, string> = {
   elif: "5321100001",
@@ -66,6 +67,9 @@ const SEED_PHONES: Record<string, string> = {
   serap: "5321100042",
   cemal: "5321100043",
   aylin: "5321100044",
+  seda: "5321100045",
+  tugce: "5321100046",
+  melis: "5321100047",
 };
 
 function deliveryMode(drops: Array<"kapi" | "nokta">): "door" | "point" | "both" {
@@ -324,6 +328,24 @@ function seedProviderDirectory() {
         products: carpet.products,
         noticeDays: carpet.noticeDays,
         notes: carpet.notes,
+      });
+    }
+    for (const lesson of p.lessons ?? []) {
+      upsertLesson({
+        id: lesson.id,
+        provider_id: p.id,
+        name: lesson.name,
+        description: lesson.description,
+        kinds: lesson.kinds,
+        levels: lesson.levels,
+        subjects: lesson.subjects,
+        subjectOther: lesson.subjectOther,
+        durations: lesson.durations,
+        price: lesson.price,
+        place: lesson.place,
+        weekly: lesson.weekly,
+        materials: lesson.materials,
+        notes: lesson.notes,
       });
     }
     if (p.drops.includes("nokta")) {

@@ -18,6 +18,7 @@ import { getCargo, setCargoPhotoUrl } from "@/lib/db/cargos";
 import { getPrint, setPrintPhotoUrl } from "@/lib/db/prints";
 import { getPreserve, setPreservePhotoUrl } from "@/lib/db/preserves";
 import { getCarpet, setCarpetPhotoUrl } from "@/lib/db/carpets";
+import { getLesson, setLessonPhotoUrl } from "@/lib/db/lessons";
 
 export const PHOTO_MAX = 4;
 export const PORTFOLIO_MAX = 16;
@@ -426,6 +427,23 @@ export function setCarpetPhoto(userId: string, carpetId: string, buf: Buffer): s
     .run(file.id, userId, file.mime, file.ext, file.now);
   const url = `/api/photos/${file.id}`;
   setCarpetPhotoUrl(carpetId, userId, url);
+  return url;
+}
+
+export function setLessonPhoto(userId: string, lessonId: string, buf: Buffer): string {
+  const lesson = getLesson(lessonId);
+  if (!lesson || lesson.provider_id !== userId) {
+    throw new ApiError(404, "Hizmet bulunamadı.");
+  }
+  const file = writeFile(buf);
+  db()
+    .prepare(
+      `INSERT INTO gallery_photos (id, provider_id, order_id, review_id, kind, mime, ext, created_at)
+       VALUES (?, ?, NULL, NULL, 'lesson', ?, ?, ?)`,
+    )
+    .run(file.id, userId, file.mime, file.ext, file.now);
+  const url = `/api/photos/${file.id}`;
+  setLessonPhotoUrl(lessonId, userId, url);
   return url;
 }
 
