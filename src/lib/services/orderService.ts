@@ -17,6 +17,8 @@ import { dropsForWash, washCanOrder, washQtyBounds } from "@/lib/wash";
 import { courierCanOrder, courierQtyBounds, dropsForCourier } from "@/lib/courier";
 import { dropsForGarden, gardenCanOrder, gardenQtyBounds } from "@/lib/garden";
 import { cargoCanOrder, cargoQtyBounds, dropsForCargo } from "@/lib/cargo";
+import { dropsForPrint, printCanOrder, printQtyBounds } from "@/lib/print";
+import { getPrint, toPublicPrint } from "@/lib/db/prints";
 import { getCargo, toPublicCargo } from "@/lib/db/cargos";
 import { strategyFor } from "@/lib/fulfillment";
 import {
@@ -190,6 +192,7 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
   if (cat.id === "kurye") return createKuryeOrder(input, userId, provider);
   if (cat.id === "bahce") return createBahceOrder(input, userId, provider);
   if (cat.id === "kargo") return createKargoOrder(input, userId, provider);
+  if (cat.id === "cikti") return createCiktiOrder(input, userId, provider);
   return createLaundryOrder(input, userId, provider);
 }
 
@@ -233,15 +236,17 @@ function insertPendingOrder(args: {
   const capacityLabel =
     args.packageId === "davet"
       ? "kişilik yer"
-      : args.packageId === "dikis" ||
-          args.packageId === "tamir" ||
-          args.packageId === "teknoloji" ||
-          args.packageId === "araba" ||
-          args.packageId === "kurye" ||
-          args.packageId === "bahce" ||
-          args.packageId === "kargo"
-        ? "adet yer"
-        : "parça yer";
+      : args.packageId === "cikti"
+        ? "sayfa yer"
+        : args.packageId === "dikis" ||
+            args.packageId === "tamir" ||
+            args.packageId === "teknoloji" ||
+            args.packageId === "araba" ||
+            args.packageId === "kurye" ||
+            args.packageId === "bahce" ||
+            args.packageId === "kargo"
+          ? "adet yer"
+          : "parça yer";
   runOrderTx(() => {
     const remaining = getRemaining(args.providerId);
     if (remaining == null) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
@@ -734,6 +739,57 @@ function createKargoOrder(input: CreateOrderInput, userId: string, provider: Non
   const id = insertPendingOrder({
     providerId: provider.id,
     packageId: "kargo",
+    pieces: qty,
+    express: false,
+    drop: input.drop,
+    dropPointId,
+    slot: input.slot,
+    note: (input.note ?? "").trim().slice(0, 500),
+    quote,
+    userId,
+    productId: row.id,
+    productName: row.name,
+    guestCount: qty,
+  });
+  const order = getOrder(id)!;
+  notifyNewOrder({
+    id,
+    provider_id: provider.id,
+    user_id: userId,
+    pieces: qty,
+  });
+  return order;
+}
+
+function createCiktiOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
+  const printId = (input.productId ?? "").trim();
+  if (!printId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
+  const row = getPrint(printId);
+  if (!row || row.provider_id !== provider.id || !row.is_active) {
+    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
+  }
+
+  const card = toPublicPrint(row);
+  if (!printCanOrder(card)) {
+    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
+  }
+
+  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
+  const { min, max } = printQtyBounds(card, provider.remaining);
+  if (!Number.isFinite(qty) || qty < min || qty > max) {
+    throw new ApiError(400, `Miktar ${min}–${max} sayfa olmalı.`, "VALIDATION_ERROR");
+  }
+
+  const allowedDrops = dropsForPrint(card, provider.drops);
+  if (!allowedDrops.includes(input.drop)) {
+    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
+  }
+
+  const dropPointId = validateDropAndSlot(provider, input);
+  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
+  const id = insertPendingOrder({
+    providerId: provider.id,
+    packageId: "cikti",
     pieces: qty,
     express: false,
     drop: input.drop,

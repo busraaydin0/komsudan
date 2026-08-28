@@ -111,6 +111,34 @@ export type CargoPickup = { sube: boolean; adres: boolean; nokta: boolean };
 export type CargoDrop = { sube: boolean; adres: boolean; nokta: boolean };
 export type CargoConfirm = { kod: boolean; app: boolean };
 
+export type PrintColor = { bw: boolean; color: boolean };
+export type PrintPaper = { a4: boolean };
+export type PrintSides = { tek: boolean; cift: boolean };
+export type PrintFile = { pdf: boolean; word: boolean; image: boolean; other: boolean };
+export type PrintSend = { app: boolean; email: boolean; other: boolean };
+export type PrintPickup = { adres: boolean; nokta: boolean };
+export type PrintAvail = "hemen" | "saat" | "randevu";
+
+/** Evde çıktı kartı. Sayfa başı fiyat; siparişte sunucu çarpar. */
+export type ProviderPrint = {
+  id: string;
+  name: string;
+  photoUrl?: string | null;
+  colors: PrintColor;
+  paper: PrintPaper;
+  sides: PrintSides;
+  files: PrintFile;
+  price: number;
+  minPages: number;
+  durationMin?: number | null;
+  send: PrintSend;
+  pickup: PrintPickup;
+  avail?: PrintAvail;
+  workHours?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+};
+
 /** Kargo & paket kartı. Sabit fiyatta sunucu çarpar; mesafeye göre listedeki tutar başlangıç. */
 export type ProviderCargo = {
   id: string;
@@ -347,6 +375,7 @@ export type Provider = {
   couriers?: ProviderCourier[];
   gardens?: ProviderGarden[];
   cargos?: ProviderCargo[];
+  prints?: ProviderPrint[];
 };
 
 export type DropPoint = {
@@ -385,7 +414,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo";
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti";
   pieces: number;
   express: boolean;
   drop: DropMethod;

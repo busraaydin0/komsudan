@@ -7,6 +7,7 @@ import { listWashes, toPublicWash } from "./washes";
 import { listCouriers, toPublicCourier } from "./couriers";
 import { listGardens, toPublicGarden } from "./gardens";
 import { listCargos, toPublicCargo } from "./cargos";
+import { listPrints, toPublicPrint } from "./prints";
 
 export function toProvider(row: {
   id: string;
@@ -24,6 +25,7 @@ export function toProvider(row: {
   const couriers = listCouriers(p.id).map(toPublicCourier);
   const gardens = listGardens(p.id).map(toPublicGarden);
   const cargos = listCargos(p.id).map(toPublicCargo);
+  const prints = listPrints(p.id).map(toPublicPrint);
   return {
     ...p,
     remaining: row.remaining,
@@ -39,6 +41,7 @@ export function toProvider(row: {
     couriers: couriers.length > 0 ? couriers : (p.couriers ?? []),
     gardens: gardens.length > 0 ? gardens : (p.gardens ?? []),
     cargos: cargos.length > 0 ? cargos : (p.cargos ?? []),
+    prints: prints.length > 0 ? prints : (p.prints ?? []),
   };
 }
 

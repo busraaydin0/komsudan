@@ -256,6 +256,15 @@ function ensureColumns(db: Database.Database) {
       is_active = 1,
       sort_order = 9
     WHERE id = 'kargo';
+    INSERT OR IGNORE INTO service_categories (id, name, fulfillment_mode, pricing_model)
+    VALUES ('cikti', 'Evde Çıktı Alma', 'delivery', 'fixed');
+    UPDATE service_categories SET
+      name = 'Evde Çıktı Alma',
+      icon = 'printer',
+      blurb = 'A4 çıktı — yakında al',
+      is_active = 1,
+      sort_order = 10
+    WHERE id = 'cikti';
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS provider_services (
@@ -484,6 +493,37 @@ function ensureColumns(db: Database.Database) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_cargos_provider ON provider_cargos(provider_id);
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_prints (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL REFERENCES provider_profiles(user_id),
+      name TEXT NOT NULL,
+      photo_url TEXT,
+      color_bw INTEGER NOT NULL DEFAULT 0,
+      color_renkli INTEGER NOT NULL DEFAULT 0,
+      paper_a4 INTEGER NOT NULL DEFAULT 1,
+      side_tek INTEGER NOT NULL DEFAULT 0,
+      side_cift INTEGER NOT NULL DEFAULT 0,
+      file_pdf INTEGER NOT NULL DEFAULT 0,
+      file_word INTEGER NOT NULL DEFAULT 0,
+      file_image INTEGER NOT NULL DEFAULT 0,
+      file_other INTEGER NOT NULL DEFAULT 0,
+      price INTEGER NOT NULL DEFAULT 0,
+      min_pages INTEGER NOT NULL DEFAULT 1,
+      duration_min INTEGER,
+      send_app INTEGER NOT NULL DEFAULT 0,
+      send_email INTEGER NOT NULL DEFAULT 0,
+      send_other INTEGER NOT NULL DEFAULT 0,
+      pick_adres INTEGER NOT NULL DEFAULT 0,
+      pick_nokta INTEGER NOT NULL DEFAULT 0,
+      avail TEXT NOT NULL DEFAULT 'hemen',
+      work_hours TEXT,
+      notes TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_prints_provider ON provider_prints(provider_id);
   `);
   addColumn(db, "orders", "product_id", "product_id TEXT");
   addColumn(db, "orders", "product_name", "product_name TEXT");

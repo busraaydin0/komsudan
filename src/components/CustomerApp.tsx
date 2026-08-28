@@ -95,6 +95,21 @@ import {
   dropsForCargo,
   CARGO_UNIT,
 } from "@/lib/cargo";
+import {
+  dropsForPrint,
+  printAvailLabel,
+  printCanOrder,
+  printColorList,
+  printDropLabel,
+  printDurationLabel,
+  printFileList,
+  printPaperList,
+  printPickupList,
+  printQtyBounds,
+  printSendList,
+  printSideList,
+  PRINT_UNIT,
+} from "@/lib/print";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFood, estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
@@ -119,6 +134,7 @@ import type {
   ProviderCourier,
   ProviderGarden,
   ProviderCargo,
+  ProviderPrint,
 } from "@/lib/types";
 
 const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), {
@@ -162,6 +178,10 @@ function isBahce(p: Pick<Provider, "categoryId">) {
 
 function isKargo(p: Pick<Provider, "categoryId">) {
   return p.categoryId === "kargo";
+}
+
+function isCikti(p: Pick<Provider, "categoryId">) {
+  return p.categoryId === "cikti";
 }
 
 function laundryInFilter(ids?: string[]) {
@@ -212,6 +232,10 @@ function listPrice(p: Provider): number | null {
   }
   if (isKargo(p)) {
     const prices = (p.cargos ?? []).filter((x) => x.price > 0).map((x) => x.price);
+    return prices.length ? Math.min(...prices) : null;
+  }
+  if (isCikti(p)) {
+    const prices = (p.prints ?? []).filter((x) => x.price > 0).map((x) => x.price);
     return prices.length ? Math.min(...prices) : null;
   }
   return p.packages.find((x) => x.id === "tam")?.pricePerPiece ?? p.packages.at(-1)?.pricePerPiece ?? null;
@@ -315,6 +339,7 @@ export function CustomerApp({
   const kurye = selected ? isKurye(selected) : false;
   const bahce = selected ? isBahce(selected) : false;
   const kargo = selected ? isKargo(selected) : false;
+  const cikti = selected ? isCikti(selected) : false;
   const product = selected?.products?.find((x) => x.id === productId) ?? selected?.products?.[0];
   const service = selected?.services?.find((x) => x.id === productId) ?? selected?.services?.[0];
   const repair = selected?.repairs?.find((x) => x.id === productId) ?? selected?.repairs?.[0];
@@ -323,6 +348,7 @@ export function CustomerApp({
   const courier = selected?.couriers?.find((x) => x.id === productId) ?? selected?.couriers?.[0];
   const garden = selected?.gardens?.find((x) => x.id === productId) ?? selected?.gardens?.[0];
   const cargo = selected?.cargos?.find((x) => x.id === productId) ?? selected?.cargos?.[0];
+  const print = selected?.prints?.find((x) => x.id === productId) ?? selected?.prints?.[0];
   const quote = selected
     ? davet && product
       ? estimateFood(guests, product.pricePerPerson, loyaltyRate)
@@ -351,6 +377,10 @@ export function CustomerApp({
                             : kargo && cargo && cargoCanOrder(cargo)
                               ? estimateFood(guests, cargo.price, loyaltyRate)
                               : kargo
+                                ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
+                            : cikti && print && printCanOrder(print)
+                              ? estimateFood(guests, print.price, loyaltyRate)
+                              : cikti
                                 ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
                             : estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
     : { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 };
@@ -420,6 +450,9 @@ export function CustomerApp({
       } else if (isKargo(selected)) {
         const first = selected.cargos?.[0]?.id ?? null;
         setProductId(selected.cargos?.some((x) => x.id === productId) ? productId : first);
+      } else if (isCikti(selected)) {
+        const first = selected.prints?.[0]?.id ?? null;
+        setProductId(selected.prints?.some((x) => x.id === productId) ? productId : first);
       } else {
         setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
       }
@@ -475,6 +508,7 @@ export function CustomerApp({
       const kuryeOrder = isKurye(selected);
       const bahceOrder = isBahce(selected);
       const kargoOrder = isKargo(selected);
+      const ciktiOrder = isCikti(selected);
       if (davetOrder && !allergy.trim()) {
         setErr("Alerji durumunu yaz. Yoksa “yok” de.");
         setPlacing(false);
@@ -506,6 +540,11 @@ export function CustomerApp({
         return;
       }
       if (kargoOrder && !cargoCanOrder(cargo)) {
+        setErr("Bu hizmet için fiyat yok.");
+        setPlacing(false);
+        return;
+      }
+      if (ciktiOrder && !printCanOrder(print)) {
         setErr("Bu hizmet için fiyat yok.");
         setPlacing(false);
         return;
@@ -586,6 +625,16 @@ export function CustomerApp({
                 ? {
                     providerId: selected.id,
                     productId: cargo?.id,
+                    guestCount: guests,
+                    drop,
+                    dropPointId: drop === "nokta" ? dropId : null,
+                    slot,
+                    note,
+                  }
+              : ciktiOrder
+                ? {
+                    providerId: selected.id,
+                    productId: print?.id,
                     guestCount: guests,
                     drop,
                     dropPointId: drop === "nokta" ? dropId : null,
@@ -745,6 +794,8 @@ export function CustomerApp({
                               ? "İş bahçede yapılır; çim, budama, saksı. Eve kimse girmez."
                               : categoryIds?.length === 1 && categoryIds[0] === "kargo"
                                 ? "Şubeden al, noktaya veya adrese bırak. Eve kimse girmez."
+                              : categoryIds?.length === 1 && categoryIds[0] === "cikti"
+                                ? "A4 çıktı evde basılır; adresten veya noktada al. Eve kimse girmez."
                               : "Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak."}
               </p>
               <button
@@ -882,6 +933,13 @@ export function CustomerApp({
                     setGuests((n) => Math.min(max, Math.max(min, n)));
                     const allowed = dropsForCargo(card, selected.drops);
                     setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
+                  } else if (isCikti(selected)) {
+                    const card =
+                      selected.prints?.find((x) => x.id === productId) ?? selected.prints?.[0];
+                    const { min, max } = printQtyBounds(card, selected.remaining);
+                    setGuests((n) => Math.min(max, Math.max(min, n)));
+                    const allowed = dropsForPrint(card, selected.drops);
+                    setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
                   } else {
                     setPieces((n) => clampPieces(n, selected.remaining));
                   }
@@ -906,8 +964,11 @@ export function CustomerApp({
                 courier={courier}
                 garden={garden}
                 cargo={cargo}
+                print={print}
                 productName={
-                  kargo
+                  cikti
+                    ? print?.name
+                    : kargo
                     ? cargo?.name
                     : bahce
                     ? garden?.name
@@ -1123,6 +1184,10 @@ function List({
                                     ? (p.cargos ?? []).length
                                       ? ` · ${(p.cargos ?? []).map((x) => x.name).join(", ")}`
                                       : " · hizmet yok"
+                                  : isCikti(p)
+                                    ? (p.prints ?? []).length
+                                      ? ` · ${(p.prints ?? []).map((x) => x.name).join(", ")}`
+                                      : " · hizmet yok"
                                 : dryingListLabel(p)
                               ? ` · ${dryingListLabel(p)}`
                               : ""}
@@ -1148,13 +1213,15 @@ function List({
                           ? ((isTamir(p) ? p.repairs : p.techs) ?? []).length
                             ? "inceleme"
                             : "hizmet yok"
-                          : isAraba(p) || isDikis(p) || isKurye(p) || isBahce(p) || isKargo(p)
+                          : isAraba(p) || isDikis(p) || isKurye(p) || isBahce(p) || isKargo(p) || isCikti(p)
                             ? "hizmet yok"
                             : "menü yok"
                         : isDavet(p)
                           ? `${tl(price)}/kişi`
                           : isAraba(p)
                             ? `${tl(price)}/araç`
+                            : isCikti(p)
+                              ? `${tl(price)}/sayfa`
                             : isKargo(p)
                               ? (p.cargos ?? []).some((x) => x.price > 0 && x.priceType === "mesafe")
                                 ? `${tl(price)}'den`
@@ -1204,7 +1271,8 @@ function ProviderPane({
   const kurye = isKurye(p);
   const bahce = isBahce(p);
   const kargo = isKargo(p);
-  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo;
+  const cikti = isCikti(p);
+  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti;
   const items = davet
     ? (p.products ?? [])
     : dikis
@@ -1221,6 +1289,8 @@ function ProviderPane({
                 ? (p.gardens ?? [])
                 : kargo
                   ? (p.cargos ?? [])
+                  : cikti
+                    ? (p.prints ?? [])
             : p.packages;
   const canNext = unitCatalog ? items.length > 0 : p.packages.length > 0;
   return (
@@ -1247,7 +1317,9 @@ function ProviderPane({
                 ? "bugün dolu"
                 : davet
                   ? `bugün ${p.remaining} kişilik yer`
-                  : dikis || tamir || teknoloji || araba || kurye || bahce || kargo
+                  : cikti
+                    ? `bugün ${p.remaining} sayfa yer`
+                    : dikis || tamir || teknoloji || araba || kurye || bahce || kargo
                     ? `bugün ${p.remaining} yer`
                     : `bugün ${p.remaining} parça yer`}
             </span>
@@ -1546,8 +1618,8 @@ function ProviderPane({
                   </span>
                 </button>
               ))
-          : kargo
-            ? (p.cargos ?? []).map((item) => (
+          : cikti
+            ? (p.prints ?? []).map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -1565,16 +1637,11 @@ function ProviderPane({
                   <span className="min-w-0 flex-1">
                     <span className="flex justify-between font-medium">
                       {item.name}
-                      <span className="tabular-nums">
-                        {item.priceType === "mesafe" ? `${tl(item.price)}'den` : `${tl(item.price)}/paket`}
-                      </span>
+                      <span className="tabular-nums">{tl(item.price)}/sayfa</span>
                     </span>
-                    {(cargoJobList(item.jobs).length || item.maxKm) && (
+                    {(printColorList(item.colors).length || printSideList(item.sides).length) && (
                       <span className="mt-0.5 block text-xs text-[var(--muted)]">
-                        {[
-                          cargoJobList(item.jobs).slice(0, 2).join(", ") || null,
-                          item.maxKm ? `${item.maxKm} km çevresinde` : null,
-                        ]
+                        {[printColorList(item.colors).join(", ") || null, printSideList(item.sides).join(", ") || null]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>
@@ -1624,6 +1691,9 @@ function ProviderPane({
         {kargo && (p.cargos ?? []).length === 0 && (
           <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
         )}
+        {cikti && (p.prints ?? []).length === 0 && (
+          <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
+        )}
       </div>
       <button
         type="button"
@@ -1653,6 +1723,7 @@ function Checkout({
   courier,
   garden,
   cargo,
+  print,
   productName,
   express,
   onExpress,
@@ -1687,6 +1758,7 @@ function Checkout({
   courier?: ProviderCourier;
   garden?: ProviderGarden;
   cargo?: ProviderCargo;
+  print?: ProviderPrint;
   productName?: string;
   express: boolean;
   onExpress: (v: boolean) => void;
@@ -1714,8 +1786,11 @@ function Checkout({
   const kurye = isKurye(p);
   const bahce = isBahce(p);
   const kargo = isKargo(p);
-  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo;
-  const unit = kargo
+  const cikti = isCikti(p);
+  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti;
+  const unit = cikti
+    ? PRINT_UNIT
+    : kargo
     ? CARGO_UNIT
     : bahce
     ? GARDEN_UNIT
@@ -1730,7 +1805,9 @@ function Checkout({
         : dikis
           ? sewingUnitMeta(service?.priceUnit)
           : foodUnitMeta(product?.priceUnit);
-  const bounds = kargo
+  const bounds = cikti
+    ? printQtyBounds(print, p.remaining)
+    : kargo
     ? cargoQtyBounds(cargo, p.remaining)
     : bahce
     ? gardenQtyBounds(garden, p.remaining)
@@ -1747,7 +1824,9 @@ function Checkout({
           : foodQtyBounds(product, p.remaining);
   const cap = unitPriced ? bounds.max : Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
   const minCount = unitPriced ? bounds.min : PIECES_MIN;
-  const foodDrops = kargo
+  const foodDrops = cikti
+    ? dropsForPrint(print, p.drops)
+    : kargo
     ? dropsForCargo(cargo, p.drops)
     : bahce
     ? dropsForGarden(garden, p.drops)
@@ -1776,7 +1855,7 @@ function Checkout({
   }
 
   function typeCount(raw: string) {
-    const digits = raw.replace(/\D/g, "").slice(0, 2);
+    const digits = raw.replace(/\D/g, "").slice(0, unit.id === "sayfa" ? 3 : 2);
     setDraft(digits);
     if (!digits) return;
     if (unitPriced) onGuests(clampGuests(Number(digits)));
@@ -1789,7 +1868,9 @@ function Checkout({
   }
 
   const count = unitPriced ? guests : pieces;
-  const unitPrice = kargo
+  const unitPrice = cikti
+    ? (print?.price ?? 0)
+    : kargo
     ? (cargo?.price ?? 0)
     : bahce
     ? (garden?.price ?? 0)
@@ -1810,21 +1891,22 @@ function Checkout({
     (!araba || washCanOrder(wash)) &&
     (!kurye || courierCanOrder(courier)) &&
     (!bahce || gardenCanOrder(garden)) &&
-    (!kargo || cargoCanOrder(cargo));
+    (!kargo || cargoCanOrder(cargo)) &&
+    (!cikti || printCanOrder(print));
   const qtyTitle =
     unit.id === "kisi" ? "Kaç kişilik?" : unit.id === "kg" ? "Kaç kg?" : `Kaç ${unit.qty}?`;
 
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
-        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce || kargo ? "← Hizmet" : "← Paket"}
+        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti ? "← Hizmet" : "← Paket"}
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">
         {unitPriced ? qtyTitle : "Kaç parça?"}
       </h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
         {unitPriced
-          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye || bahce || kargo ? "Seçili hizmet" : "Seçili yemek")} · ${
+          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye || bahce || kargo || cikti ? "Seçili hizmet" : "Seçili yemek")} · ${
               (tamir || teknoloji) && !canPlace
                 ? "fiyat inceleme sonrası."
                 : kurye && courier?.priceType === "mesafe"
@@ -2105,6 +2187,39 @@ function Checkout({
       {kargo && cargoPriceTypeLabel(cargo?.priceType) ? (
         <p className="mt-2 text-xs text-[var(--muted)]">{cargoPriceTypeLabel(cargo?.priceType)}</p>
       ) : null}
+      {cikti && printDurationLabel(print?.durationMin) ? (
+        <p className="mt-3 text-xs text-[var(--muted)]">Hazırlama: {printDurationLabel(print?.durationMin)}.</p>
+      ) : null}
+      {cikti && printColorList(print?.colors).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{printColorList(print?.colors).join(", ")}</p>
+      ) : null}
+      {cikti && printPaperList(print?.paper).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{printPaperList(print?.paper).join(", ")}</p>
+      ) : null}
+      {cikti && printSideList(print?.sides).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{printSideList(print?.sides).join(", ")}</p>
+      ) : null}
+      {cikti && printFileList(print?.files).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Dosya: {printFileList(print?.files).join(", ")}</p>
+      ) : null}
+      {cikti && print?.minPages ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">En az {print.minPages} sayfa</p>
+      ) : null}
+      {cikti && printSendList(print?.send).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Gönderim: {printSendList(print?.send).join(", ")}</p>
+      ) : null}
+      {cikti && printPickupList(print?.pickup).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Alma: {printPickupList(print?.pickup).join(", ")}</p>
+      ) : null}
+      {cikti && printAvailLabel(print?.avail) ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{printAvailLabel(print?.avail)}</p>
+      ) : null}
+      {cikti && print?.workHours ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Çalışma saatleri: {print.workHours}</p>
+      ) : null}
+      {cikti && print?.notes ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{print.notes}</p>
+      ) : null}
       {davet && product?.allergens && (
         <p className="mt-2 text-xs text-[var(--muted)]">İçerik / alerjen: {product.allergens}</p>
       )}
@@ -2141,7 +2256,9 @@ function Checkout({
               drop === d ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
             }`}
           >
-            {kargo
+            {cikti
+              ? printDropLabel(d)
+              : kargo
               ? cargoDropLabel(d)
               : bahce
               ? gardenDropLabel(d)
@@ -2203,6 +2320,8 @@ function Checkout({
             ? "Musluk, otopark, kapı kodu…"
             : kargo
             ? "Şube, fiş no, kapı kodu…"
+            : cikti
+            ? "Sayfa, renk, dosya adı…"
             : kurye
             ? "Alıcı, kapı kodu, paket içeriği…"
             : araba
@@ -2277,7 +2396,8 @@ function Track({
   const courier = order.packageId === "kurye";
   const garden = order.packageId === "bahce";
   const cargo = order.packageId === "kargo";
-  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo;
+  const print = order.packageId === "cikti";
+  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print;
   const steps = trackSteps(order.packageId, catalog);
   const idx = steps.indexOf(order.status);
   const [busy, setBusy] = useState(false);
@@ -2292,7 +2412,7 @@ function Track({
         {provider?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : sewing || repair || tech || wash || courier || garden || cargo
+          : sewing || repair || tech || wash || courier || garden || cargo || print
             ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
             : `${order.pieces} parça`}{" "}
         · {tl(order.total)}

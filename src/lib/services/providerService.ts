@@ -88,6 +88,15 @@ import {
   updateCargo,
   type CargoWrite,
 } from "@/lib/db/cargos";
+import {
+  countPrints,
+  deactivatePrint,
+  insertPrint,
+  listPrints,
+  toPublicPrint,
+  updatePrint,
+  type PrintWrite,
+} from "@/lib/db/prints";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -164,6 +173,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     couriers: listCouriers(row.user_id).map(toPublicCourier),
     gardens: listGardens(row.user_id).map(toPublicGarden),
     cargos: listCargos(row.user_id).map(toPublicCargo),
+    prints: listPrints(row.user_id).map(toPublicPrint),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -239,7 +249,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -590,10 +600,25 @@ export function ensureKargoOffer(
   });
 }
 
+export function ensureCiktiOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Evde çıktı. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "cikti",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -625,6 +650,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "kargo") {
     return ensureKargoOffer(user, input);
+  }
+  if (categoryId === "cikti") {
+    return ensureCiktiOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -1217,6 +1245,83 @@ export function patchMyCargo(user: AuthUser, cargoId: string, input: CargoWrite)
 export function removeMyCargo(user: AuthUser, cargoId: string) {
   requireProvider(user);
   if (!deactivateCargo(cargoId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_PRINTS = 12;
+
+function assertPrintWrite(input: PrintWrite) {
+  if (input.price < 1) {
+    throw new ApiError(400, "Sayfa ücreti 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
+  }
+  const c = input.colors;
+  if (c && !c.bw && !c.color) {
+    throw new ApiError(400, "En az bir baskı türü seç.", "VALIDATION_ERROR");
+  }
+  const p = input.paper;
+  if (p && !p.a4) {
+    throw new ApiError(400, "Kağıt boyutu seç.", "VALIDATION_ERROR");
+  }
+  const s = input.sides;
+  if (s && !s.tek && !s.cift) {
+    throw new ApiError(400, "En az bir baskı yüzü seç.", "VALIDATION_ERROR");
+  }
+  const f = input.files;
+  if (f && !f.pdf && !f.word && !f.image && !f.other) {
+    throw new ApiError(400, "En az bir dosya türü seç.", "VALIDATION_ERROR");
+  }
+  const g = input.send;
+  if (g && !g.app && !g.email && !g.other) {
+    throw new ApiError(400, "En az bir dosya gönderme yöntemi seç.", "VALIDATION_ERROR");
+  }
+  const k = input.pickup;
+  if (k && !k.adres && !k.nokta) {
+    throw new ApiError(400, "En az bir teslim alma yöntemi seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyPrints(user: AuthUser) {
+  requireProvider(user);
+  return listPrints(user.id, false).map(toPublicPrint);
+}
+
+export function addMyPrint(user: AuthUser, input: PrintWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "cikti") {
+    throw new ApiError(400, "Çıktı kartı yalnızca Evde Çıktı Alma alanında.", "VALIDATION_ERROR");
+  }
+  assertPrintWrite(input);
+  if (countPrints(user.id, false) >= MAX_PRINTS) {
+    throw new ApiError(400, `En fazla ${MAX_PRINTS} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicPrint(
+    insertPrint(user.id, {
+      ...input,
+      name: input.name.trim(),
+      workHours: input.workHours?.trim() || null,
+      notes: input.notes?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyPrint(user: AuthUser, printId: string, input: PrintWrite) {
+  requireProvider(user);
+  assertPrintWrite(input);
+  const row = updatePrint(printId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    workHours: input.workHours?.trim() || null,
+    notes: input.notes?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicPrint(row);
+}
+
+export function removeMyPrint(user: AuthUser, printId: string) {
+  requireProvider(user);
+  if (!deactivatePrint(printId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };

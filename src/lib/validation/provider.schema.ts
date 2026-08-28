@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -454,6 +454,73 @@ export const cargoCreateSchema = z
   });
 
 export const cargoPatchSchema = cargoCreateSchema;
+
+const printColorSchema = z.object({
+  bw: z.boolean(),
+  color: z.boolean(),
+});
+const printPaperSchema = z.object({
+  a4: z.boolean(),
+});
+const printSidesSchema = z.object({
+  tek: z.boolean(),
+  cift: z.boolean(),
+});
+const printFileSchema = z.object({
+  pdf: z.boolean(),
+  word: z.boolean(),
+  image: z.boolean(),
+  other: z.boolean(),
+});
+const printSendSchema = z.object({
+  app: z.boolean(),
+  email: z.boolean(),
+  other: z.boolean(),
+});
+const printPickupSchema = z.object({
+  adres: z.boolean(),
+  nokta: z.boolean(),
+});
+
+export const printCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    colors: printColorSchema.optional(),
+    paper: printPaperSchema.optional(),
+    sides: printSidesSchema.optional(),
+    files: printFileSchema.optional(),
+    price: z.number({ error: "Fiyat gerekli." }).int().min(1, "Sayfa ücreti 1–100 ₺.").max(100, "Sayfa ücreti 1–100 ₺."),
+    minPages: z.number().int().min(1, "Minimum 1–200 sayfa.").max(200, "Minimum 1–200 sayfa.").optional(),
+    durationMin: z.number().int().min(0).max(480).optional().nullable(),
+    send: printSendSchema.optional(),
+    pickup: printPickupSchema.optional(),
+    avail: z.enum(["hemen", "saat", "randevu"]).optional(),
+    workHours: z.string().trim().max(80).optional().nullable(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.colors && !val.colors.bw && !val.colors.color) {
+      ctx.addIssue({ code: "custom", message: "En az bir baskı türü seç.", path: ["colors"] });
+    }
+    if (val.paper && !val.paper.a4) {
+      ctx.addIssue({ code: "custom", message: "Kağıt boyutu seç.", path: ["paper"] });
+    }
+    if (val.sides && !val.sides.tek && !val.sides.cift) {
+      ctx.addIssue({ code: "custom", message: "En az bir baskı yüzü seç.", path: ["sides"] });
+    }
+    if (val.files && !val.files.pdf && !val.files.word && !val.files.image && !val.files.other) {
+      ctx.addIssue({ code: "custom", message: "En az bir dosya türü seç.", path: ["files"] });
+    }
+    if (val.send && !val.send.app && !val.send.email && !val.send.other) {
+      ctx.addIssue({ code: "custom", message: "En az bir dosya gönderme yöntemi seç.", path: ["send"] });
+    }
+    if (val.pickup && !val.pickup.adres && !val.pickup.nokta) {
+      ctx.addIssue({ code: "custom", message: "En az bir teslim alma yöntemi seç.", path: ["pickup"] });
+    }
+  });
+
+export const printPatchSchema = printCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

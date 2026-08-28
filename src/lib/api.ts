@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCourier, ProviderGarden, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCourier, ProviderGarden, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -372,7 +372,7 @@ export async function patchMyProviderProfile(body: {
 }
 
 export async function postMyOffer(body: {
-  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo";
+  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti";
   dryingType?: "makine" | "ip" | "ikisi";
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
@@ -1002,5 +1002,72 @@ export async function uploadMyCargoPhoto(id: string, file: File) {
 export async function deleteMyCargo(id: string) {
   await readJson(
     await fetch(`/api/providers/me/cargos/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}
+
+export async function postMyPrint(body: {
+  name: string;
+  colors?: { bw: boolean; color: boolean };
+  paper?: { a4: boolean };
+  sides?: { tek: boolean; cift: boolean };
+  files?: { pdf: boolean; word: boolean; image: boolean; other: boolean };
+  price: number;
+  minPages?: number;
+  durationMin?: number | null;
+  send?: { app: boolean; email: boolean; other: boolean };
+  pickup?: { adres: boolean; nokta: boolean };
+  avail?: "hemen" | "saat" | "randevu";
+  workHours?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { print: ProviderPrint }; print?: ProviderPrint }>(
+      await fetch("/api/providers/me/prints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.print!;
+}
+
+export async function fetchMyPrints() {
+  const data = unwrap(
+    await readJson<{ data?: { prints: ProviderPrint[] }; prints?: ProviderPrint[] }>(
+      await fetch("/api/providers/me/prints"),
+    ),
+  );
+  return data.prints ?? [];
+}
+
+export async function patchMyPrint(id: string, body: Parameters<typeof postMyPrint>[0]) {
+  const data = unwrap(
+    await readJson<{ data?: { print: ProviderPrint }; print?: ProviderPrint }>(
+      await fetch(`/api/providers/me/prints/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.print!;
+}
+
+export async function uploadMyPrintPhoto(id: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = unwrap(
+    await readJson<{ data?: { photoUrl: string; print: ProviderPrint }; photoUrl?: string; print?: ProviderPrint }>(
+      await fetch(`/api/providers/me/prints/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
+    ),
+  );
+  return data;
+}
+
+export async function deleteMyPrint(id: string) {
+  await readJson(
+    await fetch(`/api/providers/me/prints/${encodeURIComponent(id)}`, { method: "DELETE" }),
   );
 }
