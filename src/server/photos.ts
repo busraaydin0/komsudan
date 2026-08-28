@@ -10,6 +10,7 @@ import { countOrderPhotos, insertOrderPhoto, listOrderPhotoRows } from "@/lib/db
 import { getProduct, setProductPhotoUrl } from "@/lib/db/products";
 import { getService, setServicePhotoUrl } from "@/lib/db/services";
 import { getRepair, setRepairPhotoUrl } from "@/lib/db/repairs";
+import { getTech, setTechPhotoUrl } from "@/lib/db/tech";
 
 export const PHOTO_MAX = 4;
 export const PORTFOLIO_MAX = 16;
@@ -282,6 +283,23 @@ export function setRepairPhoto(userId: string, repairId: string, buf: Buffer): s
     .run(file.id, userId, file.mime, file.ext, file.now);
   const url = `/api/photos/${file.id}`;
   setRepairPhotoUrl(repairId, userId, url);
+  return url;
+}
+
+export function setTechPhoto(userId: string, techId: string, buf: Buffer): string {
+  const tech = getTech(techId);
+  if (!tech || tech.provider_id !== userId) {
+    throw new ApiError(404, "Hizmet bulunamadı.");
+  }
+  const file = writeFile(buf);
+  db()
+    .prepare(
+      `INSERT INTO gallery_photos (id, provider_id, order_id, review_id, kind, mime, ext, created_at)
+       VALUES (?, ?, NULL, NULL, 'tech', ?, ?, ?)`,
+    )
+    .run(file.id, userId, file.mime, file.ext, file.now);
+  const url = `/api/photos/${file.id}`;
+  setTechPhotoUrl(techId, userId, url);
   return url;
 }
 

@@ -43,6 +43,15 @@ import {
   updateRepair,
   type RepairWrite,
 } from "@/lib/db/repairs";
+import {
+  countTechs,
+  deactivateTech,
+  insertTech,
+  listTechs,
+  toPublicTech,
+  updateTech,
+  type TechWrite,
+} from "@/lib/db/tech";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -114,6 +123,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     products: listProducts(row.user_id).map(toProduct),
     services: listServices(row.user_id).map(toPublicService),
     repairs: listRepairs(row.user_id).map(toPublicRepair),
+    techs: listTechs(row.user_id).map(toPublicTech),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -189,7 +199,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -465,10 +475,25 @@ export function ensureTamirOffer(
   });
 }
 
+export function ensureTeknolojiOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Teknoloji ve kurulum. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "teknoloji",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -485,6 +510,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "tamir") {
     return ensureTamirOffer(user, input);
+  }
+  if (categoryId === "teknoloji") {
+    return ensureTeknolojiOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -708,6 +736,70 @@ export function patchMyRepair(user: AuthUser, repairId: string, input: RepairWri
 export function removeMyRepair(user: AuthUser, repairId: string) {
   requireProvider(user);
   if (!deactivateRepair(repairId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_TECHS = 12;
+
+function assertTechWrite(input: TechWrite) {
+  const type = input.priceType ?? "sabit";
+  if (type !== "inceleme" && input.price < 1) {
+    throw new ApiError(400, "Sabit veya başlangıç fiyatı 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
+  }
+  const d = input.delivery;
+  if (d && !d.adres && !d.nokta && !d.yakin && !d.yerinde) {
+    throw new ApiError(400, "En az bir teslim yöntemi seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyTechs(user: AuthUser) {
+  requireProvider(user);
+  return listTechs(user.id, false).map(toPublicTech);
+}
+
+export function addMyTech(user: AuthUser, input: TechWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "teknoloji") {
+    throw new ApiError(400, "Teknoloji kartı yalnızca Teknoloji alanında.", "VALIDATION_ERROR");
+  }
+  assertTechWrite(input);
+  if (countTechs(user.id, false) >= MAX_TECHS) {
+    throw new ApiError(400, `En fazla ${MAX_TECHS} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicTech(
+    insertTech(user.id, {
+      ...input,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      item: input.item?.trim() || null,
+      platform: input.platform?.trim() || null,
+      notes: input.notes?.trim() || null,
+      workHours: input.workHours?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyTech(user: AuthUser, techId: string, input: TechWrite) {
+  requireProvider(user);
+  assertTechWrite(input);
+  const row = updateTech(techId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    item: input.item?.trim() || null,
+    platform: input.platform?.trim() || null,
+    notes: input.notes?.trim() || null,
+    workHours: input.workHours?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicTech(row);
+}
+
+export function removeMyTech(user: AuthUser, techId: string) {
+  requireProvider(user);
+  if (!deactivateTech(techId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };

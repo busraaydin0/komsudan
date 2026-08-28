@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -169,6 +169,54 @@ export const repairCreateSchema = z
   });
 
 export const repairPatchSchema = repairCreateSchema;
+
+const techDeliverySchema = z.object({
+  adres: z.boolean(),
+  nokta: z.boolean(),
+  yakin: z.boolean(),
+  yerinde: z.boolean(),
+});
+
+export const techCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    description: z.string().trim().max(400).optional().nullable(),
+    kind: z.enum(["bilgisayar", "telefon", "yazici", "konsol", "tv", "ag", "diger"]).optional(),
+    item: z.string().trim().max(80).optional().nullable(),
+    job: z.enum(["kurulum", "format", "yazilim", "veri", "bakim", "parca", "sorun", "diger"]).optional(),
+    price: z.number({ error: "Fiyat gerekli." }).int().min(0).max(50_000, "Fiyat 0–50.000 ₺."),
+    priceType: z.enum(["sabit", "baslangic", "inceleme"]).optional(),
+    priceUnit: z.enum(["cihaz", "islem", "saat", "paket"]).optional(),
+    materials: z.enum(["provider", "customer", "included", "extra", "none"]).optional(),
+    leadHours: z.number().int().min(0).max(168).optional().nullable(),
+    leadDays: z.number().int().min(0).max(30).optional().nullable(),
+    maxPerWeek: z.number().int().min(1).max(80).optional().nullable(),
+    delivery: techDeliverySchema.optional(),
+    inspectRequired: z.boolean().optional(),
+    quoteFromPhoto: z.boolean().optional(),
+    platform: z.string().trim().max(80).optional().nullable(),
+    warrantyDays: z.number().int().min(0).max(365).optional().nullable(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    workHours: z.string().trim().max(80).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    const type = val.priceType ?? "sabit";
+    if (type !== "inceleme" && val.price < 1) {
+      ctx.addIssue({ code: "custom", message: "Sabit veya başlangıç fiyatı 1 ₺ ve üzeri olsun.", path: ["price"] });
+    }
+    if (
+      val.delivery &&
+      !val.delivery.adres &&
+      !val.delivery.nokta &&
+      !val.delivery.yakin &&
+      !val.delivery.yerinde
+    ) {
+      ctx.addIssue({ code: "custom", message: "En az bir teslim yöntemi seç.", path: ["delivery"] });
+    }
+  });
+
+export const techPatchSchema = techCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

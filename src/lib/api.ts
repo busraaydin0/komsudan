@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderProduct, ProviderRepair, ProviderService, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderProduct, ProviderRepair, ProviderService, ProviderTech, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -372,7 +372,7 @@ export async function patchMyProviderProfile(body: {
 }
 
 export async function postMyOffer(body: {
-  categoryId: "camasir" | "davet" | "dikis" | "tamir";
+  categoryId: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji";
   dryingType?: "makine" | "ip" | "ikisi";
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
@@ -615,5 +615,78 @@ export async function uploadMyRepairPhoto(id: string, file: File) {
 export async function deleteMyRepair(id: string) {
   await readJson(
     await fetch(`/api/providers/me/repairs/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}
+
+export async function postMyTech(body: {
+  name: string;
+  description?: string | null;
+  kind?: "bilgisayar" | "telefon" | "yazici" | "konsol" | "tv" | "ag" | "diger";
+  item?: string | null;
+  job?: "kurulum" | "format" | "yazilim" | "veri" | "bakim" | "parca" | "sorun" | "diger";
+  price: number;
+  priceType?: "sabit" | "baslangic" | "inceleme";
+  priceUnit?: "cihaz" | "islem" | "saat" | "paket";
+  materials?: "provider" | "customer" | "included" | "extra" | "none";
+  leadHours?: number | null;
+  leadDays?: number | null;
+  maxPerWeek?: number | null;
+  delivery?: { adres: boolean; nokta: boolean; yakin: boolean; yerinde: boolean };
+  inspectRequired?: boolean;
+  quoteFromPhoto?: boolean;
+  platform?: string | null;
+  warrantyDays?: number | null;
+  notes?: string | null;
+  workHours?: string | null;
+  isActive?: boolean;
+}) {
+  const data = unwrap(
+    await readJson<{ data?: { tech: ProviderTech }; tech?: ProviderTech }>(
+      await fetch("/api/providers/me/tech", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.tech!;
+}
+
+export async function fetchMyTechs() {
+  const data = unwrap(
+    await readJson<{ data?: { techs: ProviderTech[] }; techs?: ProviderTech[] }>(
+      await fetch("/api/providers/me/tech"),
+    ),
+  );
+  return data.techs ?? [];
+}
+
+export async function patchMyTech(id: string, body: Parameters<typeof postMyTech>[0]) {
+  const data = unwrap(
+    await readJson<{ data?: { tech: ProviderTech }; tech?: ProviderTech }>(
+      await fetch(`/api/providers/me/tech/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.tech!;
+}
+
+export async function uploadMyTechPhoto(id: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  const data = unwrap(
+    await readJson<{ data?: { photoUrl: string; tech: ProviderTech }; photoUrl?: string; tech?: ProviderTech }>(
+      await fetch(`/api/providers/me/tech/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
+    ),
+  );
+  return data;
+}
+
+export async function deleteMyTech(id: string) {
+  await readJson(
+    await fetch(`/api/providers/me/tech/${encodeURIComponent(id)}`, { method: "DELETE" }),
   );
 }

@@ -12,6 +12,7 @@ import {
 import { upsertProduct } from "./products";
 import { upsertService } from "./services";
 import { upsertRepair } from "./repairs";
+import { upsertTech } from "./tech";
 
 const SEED_PHONES: Record<string, string> = {
   elif: "5321100001",
@@ -34,6 +35,9 @@ const SEED_PHONES: Record<string, string> = {
   hasan: "5321100018",
   metin: "5321100019",
   ozkan: "5321100020",
+  emre: "5321100021",
+  caner: "5321100022",
+  baris: "5321100023",
 };
 
 function deliveryMode(drops: Array<"kapi" | "nokta">): "door" | "point" | "both" {
@@ -122,6 +126,31 @@ function seedProviderDirectory() {
         warrantyDays: repair.warrantyDays,
         notes: repair.notes,
         workHours: repair.workHours,
+      });
+    }
+    for (const tech of p.techs ?? []) {
+      upsertTech({
+        id: tech.id,
+        provider_id: p.id,
+        name: tech.name,
+        description: tech.description,
+        kind: tech.kind,
+        item: tech.item,
+        job: tech.job,
+        price: tech.price,
+        priceType: tech.priceType,
+        priceUnit: tech.priceUnit,
+        materials: tech.materials,
+        leadHours: tech.leadHours,
+        leadDays: tech.leadDays,
+        maxPerWeek: tech.maxPerWeek,
+        delivery: tech.delivery,
+        inspectRequired: tech.inspectRequired,
+        quoteFromPhoto: tech.quoteFromPhoto,
+        platform: tech.platform,
+        warrantyDays: tech.warrantyDays,
+        notes: tech.notes,
+        workHours: tech.workHours,
       });
     }
     if (p.drops.includes("nokta")) {

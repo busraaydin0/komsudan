@@ -5,9 +5,11 @@ import { getCategoryForProvider } from "@/lib/db/categories";
 import { getProduct, toPublicProduct } from "@/lib/db/products";
 import { getService, toPublicService } from "@/lib/db/services";
 import { getRepair, toPublicRepair } from "@/lib/db/repairs";
+import { getTech, toPublicTech } from "@/lib/db/tech";
 import { dropsForFood, foodQtyBounds, foodUnitMeta } from "@/lib/food";
 import { dropsForSewing, sewingQtyBounds, sewingUnitMeta } from "@/lib/sewing";
 import { dropsForRepair, repairCanOrder, repairQtyBounds, repairUnitMeta } from "@/lib/repair";
+import { dropsForTech, techCanOrder, techQtyBounds, techUnitMeta } from "@/lib/tech";
 import { strategyFor } from "@/lib/fulfillment";
 import {
   canAddPhotos,
@@ -175,6 +177,7 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
   if (cat.id === "davet") return createDavetOrder(input, userId, provider);
   if (cat.id === "dikis") return createDikisOrder(input, userId, provider);
   if (cat.id === "tamir") return createTamirOrder(input, userId, provider);
+  if (cat.id === "teknoloji") return createTeknolojiOrder(input, userId, provider);
   return createLaundryOrder(input, userId, provider);
 }
 
@@ -216,7 +219,11 @@ function insertPendingOrder(args: {
   const now = new Date().toISOString();
   const id = `k-${randomUUID().slice(0, 8)}`;
   const capacityLabel =
-    args.packageId === "davet" ? "kişilik yer" : args.packageId === "dikis" || args.packageId === "tamir" ? "adet yer" : "parça yer";
+    args.packageId === "davet"
+      ? "kişilik yer"
+      : args.packageId === "dikis" || args.packageId === "tamir" || args.packageId === "teknoloji"
+        ? "adet yer"
+        : "parça yer";
   runOrderTx(() => {
     const remaining = getRemaining(args.providerId);
     if (remaining == null) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
@@ -453,6 +460,58 @@ function createTamirOrder(input: CreateOrderInput, userId: string, provider: Non
   const id = insertPendingOrder({
     providerId: provider.id,
     packageId: "tamir",
+    pieces: qty,
+    express: false,
+    drop: input.drop,
+    dropPointId,
+    slot: input.slot,
+    note: (input.note ?? "").trim().slice(0, 500),
+    quote,
+    userId,
+    productId: row.id,
+    productName: row.name,
+    guestCount: qty,
+  });
+  const order = getOrder(id)!;
+  notifyNewOrder({
+    id,
+    provider_id: provider.id,
+    user_id: userId,
+    pieces: qty,
+  });
+  return order;
+}
+
+function createTeknolojiOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
+  const techId = (input.productId ?? "").trim();
+  if (!techId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
+  const row = getTech(techId);
+  if (!row || row.provider_id !== provider.id || !row.is_active) {
+    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
+  }
+
+  const card = toPublicTech(row);
+  if (!techCanOrder(card)) {
+    throw new ApiError(400, "Bu iş için önce inceleme. Fiyat cihazı görünce netleşir.", "VALIDATION_ERROR");
+  }
+
+  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
+  const { min, max } = techQtyBounds(card);
+  const unit = techUnitMeta(card.priceUnit).qty;
+  if (!Number.isFinite(qty) || qty < min || qty > max) {
+    throw new ApiError(400, `Miktar ${min}–${max} ${unit} olmalı.`, "VALIDATION_ERROR");
+  }
+
+  const allowedDrops = dropsForTech(card, provider.drops);
+  if (!allowedDrops.includes(input.drop)) {
+    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
+  }
+
+  const dropPointId = validateDropAndSlot(provider, input);
+  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
+  const id = insertPendingOrder({
+    providerId: provider.id,
+    packageId: "teknoloji",
     pieces: qty,
     express: false,
     drop: input.drop,

@@ -39,6 +39,39 @@ export type RepairParts = "included" | "extra" | "customer" | "either";
 export type RepairQuoteFrom = "photo" | "seen";
 export type RepairDelivery = { adres: boolean; nokta: boolean; yakin: boolean };
 
+export type TechKind = "bilgisayar" | "telefon" | "yazici" | "konsol" | "tv" | "ag" | "diger";
+export type TechJob = "kurulum" | "format" | "yazilim" | "veri" | "bakim" | "parca" | "sorun" | "diger";
+export type TechPriceType = "sabit" | "baslangic" | "inceleme";
+export type TechPriceUnit = "cihaz" | "islem" | "saat" | "paket";
+export type TechMaterials = "provider" | "customer" | "included" | "extra" | "none";
+export type TechDelivery = { adres: boolean; nokta: boolean; yakin: boolean; yerinde: boolean };
+
+/** Teknoloji & kurulum kartı. Sabit/başlangıç fiyatta sunucu çarpar; inceleme sonrası 0 ise sipariş yok. */
+export type ProviderTech = {
+  id: string;
+  name: string;
+  description?: string | null;
+  kind?: TechKind;
+  item?: string | null;
+  job?: TechJob;
+  photoUrl?: string | null;
+  price: number;
+  priceType?: TechPriceType;
+  priceUnit?: TechPriceUnit;
+  materials?: TechMaterials;
+  leadHours?: number | null;
+  leadDays?: number | null;
+  maxPerWeek?: number | null;
+  delivery: TechDelivery;
+  inspectRequired?: boolean;
+  quoteFromPhoto?: boolean;
+  platform?: string | null;
+  warrantyDays?: number | null;
+  notes?: string | null;
+  workHours?: string | null;
+  isActive?: boolean;
+};
+
 /** Tamir hizmet kartı. Sabit/başlangıç fiyatta sunucu çarpar; inceleme sonrası 0 ise sipariş yok. */
 export type ProviderRepair = {
   id: string;
@@ -155,6 +188,7 @@ export type Provider = {
   products?: ProviderProduct[];
   services?: ProviderService[];
   repairs?: ProviderRepair[];
+  techs?: ProviderTech[];
 };
 
 export type DropPoint = {
@@ -193,7 +227,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis" | "tamir";
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji";
   pieces: number;
   express: boolean;
   drop: DropMethod;
