@@ -1,10 +1,11 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { estimateFor, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { loyaltyRate } from "@/lib/loyalty";
+import { getCategoryForProvider } from "@/lib/db/categories";
+import { strategyFor } from "@/lib/fulfillment";
 import {
   canAddPhotos,
   canCancel,
-  canTransition,
   isLifecycle,
   lifecycleOf,
   nextStatus,
@@ -163,6 +164,7 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
 
   const provider = getProvider(input.providerId);
   if (!provider) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
+  assertFulfillmentReady(provider.id);
 
   const pack = provider.packages.find((p) => p.id === input.packageId);
   if (!pack) throw new ApiError(400, "Bu paket bu komşuda yok.", "VALIDATION_ERROR");
@@ -260,8 +262,18 @@ function currentLifecycle(row: OrderRow): ApiLifecycle {
   return lifecycleOf(row.status as OrderStatus, row.lifecycle);
 }
 
-function assertCanMove(from: ApiLifecycle, to: ApiLifecycle, packageId: PackageId) {
-  if (canTransition(from, to, packageId)) return;
+function assertFulfillmentReady(providerId: string) {
+  const cat = getCategoryForProvider(providerId);
+  const strat = strategyFor(cat.fulfillment_mode);
+  if (!strat.ready) {
+    throw new ApiError(409, "Bu hizmet tipi henüz açık değil.", "CATEGORY_NOT_READY");
+  }
+  return strat;
+}
+
+function assertCanMove(row: OrderRow, from: ApiLifecycle, to: ApiLifecycle, packageId: PackageId) {
+  const strat = assertFulfillmentReady(row.provider_id);
+  if (strat.canTransition(from, to, packageId)) return;
   if (to === "ironing" && packageId !== "tam") {
     throw new ApiError(409, "Ütü bu pakette yok.", "INVALID_TRANSITION");
   }
@@ -314,7 +326,7 @@ export function applyStatus(
   }
   const from = currentLifecycle(row);
   const pack = row.package_id as PackageId;
-  assertCanMove(from, next, pack);
+  assertCanMove(row, from, next, pack);
   assertStatusRole(user, row, next);
 
   const now = new Date().toISOString();

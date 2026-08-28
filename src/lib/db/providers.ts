@@ -17,6 +17,7 @@ export type ProfileRow = {
   rating_avg: number;
   rating_count: number;
   completed_orders: number;
+  category_id: string | null;
   updated_at: string;
 };
 
@@ -29,6 +30,7 @@ export type PackageRow = {
   express_available: number;
   express_surcharge_pct: number;
   is_active: number;
+  category_id: string | null;
 };
 
 export type DropRow = {
@@ -53,7 +55,7 @@ export type SlotRow = {
 const PROFILE_SELECT = `
   p.user_id, u.full_name, p.bio, p.avatar_url, p.lat, p.lng, p.neighborhood,
   p.has_dryer, p.is_founder, p.verification_status, p.status, p.commission_rate,
-  p.rating_avg, p.rating_count, p.completed_orders, p.updated_at
+  p.rating_avg, p.rating_count, p.completed_orders, p.category_id, p.updated_at
 `;
 
 export function upsertProviderUser(input: {
@@ -96,10 +98,10 @@ export function upsertProfile(input: {
       `INSERT INTO provider_profiles (
          user_id, bio, avatar_url, lat, lng, neighborhood, has_dryer, is_founder,
          verification_status, status, commission_rate, rating_avg, rating_count,
-         completed_orders, updated_at
+         completed_orders, category_id, updated_at
        ) VALUES (
          @userId, @bio, @avatarUrl, @lat, @lng, @neighborhood, @hasDryer, @isFounder,
-         'verified', 'active', 0.10, @ratingAvg, @ratingCount, 0, @now
+         'verified', 'active', 0.10, @ratingAvg, @ratingCount, 0, @categoryId, @now
        )
        ON CONFLICT(user_id) DO UPDATE SET
          rating_avg = excluded.rating_avg,
@@ -116,6 +118,7 @@ export function upsertProfile(input: {
       avatarUrl: input.avatarUrl ?? null,
       hasDryer: input.hasDryer ? 1 : 0,
       isFounder: input.isFounder ? 1 : 0,
+      categoryId: "camasir",
       now,
     });
 }
@@ -186,15 +189,18 @@ export function updateProfileFields(
   return getProfile(userId);
 }
 
-export function upsertPackage(row: Omit<PackageRow, "is_active"> & { is_active?: number }) {
+export function upsertPackage(row: Omit<PackageRow, "is_active" | "category_id"> & {
+  is_active?: number;
+  category_id?: string | null;
+}) {
   db()
     .prepare(
       `INSERT INTO service_packages (
          id, provider_id, name, price_per_kg, min_order_amount,
-         express_available, express_surcharge_pct, is_active
+         express_available, express_surcharge_pct, is_active, category_id
        ) VALUES (
          @id, @provider_id, @name, @price_per_kg, @min_order_amount,
-         @express_available, @express_surcharge_pct, @is_active
+         @express_available, @express_surcharge_pct, @is_active, @category_id
        )
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
@@ -203,7 +209,7 @@ export function upsertPackage(row: Omit<PackageRow, "is_active"> & { is_active?:
          express_available = excluded.express_available,
          express_surcharge_pct = excluded.express_surcharge_pct`,
     )
-    .run({ is_active: 1, ...row });
+    .run({ is_active: 1, category_id: "camasir", ...row });
 }
 
 export function listPackages(providerId: string, activeOnly = true): PackageRow[] {

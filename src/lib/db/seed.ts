@@ -92,8 +92,8 @@ function seedProviderDirectory() {
 
 export function seedCatalog(database: Database.Database) {
   const upProvider = database.prepare(
-    `INSERT INTO providers (id, payload, remaining)
-     VALUES (@id, @payload, @remaining)
+    `INSERT INTO providers (id, payload, remaining, category_id)
+     VALUES (@id, @payload, @remaining, 'camasir')
      ON CONFLICT(id) DO UPDATE SET payload = excluded.payload`,
   );
   const upDrop = database.prepare(

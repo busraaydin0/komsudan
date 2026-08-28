@@ -59,6 +59,7 @@ export function pilotFromLifecycle(next: ApiLifecycle): OrderStatus {
   return "iptal";
 }
 
+/** Çamaşır / delivery geçişleri. Sipariş servisi `fulfillment.ts` üzerinden çağırır. */
 export function canTransition(from: ApiLifecycle, to: ApiLifecycle, packageId: PackageId) {
   if (!ALLOWED_TRANSITIONS[from].includes(to)) return false;
   if (to === "ironing" && packageId !== "tam") return false;

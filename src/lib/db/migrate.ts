@@ -96,6 +96,21 @@ function backfillPayments(db: Database.Database) {
   );
 }
 
+function backfillCategories(db: Database.Database) {
+  const cats = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'service_categories'")
+    .get() as { name: string } | undefined;
+  if (!cats) return;
+  addColumn(db, "provider_profiles", "category_id", "category_id TEXT");
+  addColumn(db, "service_packages", "category_id", "category_id TEXT");
+  addColumn(db, "providers", "category_id", "category_id TEXT");
+  db.exec(`
+    UPDATE provider_profiles SET category_id = 'camasir' WHERE category_id IS NULL;
+    UPDATE service_packages SET category_id = 'camasir' WHERE category_id IS NULL;
+    UPDATE providers SET category_id = 'camasir' WHERE category_id IS NULL;
+  `);
+}
+
 function ensureColumns(db: Database.Database) {
   addColumn(db, "orders", "pickup_code", "pickup_code TEXT");
   addColumn(db, "orders", "code_attempts", "code_attempts INTEGER NOT NULL DEFAULT 0");
@@ -152,6 +167,7 @@ function ensureColumns(db: Database.Database) {
   `);
   backfillHistory(db);
   backfillPayments(db);
+  backfillCategories(db);
 }
 
 export function migrate(db: Database.Database) {

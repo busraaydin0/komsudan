@@ -12,8 +12,8 @@ Kaynak: masaüstü `KOMSUDAN-ROADMAP-GENISLEME.md`. Faz atlama.
 
 ## Sıra
 
-6 Ödeme (`payments`, authorize/capture/void, iyzico id simüle) → **6.5** kategori soyutlaması (`camasir` seed, PWA değişmez) → 7 ev yemeği → 8 home-visit → 9+ review/dispute/log.
+6 Ödeme (bitti) → **6.5 kategori soyutlaması (bitti)** → **7 ev yemeği (Tip A)** → 8 home-visit (Tip B) → 9+ review/dispute/log.
 
-Faz 6 kategoriye göre dallanmaz. Faz 6.5’te yeni kategori/UI yok; home_visit yalnız iskelet.
+Faz 6.5: `camasir` seed, `category_id` backfill, delivery = mevcut çamaşır, `home_visit` iskelet (`CATEGORY_NOT_READY`). Yeni kategori/UI yok.
 
 PWA’yı kırma. Tutar/status client’tan alma. Route’ta SQL yok.
