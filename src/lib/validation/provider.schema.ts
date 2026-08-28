@@ -50,7 +50,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce"]).default("camasir"),
+    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo"]).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -387,6 +387,73 @@ export const gardenCreateSchema = z
   });
 
 export const gardenPatchSchema = gardenCreateSchema;
+
+const cargoJobsSchema = z.object({
+  subeAl: z.boolean(),
+  subeBirak: z.boolean(),
+  noktaNokta: z.boolean(),
+  alNokta: z.boolean(),
+  teslimSube: z.boolean(),
+});
+const cargoSizeSchema = z.object({
+  kucuk: z.boolean(),
+  orta: z.boolean(),
+  buyuk: z.boolean(),
+});
+const cargoPickupSchema = z.object({
+  sube: z.boolean(),
+  adres: z.boolean(),
+  nokta: z.boolean(),
+});
+const cargoDropSchema = z.object({
+  sube: z.boolean(),
+  adres: z.boolean(),
+  nokta: z.boolean(),
+});
+const cargoConfirmSchema = z.object({
+  kod: z.boolean(),
+  app: z.boolean(),
+});
+
+export const cargoCreateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
+    jobs: cargoJobsSchema.optional(),
+    sizes: cargoSizeSchema.optional(),
+    maxKm: z.number().int().min(1, "Bölge 1–50 km.").max(50, "Bölge 1–50 km.").optional(),
+    branches: z.string().trim().max(160).optional().nullable(),
+    points: z.string().trim().max(400).optional().nullable(),
+    price: z.number({ error: "Fiyat gerekli." }).int().min(1, "Fiyat 1–50.000 ₺.").max(50_000, "Fiyat 1–50.000 ₺."),
+    priceType: z.enum(["sabit", "mesafe"]).optional(),
+    durationMin: z.number().int().min(0).max(480).optional().nullable(),
+    avail: z.enum(["hemen", "randevu", "saat"]).optional(),
+    workHours: z.string().trim().max(80).optional().nullable(),
+    pickup: cargoPickupSchema.optional(),
+    dropoff: cargoDropSchema.optional(),
+    confirm: cargoConfirmSchema.optional(),
+    refuse: z.string().trim().max(400).optional().nullable(),
+    notes: z.string().trim().max(400).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.jobs && !val.jobs.subeAl && !val.jobs.subeBirak && !val.jobs.noktaNokta && !val.jobs.alNokta && !val.jobs.teslimSube) {
+      ctx.addIssue({ code: "custom", message: "En az bir hizmet türü seç.", path: ["jobs"] });
+    }
+    if (val.sizes && !val.sizes.kucuk && !val.sizes.orta && !val.sizes.buyuk) {
+      ctx.addIssue({ code: "custom", message: "En az bir paket boyutu seç.", path: ["sizes"] });
+    }
+    if (val.pickup && !val.pickup.sube && !val.pickup.adres && !val.pickup.nokta) {
+      ctx.addIssue({ code: "custom", message: "En az bir teslim alma yöntemi seç.", path: ["pickup"] });
+    }
+    if (val.dropoff && !val.dropoff.sube && !val.dropoff.adres && !val.dropoff.nokta) {
+      ctx.addIssue({ code: "custom", message: "En az bir teslim etme yöntemi seç.", path: ["dropoff"] });
+    }
+    if (val.confirm && !val.confirm.kod && !val.confirm.app) {
+      ctx.addIssue({ code: "custom", message: "En az bir teslim doğrulama seç.", path: ["confirm"] });
+    }
+  });
+
+export const cargoPatchSchema = cargoCreateSchema;
 
 export const dropCreateSchema = z.object({
   label: z.string().trim().min(2).max(80),

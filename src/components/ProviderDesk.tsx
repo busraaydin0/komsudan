@@ -15,6 +15,7 @@ import { TechServiceEditor } from "@/components/TechServiceEditor";
 import { WashServiceEditor } from "@/components/WashServiceEditor";
 import { CourierServiceEditor } from "@/components/CourierServiceEditor";
 import { GardenServiceEditor } from "@/components/GardenServiceEditor";
+import { CargoServiceEditor } from "@/components/CargoServiceEditor";
 
 const LABEL: Record<OrderStatus, string> = {
   onay_bekliyor: "Bekliyor",
@@ -117,6 +118,8 @@ export function ProviderDesk() {
         <CourierServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
 
         <GardenServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <CargoServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
 
         <h2 className="k-rise mt-8 font-[family-name:var(--font-display)] text-xl">Gelen siparişler</h2>
         {!ready ? (
@@ -222,7 +225,8 @@ function OrderCard({
   const wash = order.packageId === "araba";
   const courier = order.packageId === "kurye";
   const garden = order.packageId === "bahce";
-  const catalog = food || sewing || repair || tech || wash || courier || garden;
+  const cargo = order.packageId === "kargo";
+  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo;
   const next = nextStatus(order.status, order.packageId, catalog);
   const foodLabel: Partial<Record<OrderStatus, string>> = {
     teslim_alindi: "Hazırlanıyor",
@@ -256,7 +260,7 @@ function OrderCard({
         {p?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : sewing || repair || tech || wash || courier || garden
+          : sewing || repair || tech || wash || courier || garden || cargo
             ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
             : `${order.pieces} parça · ${pack?.title}`}
       </p>

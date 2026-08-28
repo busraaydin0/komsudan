@@ -16,6 +16,8 @@ import { dropsForTech, techCanOrder, techQtyBounds, techUnitMeta } from "@/lib/t
 import { dropsForWash, washCanOrder, washQtyBounds } from "@/lib/wash";
 import { courierCanOrder, courierQtyBounds, dropsForCourier } from "@/lib/courier";
 import { dropsForGarden, gardenCanOrder, gardenQtyBounds } from "@/lib/garden";
+import { cargoCanOrder, cargoQtyBounds, dropsForCargo } from "@/lib/cargo";
+import { getCargo, toPublicCargo } from "@/lib/db/cargos";
 import { strategyFor } from "@/lib/fulfillment";
 import {
   canAddPhotos,
@@ -187,6 +189,7 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
   if (cat.id === "araba") return createArabaOrder(input, userId, provider);
   if (cat.id === "kurye") return createKuryeOrder(input, userId, provider);
   if (cat.id === "bahce") return createBahceOrder(input, userId, provider);
+  if (cat.id === "kargo") return createKargoOrder(input, userId, provider);
   return createLaundryOrder(input, userId, provider);
 }
 
@@ -235,7 +238,8 @@ function insertPendingOrder(args: {
           args.packageId === "teknoloji" ||
           args.packageId === "araba" ||
           args.packageId === "kurye" ||
-          args.packageId === "bahce"
+          args.packageId === "bahce" ||
+          args.packageId === "kargo"
         ? "adet yer"
         : "parça yer";
   runOrderTx(() => {
@@ -679,6 +683,57 @@ function createBahceOrder(input: CreateOrderInput, userId: string, provider: Non
   const id = insertPendingOrder({
     providerId: provider.id,
     packageId: "bahce",
+    pieces: qty,
+    express: false,
+    drop: input.drop,
+    dropPointId,
+    slot: input.slot,
+    note: (input.note ?? "").trim().slice(0, 500),
+    quote,
+    userId,
+    productId: row.id,
+    productName: row.name,
+    guestCount: qty,
+  });
+  const order = getOrder(id)!;
+  notifyNewOrder({
+    id,
+    provider_id: provider.id,
+    user_id: userId,
+    pieces: qty,
+  });
+  return order;
+}
+
+function createKargoOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
+  const cargoId = (input.productId ?? "").trim();
+  if (!cargoId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
+  const row = getCargo(cargoId);
+  if (!row || row.provider_id !== provider.id || !row.is_active) {
+    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
+  }
+
+  const card = toPublicCargo(row);
+  if (!cargoCanOrder(card)) {
+    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
+  }
+
+  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
+  const { min, max } = cargoQtyBounds(card);
+  if (!Number.isFinite(qty) || qty < min || qty > max) {
+    throw new ApiError(400, `Miktar ${min}–${max} paket olmalı.`, "VALIDATION_ERROR");
+  }
+
+  const allowedDrops = dropsForCargo(card, provider.drops);
+  if (!allowedDrops.includes(input.drop)) {
+    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
+  }
+
+  const dropPointId = validateDropAndSlot(provider, input);
+  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
+  const id = insertPendingOrder({
+    providerId: provider.id,
+    packageId: "kargo",
     pieces: qty,
     express: false,
     drop: input.drop,

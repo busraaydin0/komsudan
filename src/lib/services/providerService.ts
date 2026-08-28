@@ -79,6 +79,15 @@ import {
   updateGarden,
   type GardenWrite,
 } from "@/lib/db/gardens";
+import {
+  countCargos,
+  deactivateCargo,
+  insertCargo,
+  listCargos,
+  toPublicCargo,
+  updateCargo,
+  type CargoWrite,
+} from "@/lib/db/cargos";
 import { getCategory } from "@/lib/db/categories";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -154,6 +163,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     washes: listWashes(row.user_id).map(toPublicWash),
     couriers: listCouriers(row.user_id).map(toPublicCourier),
     gardens: listGardens(row.user_id).map(toPublicGarden),
+    cargos: listCargos(row.user_id).map(toPublicCargo),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -229,7 +239,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce")) {
+  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo")) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -565,10 +575,25 @@ export function ensureBahceOffer(
   });
 }
 
+export function ensureKargoOffer(
+  user: AuthUser,
+  input: { lat: number; lng: number; neighborhood: string },
+) {
+  return ensureDirectoryEntry(user, {
+    lat: input.lat,
+    lng: input.lng,
+    neighborhood: input.neighborhood,
+    bio: "Kargo ve paket. Hizmetlerini Hizmet’ten ekle.",
+    hasDryer: false,
+    categoryId: "kargo",
+    packages: [],
+  });
+}
+
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce";
+    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo";
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -597,6 +622,9 @@ export function ensureServiceOffer(
   }
   if (categoryId === "bahce") {
     return ensureBahceOffer(user, input);
+  }
+  if (categoryId === "kargo") {
+    return ensureKargoOffer(user, input);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
@@ -1110,6 +1138,85 @@ export function patchMyGarden(user: AuthUser, gardenId: string, input: GardenWri
 export function removeMyGarden(user: AuthUser, gardenId: string) {
   requireProvider(user);
   if (!deactivateGarden(gardenId, user.id)) {
+    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  }
+  return { ok: true as const };
+}
+
+const MAX_CARGOS = 12;
+
+function assertCargoWrite(input: CargoWrite) {
+  if (input.price < 1) {
+    throw new ApiError(400, "Fiyat 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
+  }
+  const j = input.jobs;
+  if (j && !j.subeAl && !j.subeBirak && !j.noktaNokta && !j.alNokta && !j.teslimSube) {
+    throw new ApiError(400, "En az bir hizmet türü seç.", "VALIDATION_ERROR");
+  }
+  const s = input.sizes;
+  if (s && !s.kucuk && !s.orta && !s.buyuk) {
+    throw new ApiError(400, "En az bir paket boyutu seç.", "VALIDATION_ERROR");
+  }
+  const p = input.pickup;
+  if (p && !p.sube && !p.adres && !p.nokta) {
+    throw new ApiError(400, "En az bir teslim alma yöntemi seç.", "VALIDATION_ERROR");
+  }
+  const d = input.dropoff;
+  if (d && !d.sube && !d.adres && !d.nokta) {
+    throw new ApiError(400, "En az bir teslim etme yöntemi seç.", "VALIDATION_ERROR");
+  }
+  const k = input.confirm;
+  if (k && !k.kod && !k.app) {
+    throw new ApiError(400, "En az bir teslim doğrulama seç.", "VALIDATION_ERROR");
+  }
+}
+
+export function listMyCargos(user: AuthUser) {
+  requireProvider(user);
+  return listCargos(user.id, false).map(toPublicCargo);
+}
+
+export function addMyCargo(user: AuthUser, input: CargoWrite) {
+  const row = requireProvider(user);
+  if ((row.category_id ?? "camasir") !== "kargo") {
+    throw new ApiError(400, "Kargo kartı yalnızca Kargo & Paket alanında.", "VALIDATION_ERROR");
+  }
+  assertCargoWrite(input);
+  if (countCargos(user.id, false) >= MAX_CARGOS) {
+    throw new ApiError(400, `En fazla ${MAX_CARGOS} hizmet.`, "VALIDATION_ERROR");
+  }
+  return toPublicCargo(
+    insertCargo(user.id, {
+      ...input,
+      name: input.name.trim(),
+      branches: input.branches?.trim() || null,
+      points: input.points?.trim() || null,
+      workHours: input.workHours?.trim() || null,
+      refuse: input.refuse?.trim() || null,
+      notes: input.notes?.trim() || null,
+    }),
+  );
+}
+
+export function patchMyCargo(user: AuthUser, cargoId: string, input: CargoWrite) {
+  requireProvider(user);
+  assertCargoWrite(input);
+  const row = updateCargo(cargoId, user.id, {
+    ...input,
+    name: input.name.trim(),
+    branches: input.branches?.trim() || null,
+    points: input.points?.trim() || null,
+    workHours: input.workHours?.trim() || null,
+    refuse: input.refuse?.trim() || null,
+    notes: input.notes?.trim() || null,
+  });
+  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
+  return toPublicCargo(row);
+}
+
+export function removeMyCargo(user: AuthUser, cargoId: string) {
+  requireProvider(user);
+  if (!deactivateCargo(cargoId, user.id)) {
     throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
   }
   return { ok: true as const };

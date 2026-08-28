@@ -14,6 +14,7 @@ import { getTech, setTechPhotoUrl } from "@/lib/db/tech";
 import { getWash, setWashPhotoUrl } from "@/lib/db/washes";
 import { getCourier, setCourierPhotoUrl } from "@/lib/db/couriers";
 import { getGarden, setGardenPhotoUrl } from "@/lib/db/gardens";
+import { getCargo, setCargoPhotoUrl } from "@/lib/db/cargos";
 
 export const PHOTO_MAX = 4;
 export const PORTFOLIO_MAX = 16;
@@ -354,6 +355,23 @@ export function setGardenPhoto(userId: string, gardenId: string, buf: Buffer): s
     .run(file.id, userId, file.mime, file.ext, file.now);
   const url = `/api/photos/${file.id}`;
   setGardenPhotoUrl(gardenId, userId, url);
+  return url;
+}
+
+export function setCargoPhoto(userId: string, cargoId: string, buf: Buffer): string {
+  const cargo = getCargo(cargoId);
+  if (!cargo || cargo.provider_id !== userId) {
+    throw new ApiError(404, "Hizmet bulunamadı.");
+  }
+  const file = writeFile(buf);
+  db()
+    .prepare(
+      `INSERT INTO gallery_photos (id, provider_id, order_id, review_id, kind, mime, ext, created_at)
+       VALUES (?, ?, NULL, NULL, 'cargo', ?, ?, ?)`,
+    )
+    .run(file.id, userId, file.mime, file.ext, file.now);
+  const url = `/api/photos/${file.id}`;
+  setCargoPhotoUrl(cargoId, userId, url);
   return url;
 }
 

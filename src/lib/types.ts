@@ -97,6 +97,43 @@ export type GardenPriceType = "sabit" | "alan" | "durum";
 export type GardenEquipment = "provider" | "customer" | "none";
 export type GardenAvail = "hemen" | "randevu" | "gun";
 
+export type CargoJobs = {
+  subeAl: boolean;
+  subeBirak: boolean;
+  noktaNokta: boolean;
+  alNokta: boolean;
+  teslimSube: boolean;
+};
+export type CargoSize = { kucuk: boolean; orta: boolean; buyuk: boolean };
+export type CargoPriceType = "sabit" | "mesafe";
+export type CargoAvail = "hemen" | "randevu" | "saat";
+export type CargoPickup = { sube: boolean; adres: boolean; nokta: boolean };
+export type CargoDrop = { sube: boolean; adres: boolean; nokta: boolean };
+export type CargoConfirm = { kod: boolean; app: boolean };
+
+/** Kargo & paket kartı. Sabit fiyatta sunucu çarpar; mesafeye göre listedeki tutar başlangıç. */
+export type ProviderCargo = {
+  id: string;
+  name: string;
+  photoUrl?: string | null;
+  jobs: CargoJobs;
+  sizes: CargoSize;
+  maxKm: number;
+  branches?: string | null;
+  points?: string | null;
+  price: number;
+  priceType?: CargoPriceType;
+  durationMin?: number | null;
+  avail?: CargoAvail;
+  workHours?: string | null;
+  pickup: CargoPickup;
+  dropoff: CargoDrop;
+  confirm: CargoConfirm;
+  refuse?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+};
+
 /** Bahçe & bitki kartı. Sabit fiyatta sunucu çarpar; alan/durum listedeki tutar başlangıç. */
 export type ProviderGarden = {
   id: string;
@@ -309,6 +346,7 @@ export type Provider = {
   washes?: ProviderWash[];
   couriers?: ProviderCourier[];
   gardens?: ProviderGarden[];
+  cargos?: ProviderCargo[];
 };
 
 export type DropPoint = {
@@ -347,7 +385,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce";
+  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo";
   pieces: number;
   express: boolean;
   drop: DropMethod;

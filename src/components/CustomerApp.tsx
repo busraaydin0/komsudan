@@ -80,6 +80,21 @@ import {
   gardenQtyBounds,
   GARDEN_UNIT,
 } from "@/lib/garden";
+import {
+  cargoAvailLabel,
+  cargoCanOrder,
+  cargoConfirmList,
+  cargoDropLabel,
+  cargoDropList,
+  cargoDurationLabel,
+  cargoJobList,
+  cargoPickupList,
+  cargoPriceTypeLabel,
+  cargoQtyBounds,
+  cargoSizeList,
+  dropsForCargo,
+  CARGO_UNIT,
+} from "@/lib/cargo";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { estimateFood, estimateFor, tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
@@ -103,6 +118,7 @@ import type {
   ProviderWash,
   ProviderCourier,
   ProviderGarden,
+  ProviderCargo,
 } from "@/lib/types";
 
 const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), {
@@ -142,6 +158,10 @@ function isKurye(p: Pick<Provider, "categoryId">) {
 
 function isBahce(p: Pick<Provider, "categoryId">) {
   return p.categoryId === "bahce";
+}
+
+function isKargo(p: Pick<Provider, "categoryId">) {
+  return p.categoryId === "kargo";
 }
 
 function laundryInFilter(ids?: string[]) {
@@ -188,6 +208,10 @@ function listPrice(p: Provider): number | null {
   }
   if (isBahce(p)) {
     const prices = (p.gardens ?? []).filter((x) => x.price > 0).map((x) => x.price);
+    return prices.length ? Math.min(...prices) : null;
+  }
+  if (isKargo(p)) {
+    const prices = (p.cargos ?? []).filter((x) => x.price > 0).map((x) => x.price);
     return prices.length ? Math.min(...prices) : null;
   }
   return p.packages.find((x) => x.id === "tam")?.pricePerPiece ?? p.packages.at(-1)?.pricePerPiece ?? null;
@@ -290,6 +314,7 @@ export function CustomerApp({
   const araba = selected ? isAraba(selected) : false;
   const kurye = selected ? isKurye(selected) : false;
   const bahce = selected ? isBahce(selected) : false;
+  const kargo = selected ? isKargo(selected) : false;
   const product = selected?.products?.find((x) => x.id === productId) ?? selected?.products?.[0];
   const service = selected?.services?.find((x) => x.id === productId) ?? selected?.services?.[0];
   const repair = selected?.repairs?.find((x) => x.id === productId) ?? selected?.repairs?.[0];
@@ -297,6 +322,7 @@ export function CustomerApp({
   const wash = selected?.washes?.find((x) => x.id === productId) ?? selected?.washes?.[0];
   const courier = selected?.couriers?.find((x) => x.id === productId) ?? selected?.couriers?.[0];
   const garden = selected?.gardens?.find((x) => x.id === productId) ?? selected?.gardens?.[0];
+  const cargo = selected?.cargos?.find((x) => x.id === productId) ?? selected?.cargos?.[0];
   const quote = selected
     ? davet && product
       ? estimateFood(guests, product.pricePerPerson, loyaltyRate)
@@ -322,6 +348,10 @@ export function CustomerApp({
                           ? estimateFood(guests, garden.price, loyaltyRate)
                           : bahce
                             ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
+                            : kargo && cargo && cargoCanOrder(cargo)
+                              ? estimateFood(guests, cargo.price, loyaltyRate)
+                              : kargo
+                                ? { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 }
                             : estimateFor(selected, pieces, pkg, express && selected.express, loyaltyRate)
     : { total: 0, before: 0, loyaltyRate: 0, commission: 0, providerNet: 0, perPiece: 0 };
 
@@ -387,6 +417,9 @@ export function CustomerApp({
       } else if (isBahce(selected)) {
         const first = selected.gardens?.[0]?.id ?? null;
         setProductId(selected.gardens?.some((x) => x.id === productId) ? productId : first);
+      } else if (isKargo(selected)) {
+        const first = selected.cargos?.[0]?.id ?? null;
+        setProductId(selected.cargos?.some((x) => x.id === productId) ? productId : first);
       } else {
         setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
       }
@@ -441,6 +474,7 @@ export function CustomerApp({
       const arabaOrder = isAraba(selected);
       const kuryeOrder = isKurye(selected);
       const bahceOrder = isBahce(selected);
+      const kargoOrder = isKargo(selected);
       if (davetOrder && !allergy.trim()) {
         setErr("Alerji durumunu yaz. Yoksa “yok” de.");
         setPlacing(false);
@@ -467,6 +501,11 @@ export function CustomerApp({
         return;
       }
       if (bahceOrder && !gardenCanOrder(garden)) {
+        setErr("Bu hizmet için fiyat yok.");
+        setPlacing(false);
+        return;
+      }
+      if (kargoOrder && !cargoCanOrder(cargo)) {
         setErr("Bu hizmet için fiyat yok.");
         setPlacing(false);
         return;
@@ -537,6 +576,16 @@ export function CustomerApp({
                 ? {
                     providerId: selected.id,
                     productId: garden?.id,
+                    guestCount: guests,
+                    drop,
+                    dropPointId: drop === "nokta" ? dropId : null,
+                    slot,
+                    note,
+                  }
+              : kargoOrder
+                ? {
+                    providerId: selected.id,
+                    productId: cargo?.id,
                     guestCount: guests,
                     drop,
                     dropPointId: drop === "nokta" ? dropId : null,
@@ -694,6 +743,8 @@ export function CustomerApp({
                             ? "Paket alınır, yakında bırakılır. Eve kimse girmez."
                             : categoryIds?.length === 1 && categoryIds[0] === "bahce"
                               ? "İş bahçede yapılır; çim, budama, saksı. Eve kimse girmez."
+                              : categoryIds?.length === 1 && categoryIds[0] === "kargo"
+                                ? "Şubeden al, noktaya veya adrese bırak. Eve kimse girmez."
                               : "Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak."}
               </p>
               <button
@@ -824,6 +875,13 @@ export function CustomerApp({
                     setGuests((n) => Math.min(max, Math.max(min, n)));
                     const allowed = dropsForGarden(card, selected.drops);
                     setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
+                  } else if (isKargo(selected)) {
+                    const card =
+                      selected.cargos?.find((x) => x.id === productId) ?? selected.cargos?.[0];
+                    const { min, max } = cargoQtyBounds(card, selected.remaining);
+                    setGuests((n) => Math.min(max, Math.max(min, n)));
+                    const allowed = dropsForCargo(card, selected.drops);
+                    setDrop((d) => (allowed.includes(d) ? d : allowed[0] ?? d));
                   } else {
                     setPieces((n) => clampPieces(n, selected.remaining));
                   }
@@ -847,8 +905,11 @@ export function CustomerApp({
                 wash={wash}
                 courier={courier}
                 garden={garden}
+                cargo={cargo}
                 productName={
-                  bahce
+                  kargo
+                    ? cargo?.name
+                    : bahce
                     ? garden?.name
                     : kurye
                     ? courier?.name
@@ -1058,6 +1119,10 @@ function List({
                                     ? (p.gardens ?? []).length
                                       ? ` · ${(p.gardens ?? []).map((x) => x.name).join(", ")}`
                                       : " · hizmet yok"
+                                  : isKargo(p)
+                                    ? (p.cargos ?? []).length
+                                      ? ` · ${(p.cargos ?? []).map((x) => x.name).join(", ")}`
+                                      : " · hizmet yok"
                                 : dryingListLabel(p)
                               ? ` · ${dryingListLabel(p)}`
                               : ""}
@@ -1083,13 +1148,17 @@ function List({
                           ? ((isTamir(p) ? p.repairs : p.techs) ?? []).length
                             ? "inceleme"
                             : "hizmet yok"
-                          : isAraba(p) || isDikis(p) || isKurye(p) || isBahce(p)
+                          : isAraba(p) || isDikis(p) || isKurye(p) || isBahce(p) || isKargo(p)
                             ? "hizmet yok"
                             : "menü yok"
                         : isDavet(p)
                           ? `${tl(price)}/kişi`
                           : isAraba(p)
                             ? `${tl(price)}/araç`
+                            : isKargo(p)
+                              ? (p.cargos ?? []).some((x) => x.price > 0 && x.priceType === "mesafe")
+                                ? `${tl(price)}'den`
+                                : `${tl(price)}/paket`
                             : isKurye(p) || isBahce(p)
                               ? `${tl(price)}'den`
                             : isDikis(p) || isTamir(p) || isTeknoloji(p)
@@ -1134,7 +1203,8 @@ function ProviderPane({
   const araba = isAraba(p);
   const kurye = isKurye(p);
   const bahce = isBahce(p);
-  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye || bahce;
+  const kargo = isKargo(p);
+  const unitCatalog = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo;
   const items = davet
     ? (p.products ?? [])
     : dikis
@@ -1149,6 +1219,8 @@ function ProviderPane({
               ? (p.couriers ?? [])
               : bahce
                 ? (p.gardens ?? [])
+                : kargo
+                  ? (p.cargos ?? [])
             : p.packages;
   const canNext = unitCatalog ? items.length > 0 : p.packages.length > 0;
   return (
@@ -1175,7 +1247,7 @@ function ProviderPane({
                 ? "bugün dolu"
                 : davet
                   ? `bugün ${p.remaining} kişilik yer`
-                  : dikis || tamir || teknoloji || araba || kurye || bahce
+                  : dikis || tamir || teknoloji || araba || kurye || bahce || kargo
                     ? `bugün ${p.remaining} yer`
                     : `bugün ${p.remaining} parça yer`}
             </span>
@@ -1438,6 +1510,78 @@ function ProviderPane({
                   </span>
                 </button>
               ))
+          : kargo
+            ? (p.cargos ?? []).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onProduct(item.id)}
+                  className={`k-chip flex w-full gap-3 rounded-2xl px-3 py-3 text-left ring-1 ${
+                    productId === item.id
+                      ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
+                      : "bg-[var(--paper)] ring-[var(--line)]"
+                  }`}
+                >
+                  {item.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                  ) : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex justify-between font-medium">
+                      {item.name}
+                      <span className="tabular-nums">
+                        {item.priceType === "mesafe" ? `${tl(item.price)}'den` : `${tl(item.price)}/paket`}
+                      </span>
+                    </span>
+                    {(cargoJobList(item.jobs).length || item.maxKm) && (
+                      <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                        {[
+                          cargoJobList(item.jobs).slice(0, 2).join(", ") || null,
+                          item.maxKm ? `${item.maxKm} km çevresinde` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              ))
+          : kargo
+            ? (p.cargos ?? []).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onProduct(item.id)}
+                  className={`k-chip flex w-full gap-3 rounded-2xl px-3 py-3 text-left ring-1 ${
+                    productId === item.id
+                      ? "bg-[var(--sand)] ring-[var(--clay)] shadow-[0_0_0_1px_rgba(196,92,38,0.12)]"
+                      : "bg-[var(--paper)] ring-[var(--line)]"
+                  }`}
+                >
+                  {item.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                  ) : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex justify-between font-medium">
+                      {item.name}
+                      <span className="tabular-nums">
+                        {item.priceType === "mesafe" ? `${tl(item.price)}'den` : `${tl(item.price)}/paket`}
+                      </span>
+                    </span>
+                    {(cargoJobList(item.jobs).length || item.maxKm) && (
+                      <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                        {[
+                          cargoJobList(item.jobs).slice(0, 2).join(", ") || null,
+                          item.maxKm ? `${item.maxKm} km çevresinde` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              ))
           : p.packages.map((pack) => (
               <button
                 key={pack.id}
@@ -1477,6 +1621,9 @@ function ProviderPane({
         {bahce && (p.gardens ?? []).length === 0 && (
           <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
         )}
+        {kargo && (p.cargos ?? []).length === 0 && (
+          <p className="text-sm text-[var(--muted)]">Bu komşu henüz hizmet eklemedi.</p>
+        )}
       </div>
       <button
         type="button"
@@ -1505,6 +1652,7 @@ function Checkout({
   wash,
   courier,
   garden,
+  cargo,
   productName,
   express,
   onExpress,
@@ -1538,6 +1686,7 @@ function Checkout({
   wash?: ProviderWash;
   courier?: ProviderCourier;
   garden?: ProviderGarden;
+  cargo?: ProviderCargo;
   productName?: string;
   express: boolean;
   onExpress: (v: boolean) => void;
@@ -1564,8 +1713,11 @@ function Checkout({
   const araba = isAraba(p);
   const kurye = isKurye(p);
   const bahce = isBahce(p);
-  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye || bahce;
-  const unit = bahce
+  const kargo = isKargo(p);
+  const unitPriced = davet || dikis || tamir || teknoloji || araba || kurye || bahce || kargo;
+  const unit = kargo
+    ? CARGO_UNIT
+    : bahce
     ? GARDEN_UNIT
     : kurye
     ? COURIER_UNIT
@@ -1578,7 +1730,9 @@ function Checkout({
         : dikis
           ? sewingUnitMeta(service?.priceUnit)
           : foodUnitMeta(product?.priceUnit);
-  const bounds = bahce
+  const bounds = kargo
+    ? cargoQtyBounds(cargo, p.remaining)
+    : bahce
     ? gardenQtyBounds(garden, p.remaining)
     : kurye
     ? courierQtyBounds(courier, p.remaining)
@@ -1593,7 +1747,9 @@ function Checkout({
           : foodQtyBounds(product, p.remaining);
   const cap = unitPriced ? bounds.max : Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
   const minCount = unitPriced ? bounds.min : PIECES_MIN;
-  const foodDrops = bahce
+  const foodDrops = kargo
+    ? dropsForCargo(cargo, p.drops)
+    : bahce
     ? dropsForGarden(garden, p.drops)
     : kurye
     ? dropsForCourier(courier, p.drops)
@@ -1633,7 +1789,9 @@ function Checkout({
   }
 
   const count = unitPriced ? guests : pieces;
-  const unitPrice = bahce
+  const unitPrice = kargo
+    ? (cargo?.price ?? 0)
+    : bahce
     ? (garden?.price ?? 0)
     : kurye
     ? (courier?.price ?? 0)
@@ -1651,24 +1809,27 @@ function Checkout({
     (!teknoloji || techCanOrder(tech)) &&
     (!araba || washCanOrder(wash)) &&
     (!kurye || courierCanOrder(courier)) &&
-    (!bahce || gardenCanOrder(garden));
+    (!bahce || gardenCanOrder(garden)) &&
+    (!kargo || cargoCanOrder(cargo));
   const qtyTitle =
     unit.id === "kisi" ? "Kaç kişilik?" : unit.id === "kg" ? "Kaç kg?" : `Kaç ${unit.qty}?`;
 
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
-        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce ? "← Hizmet" : "← Paket"}
+        {davet ? "← Menü" : dikis || tamir || teknoloji || araba || kurye || bahce || kargo ? "← Hizmet" : "← Paket"}
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">
         {unitPriced ? qtyTitle : "Kaç parça?"}
       </h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
         {unitPriced
-          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye || bahce ? "Seçili hizmet" : "Seçili yemek")} · ${
+          ? `${productName ?? (dikis || tamir || teknoloji || araba || kurye || bahce || kargo ? "Seçili hizmet" : "Seçili yemek")} · ${
               (tamir || teknoloji) && !canPlace
                 ? "fiyat inceleme sonrası."
                 : kurye && courier?.priceType === "mesafe"
+                  ? `${tl(unitPrice)}'den, mesafeye göre.`
+                : kargo && cargo?.priceType === "mesafe"
                   ? `${tl(unitPrice)}'den, mesafeye göre.`
                 : bahce && garden?.priceType && garden.priceType !== "sabit"
                   ? `${tl(unitPrice)}'den, ${gardenPriceTypeLabel(garden.priceType).toLowerCase()}.`
@@ -1902,6 +2063,48 @@ function Checkout({
       {bahce && gardenPriceTypeLabel(garden?.priceType) ? (
         <p className="mt-2 text-xs text-[var(--muted)]">{gardenPriceTypeLabel(garden?.priceType)}</p>
       ) : null}
+      {kargo && cargoDurationLabel(cargo?.durationMin) ? (
+        <p className="mt-3 text-xs text-[var(--muted)]">Tahmini süre: {cargoDurationLabel(cargo?.durationMin)}.</p>
+      ) : null}
+      {kargo && cargoJobList(cargo?.jobs).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{cargoJobList(cargo?.jobs).join(", ")}</p>
+      ) : null}
+      {kargo && cargoSizeList(cargo?.sizes).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Paket: {cargoSizeList(cargo?.sizes).join(", ")}</p>
+      ) : null}
+      {kargo && cargo?.maxKm ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{cargo.maxKm} km çevresinde</p>
+      ) : null}
+      {kargo && cargo?.branches ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Şubeler: {cargo.branches}</p>
+      ) : null}
+      {kargo && cargo?.points ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Noktalar: {cargo.points}</p>
+      ) : null}
+      {kargo && cargoPickupList(cargo?.pickup).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Alma: {cargoPickupList(cargo?.pickup).join(", ")}</p>
+      ) : null}
+      {kargo && cargoDropList(cargo?.dropoff).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Bırakma: {cargoDropList(cargo?.dropoff).join(", ")}</p>
+      ) : null}
+      {kargo && cargoConfirmList(cargo?.confirm).length ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Doğrulama: {cargoConfirmList(cargo?.confirm).join(", ")}</p>
+      ) : null}
+      {kargo && cargoAvailLabel(cargo?.avail) ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{cargoAvailLabel(cargo?.avail)}</p>
+      ) : null}
+      {kargo && cargo?.refuse ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Taşımaz: {cargo.refuse}</p>
+      ) : null}
+      {kargo && cargo?.workHours ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Çalışma saatleri: {cargo.workHours}</p>
+      ) : null}
+      {kargo && cargo?.notes ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{cargo.notes}</p>
+      ) : null}
+      {kargo && cargoPriceTypeLabel(cargo?.priceType) ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">{cargoPriceTypeLabel(cargo?.priceType)}</p>
+      ) : null}
       {davet && product?.allergens && (
         <p className="mt-2 text-xs text-[var(--muted)]">İçerik / alerjen: {product.allergens}</p>
       )}
@@ -1938,7 +2141,9 @@ function Checkout({
               drop === d ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
             }`}
           >
-            {bahce
+            {kargo
+              ? cargoDropLabel(d)
+              : bahce
               ? gardenDropLabel(d)
               : kurye
               ? courierDropLabel(d)
@@ -1996,6 +2201,8 @@ function Checkout({
         placeholder={
           bahce
             ? "Musluk, otopark, kapı kodu…"
+            : kargo
+            ? "Şube, fiş no, kapı kodu…"
             : kurye
             ? "Alıcı, kapı kodu, paket içeriği…"
             : araba
@@ -2069,7 +2276,8 @@ function Track({
   const wash = order.packageId === "araba";
   const courier = order.packageId === "kurye";
   const garden = order.packageId === "bahce";
-  const catalog = food || sewing || repair || tech || wash || courier || garden;
+  const cargo = order.packageId === "kargo";
+  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo;
   const steps = trackSteps(order.packageId, catalog);
   const idx = steps.indexOf(order.status);
   const [busy, setBusy] = useState(false);
@@ -2084,7 +2292,7 @@ function Track({
         {provider?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : sewing || repair || tech || wash || courier || garden
+          : sewing || repair || tech || wash || courier || garden || cargo
             ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
             : `${order.pieces} parça`}{" "}
         · {tl(order.total)}
