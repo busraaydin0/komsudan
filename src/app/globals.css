@@ -176,22 +176,42 @@ input:focus-visible {
 }
 
 .katla-drop {
-  width: 14px;
-  height: 14px;
-  border: 2px dashed #c45c26;
-  background: #fbf7f0;
-  border-radius: 3px;
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 0;
+  background: transparent;
   cursor: pointer;
-  box-shadow: 0 4px 8px rgba(28, 23, 18, 0.15);
-  animation: k-pin-in 0.4s var(--ease-out) var(--pin-delay, 80ms) both;
-  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  padding: 0;
+  color: #fbf7f0;
+  filter: drop-shadow(0 6px 10px rgba(28, 23, 18, 0.22));
 }
 
-.katla-drop.is-on {
-  background: #c45c26;
-  border-style: solid;
-  box-shadow: 0 0 0 4px rgba(196, 92, 38, 0.2);
+.katla-drop .mark {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.45rem;
+  background: var(--clay);
+  border: 2px solid #fbf7f0;
+  display: grid;
+  place-items: center;
+  transform-origin: 50% 100%;
+  animation: k-pin-in 0.45s var(--ease-out) var(--pin-delay, 80ms) both;
+}
+
+.katla-drop .stem {
+  width: 2px;
+  height: 7px;
+  background: var(--clay);
+  margin-top: -1px;
+}
+
+.katla-drop:hover .mark {
+  box-shadow: 0 0 0 4px rgba(196, 92, 38, 0.22);
+}
+
+.katla-drop.is-on .mark {
+  box-shadow: 0 0 0 3px var(--card), 0 0 0 5px rgba(196, 92, 38, 0.4);
 }
 
 .katla-me {
@@ -412,7 +432,8 @@ input:focus-visible {
   .k-fade,
   .katla-pin .face,
   .katla-pin .stem,
-  .katla-drop,
+  .katla-drop .mark,
+  .katla-drop .stem,
   .katla-me span,
   .k-skel,
   .k-pulse-dot,

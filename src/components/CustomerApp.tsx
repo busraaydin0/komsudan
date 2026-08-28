@@ -244,6 +244,15 @@ export function CustomerApp({
           >
             Kurutucu var
           </button>
+          <span className="k-glass inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs ring-1 ring-[var(--line)]">
+            <span className="inline-grid h-3.5 w-3.5 place-items-center rounded-[3px] bg-[var(--clay)] text-[var(--paper)]" aria-hidden>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+                <path d="M7 7h10l-.8 11.2a2 2 0 0 1-2 1.8H9.8a2 2 0 0 1-2-1.8L7 7Z" stroke="currentColor" strokeWidth="2.2" />
+                <path d="M9 7V5.8A3 3 0 0 1 12 3a3 3 0 0 1 3 2.8V7" stroke="currentColor" strokeWidth="2.2" />
+              </svg>
+            </span>
+            Nötr nokta
+          </span>
         </div>
         {far && (
           <p className="k-glass k-rise pointer-events-auto mt-2 max-w-[16rem] rounded-xl px-3 py-2 text-xs text-[var(--muted)] ring-1 ring-[var(--line)]">

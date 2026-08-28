@@ -78,6 +78,7 @@ export function MapCanvas({
   const onSelectDropRef = useRef(onSelectDrop);
   const modeRef = useRef(mode);
   const providersRef = useRef(providers);
+  const dropPointsRef = useRef(dropPoints);
   const selectedRef = useRef(selectedId);
   const dropIdRef = useRef(dropId);
   const [mapReady, setMapReady] = useState(false);
@@ -85,6 +86,7 @@ export function MapCanvas({
   onSelectDropRef.current = onSelectDrop;
   modeRef.current = mode;
   providersRef.current = providers;
+  dropPointsRef.current = dropPoints;
   selectedRef.current = selectedId;
   dropIdRef.current = dropId;
   const pins = pinKey(providers, dropPoints);
@@ -179,7 +181,14 @@ export function MapCanvas({
       el.className = "katla-drop";
       el.dataset.drop = d.id;
       el.title = d.name;
+      el.setAttribute("aria-label", `Nötr nokta: ${d.name}`);
       el.style.setProperty("--pin-delay", `${80 + i * 40}ms`);
+      const mark = document.createElement("span");
+      mark.className = "mark";
+      mark.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 7h10l-.8 11.2a2 2 0 0 1-2 1.8H9.8a2 2 0 0 1-2-1.8L7 7Z" stroke="currentColor" stroke-width="1.9"/><path d="M9 7V5.8A3 3 0 0 1 12 3a3 3 0 0 1 3 2.8V7" stroke="currentColor" stroke-width="1.9"/></svg>`;
+      const stem = document.createElement("span");
+      stem.className = "stem";
+      el.append(mark, stem);
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         onSelectDropRef.current(d.id);
@@ -226,14 +235,29 @@ export function MapCanvas({
       el.classList.toggle("is-on", id === selectedId || drop === dropId);
     }
     const map = mapRef.current;
-    if (!map || !selectedId) return;
-    const p = providersRef.current.find((x) => x.id === selectedId);
-    if (!p) return;
+    if (!map) return;
+    if (selectedId) {
+      const p = providersRef.current.find((x) => x.id === selectedId);
+      if (!p) return;
+      map.easeTo({
+        center: [p.loc.lng, p.loc.lat],
+        zoom: Math.max(map.getZoom(), 16.2),
+        duration: 650,
+        offset: [0, -80],
+        pitch: modeRef.current === "3d" ? Math.max(map.getPitch(), 52) : 0,
+        bearing: modeRef.current === "3d" ? map.getBearing() : 0,
+        essential: true,
+      });
+      return;
+    }
+    if (!dropId) return;
+    const d = dropPointsRef.current.find((x) => x.id === dropId);
+    if (!d) return;
     map.easeTo({
-      center: [p.loc.lng, p.loc.lat],
-      zoom: Math.max(map.getZoom(), 16.2),
+      center: [d.loc.lng, d.loc.lat],
+      zoom: Math.max(map.getZoom(), 16),
       duration: 650,
-      offset: [0, -80],
+      offset: [0, -64],
       pitch: modeRef.current === "3d" ? Math.max(map.getPitch(), 52) : 0,
       bearing: modeRef.current === "3d" ? map.getBearing() : 0,
       essential: true,
