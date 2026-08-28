@@ -200,7 +200,7 @@ export function CustomerApp({
           </p>
           <p className="mt-0.5 text-[11px] text-[var(--muted)]">{PILOT.label}</p>
         </div>
-        <div className="k-rise pointer-events-auto flex items-center gap-2" style={{ animationDelay: "60ms" }}>
+        <div className="k-rise pointer-events-auto mr-12 flex items-center gap-2" style={{ animationDelay: "60ms" }}>
           <div
             className="k-glass relative grid grid-cols-2 rounded-full p-1 ring-1 ring-[var(--line)]"
             role="group"

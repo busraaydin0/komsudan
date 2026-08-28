@@ -65,7 +65,7 @@ export function ProviderDesk() {
 
   return (
     <div className="min-h-full bg-[var(--paper)]">
-      <header className="k-rise mx-auto flex max-w-lg items-center justify-between px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <header className="k-rise mx-auto flex max-w-lg items-center justify-between px-5 pr-16 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <div>
           <p className="flex items-center gap-1.5 font-[family-name:var(--font-display)] text-2xl">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />

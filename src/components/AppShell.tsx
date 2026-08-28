@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AccountScreen } from "@/components/AccountScreen";
 import { AppNotice } from "@/components/AppNotice";
+import { NoticeCenter } from "@/components/NoticeCenter";
 import { CustomerApp } from "@/components/CustomerApp";
 import { LoginGate } from "@/components/LoginGate";
 import { PermissionPrompt } from "@/components/PermissionPrompt";
@@ -64,6 +65,7 @@ export function AppShell() {
   return (
     <div className="relative h-dvh overflow-hidden bg-[var(--paper)]">
       {askPerms && <PermissionPrompt onDone={() => setAskPerms(false)} />}
+      <NoticeCenter onOpen={openNotice} />
       <AppNotice onOpen={openNotice} />
       <div
         className={hideMap ? "absolute inset-0 hidden" : "h-full"}
