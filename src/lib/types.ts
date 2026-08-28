@@ -135,6 +135,17 @@ export type CreateOrderInput = {
   note: string;
 };
 
+export type AppNotification = {
+  id: string;
+  orderId: string | null;
+  type: string;
+  title: string;
+  body: string;
+  channel: string;
+  readAt: string | null;
+  createdAt: string;
+};
+
 export type Account = {
   id: string;
   phone: string;

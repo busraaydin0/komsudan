@@ -30,6 +30,7 @@ import {
   updateUserName,
   type UserRow,
 } from "@/lib/db/auth";
+import { deleteNotificationsForUser } from "@/lib/db/notifications";
 import { echoOtp, hashOtp, OTP_MAX_ATTEMPTS, OTP_PER_HOUR, OTP_PER_MINUTE, OTP_TTL_MS } from "@/lib/auth/otp";
 import { ACCESS_TTL_SEC, REFRESH_TTL_SEC, signAccess } from "@/lib/auth/jwt";
 import { toAuthUser, type AuthUser } from "@/lib/auth/types";
@@ -189,6 +190,7 @@ export function deleteAccount(user: AuthUser) {
   db().transaction(() => {
     anonymizeReviewsForUser(user.id);
     unlinkUserOrders(user.id);
+    deleteNotificationsForUser(user.id);
     db()
       .prepare(`DELETE FROM gallery_photos WHERE provider_id = ? AND kind = 'portfolio'`)
       .run(user.id);

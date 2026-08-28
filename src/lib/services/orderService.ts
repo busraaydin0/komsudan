@@ -47,6 +47,11 @@ import { getProvider } from "@/server/catalog";
 import { addPhoto, photosForOrder } from "@/server/photos";
 import { reviewForOrder } from "@/server/reviews";
 import { ApiError } from "@/server/rules";
+import {
+  notifyNewOrder,
+  notifyPickupCodeRotated,
+  notifyStatusChange,
+} from "@/lib/services/notificationService";
 
 export type OrderAction = "accept" | "reject" | "advance" | "deliver";
 
@@ -231,7 +236,14 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
     });
   });
 
-  return getOrder(id)!;
+  const order = getOrder(id)!;
+  notifyNewOrder({
+    id,
+    provider_id: provider.id,
+    user_id: userId,
+    pieces,
+  });
+  return order;
 }
 
 function currentLifecycle(row: OrderRow): ApiLifecycle {
@@ -265,7 +277,9 @@ function verifyPickupCode(row: OrderRow, code: string | undefined, now: string) 
   if (entered.length !== PICKUP_CODE_LEN || entered !== expected) {
     const attempts = (row.code_attempts ?? 0) + 1;
     if (attempts >= PICKUP_CODE_TRIES) {
-      rotatePickupCode(row.id, genCode(), now);
+      const fresh = genCode();
+      rotatePickupCode(row.id, fresh, now);
+      notifyPickupCodeRotated(row, fresh);
       throw new ApiError(
         409,
         "Beş hatalı deneme. Yeni kod müşteriye gitti (SMS simülasyonu).",
@@ -347,7 +361,15 @@ export function applyStatus(
     if (voidPay) addRemaining(row.provider_id, row.pieces);
   });
 
-  return getOrder(id)!;
+  const order = getOrder(id)!;
+  notifyStatusChange({
+    row,
+    from,
+    next,
+    actorId: user.id,
+    pickupCode: order.pickupCode,
+  });
+  return order;
 }
 
 export function applyOrderAction(id: string, action: OrderAction, user: AuthUser, code?: string): Order {

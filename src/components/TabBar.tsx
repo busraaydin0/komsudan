@@ -1,6 +1,6 @@
 "use client";
 
-import { useOrders } from "@/lib/api";
+import { useOrders, useNotifications } from "@/lib/api";
 
 export type AppTab = "harita" | "siparis" | "hizmet" | "hesap";
 
@@ -13,6 +13,7 @@ const ITEMS: { id: AppTab; label: string }[] = [
 
 export function TabBar({ tab, onTab }: { tab: AppTab; onTab: (t: AppTab) => void }) {
   const { orders } = useOrders();
+  const { unread } = useNotifications();
   const openOrder = orders.some((o) => o.status !== "teslim_edildi" && o.status !== "iptal");
   const openDesk = orders.some((o) => o.status !== "teslim_edildi" && o.status !== "iptal");
 
@@ -24,7 +25,8 @@ export function TabBar({ tab, onTab }: { tab: AppTab; onTab: (t: AppTab) => void
       <ul className="grid grid-cols-4">
         {ITEMS.map((item) => {
           const on = tab === item.id;
-          const badge = item.id === "siparis" ? openOrder : item.id === "hizmet" ? openDesk : false;
+          const badge =
+            item.id === "siparis" ? openOrder : item.id === "hizmet" ? openDesk : item.id === "hesap" ? unread > 0 : false;
           return (
             <li key={item.id}>
               <button

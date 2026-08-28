@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Loyalty } from "@/lib/loyalty";
 import type { Account, WorkPhoto } from "@/lib/types";
 import { formatPhone } from "@/lib/phone";
-import { deleteMyAccount, deleteMyPhoto, fetchMyPhotos, logoutSession, patchAccount, uploadMyAvatar, uploadMyPhoto } from "@/lib/api";
+import { deleteMyAccount, deleteMyPhoto, fetchMyPhotos, logoutSession, markAllNotificationsRead, markNotificationRead, patchAccount, uploadMyAvatar, uploadMyPhoto, useNotifications } from "@/lib/api";
 import {
   cameraState,
   clearPermissionAsked,
@@ -87,6 +87,8 @@ export function AccountScreen({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState("");
+  const { notifications, unread, reload: reloadInbox } = useNotifications();
+  const [inboxBusy, setInboxBusy] = useState(false);
 
   const locked = account.role === "provider" || account.role === "admin";
 
@@ -182,6 +184,28 @@ export function AccountScreen({
     }
   }
 
+  async function readOne(id: string, alreadyRead: boolean) {
+    if (alreadyRead || inboxBusy) return;
+    setInboxBusy(true);
+    try {
+      await markNotificationRead(id);
+      await reloadInbox();
+    } finally {
+      setInboxBusy(false);
+    }
+  }
+
+  async function readAll() {
+    if (inboxBusy || unread === 0) return;
+    setInboxBusy(true);
+    try {
+      await markAllNotificationsRead();
+      await reloadInbox();
+    } finally {
+      setInboxBusy(false);
+    }
+  }
+
   async function out() {
     await logoutSession();
     onLogout();
@@ -252,6 +276,66 @@ export function AccountScreen({
             </div>
           </section>
         )}
+
+        <section className="rounded-3xl bg-[var(--card)] p-5 ring-1 ring-[var(--line)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-[family-name:var(--font-display)] text-xl">Bildirimler</h2>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Sipariş durumu uygulama içinde. SMS simülasyonu; gerçek SMS veya push yok.
+              </p>
+            </div>
+            {unread > 0 && (
+              <button
+                type="button"
+                disabled={inboxBusy}
+                onClick={() => void readAll()}
+                className="shrink-0 text-xs text-[var(--clay)]"
+              >
+                Tümünü oku
+              </button>
+            )}
+          </div>
+          {notifications.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--muted)]">Henüz bildirim yok.</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-[var(--line)]">
+              {notifications.map((n) => {
+                const unreadItem = !n.readAt;
+                return (
+                  <li key={n.id}>
+                    <button
+                      type="button"
+                      disabled={!unreadItem || inboxBusy}
+                      onClick={() => void readOne(n.id, !unreadItem)}
+                      className={`flex w-full items-start gap-2 py-2.5 text-left first:pt-0 last:pb-0 ${
+                        unreadItem ? "" : "opacity-70"
+                      }`}
+                    >
+                      <span
+                        className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                          unreadItem ? "bg-[var(--clay)]" : "bg-transparent"
+                        }`}
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm">{n.title}</span>
+                        <span className="mt-0.5 block text-xs text-[var(--muted)]">{n.body}</span>
+                        <span className="mt-1 block text-[11px] text-[var(--muted)]">
+                          {new Date(n.createdAt).toLocaleString("tr-TR", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
         <section className="rounded-3xl bg-[var(--card)] p-5 ring-1 ring-[var(--line)]">
           <div className="flex items-start justify-between gap-3">

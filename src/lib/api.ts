@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Account, CreateOrderInput, DropPoint, Order, Provider, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -69,6 +69,67 @@ export function useOrders() {
   }, [reload]);
 
   return { orders, ready, reload };
+}
+
+export function useNotifications() {
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [ready, setReady] = useState(false);
+
+  const reload = useCallback(async () => {
+    try {
+      const data = unwrap(
+        await readJson<{
+          data?: { notifications: AppNotification[]; unread: number };
+          notifications?: AppNotification[];
+          unread?: number;
+        }>(await fetch("/api/notifications")),
+      );
+      setNotifications(data.notifications ?? []);
+      setUnread(data.unread ?? 0);
+      setReady(true);
+    } catch {
+      setNotifications([]);
+      setUnread(0);
+      setReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+    const t = setInterval(() => void reload(), 2500);
+    return () => clearInterval(t);
+  }, [reload]);
+
+  return { notifications, unread, ready, reload };
+}
+
+export async function markNotificationRead(id: string) {
+  const data = unwrap(
+    await readJson<{
+      data?: { notifications: AppNotification[]; unread: number };
+      notifications?: AppNotification[];
+      unread?: number;
+    }>(
+      await fetch(`/api/notifications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ read: true }),
+      }),
+    ),
+  );
+  return { notifications: data.notifications ?? [], unread: data.unread ?? 0 };
+}
+
+export async function markAllNotificationsRead() {
+  const data = unwrap(
+    await readJson<{
+      data?: { notifications: AppNotification[]; unread: number };
+      notifications?: AppNotification[];
+      unread?: number;
+    }>(await fetch("/api/notifications/read-all", { method: "POST" })),
+  );
+  return { notifications: data.notifications ?? [], unread: data.unread ?? 0 };
 }
 
 export async function postOrder(input: CreateOrderInput) {
