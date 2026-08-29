@@ -35,6 +35,7 @@ import { echoOtp, hashOtp, OTP_MAX_ATTEMPTS, OTP_PER_HOUR, OTP_PER_MINUTE, OTP_T
 import { ACCESS_TTL_SEC, REFRESH_TTL_SEC, signAccess } from "@/lib/auth/jwt";
 import { toAuthUser, type AuthUser } from "@/lib/auth/types";
 import { normalizePhone } from "@/lib/phone";
+import { logger } from "@/lib/logger";
 
 export { normalizePhone };
 
@@ -55,9 +56,11 @@ export function requestOtp(rawPhone: string) {
   }
   const now = Date.now();
   if (countOtpSince(phone, new Date(now - 60_000).toISOString()) >= OTP_PER_MINUTE) {
+    logger.warn({ phone }, "OTP dakika limiti.");
     throw new ApiError(429, "Aynı numaraya dakikada bir kod.", "OTP_RATE_LIMIT");
   }
   if (countOtpSince(phone, new Date(now - 3_600_000).toISOString()) >= OTP_PER_HOUR) {
+    logger.warn({ phone }, "OTP saatlik limiti.");
     throw new ApiError(429, "Bu numara için saatlik kod limiti doldu.", "OTP_RATE_LIMIT");
   }
   const code = randomInt(0, 1_000_000).toString().padStart(6, "0");

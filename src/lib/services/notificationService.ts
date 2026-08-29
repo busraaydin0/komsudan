@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import type { ApiLifecycle, AppNotification } from "@/lib/types";
 import { ApiError } from "@/server/rules";
 import type { AuthUser } from "@/lib/auth/types";
@@ -41,7 +42,7 @@ function pushTo(userId: string | null | undefined, input: {
   try {
     insertNotification({ userId, ...input });
   } catch (e) {
-    console.error("Bildirim yazılamadı.", e);
+    logger.error({ err: e }, "Bildirim yazılamadı.");
   }
 }
 
