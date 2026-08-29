@@ -29,7 +29,8 @@ function open() {
   const dir = path.join(process.cwd(), "data");
   fs.mkdirSync(dir, { recursive: true });
   uploadsDir();
-  const database = new Database(path.join(dir, "komsudan.db"));
+  const file = process.env.KOMSU_DB_PATH ?? path.join(dir, "komsudan.db");
+  const database = new Database(file);
   database.pragma("journal_mode = WAL");
   database.pragma("foreign_keys = ON");
   g.__komsuDb = database;
