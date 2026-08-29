@@ -217,6 +217,16 @@ export function updateProfileFields(
   return getProfile(userId);
 }
 
+export function setProfileRating(userId: string, ratingAvg: number, ratingCount: number) {
+  db()
+    .prepare(
+      `UPDATE provider_profiles
+       SET rating_avg = ?, rating_count = ?, updated_at = ?
+       WHERE user_id = ?`,
+    )
+    .run(ratingAvg, ratingCount, new Date().toISOString(), userId);
+}
+
 export function catalogProviderExists(id: string) {
   return Boolean(db().prepare("SELECT 1 AS ok FROM providers WHERE id = ?").get(id));
 }

@@ -144,6 +144,7 @@ import {
   type GraveWrite,
 } from "@/lib/db/graves";
 import { getCategory } from "@/lib/db/categories";
+import { ratingForProvider } from "@/lib/services/reviewService";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
 import type { AuthUser } from "@/lib/auth/types";
@@ -193,6 +194,10 @@ function toProduct(row: ProductRow) {
 }
 
 function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
+  const live = ratingForProvider(row.user_id, {
+    rating: row.rating_avg,
+    reviews: row.rating_count,
+  });
   const provider = {
     id: row.user_id,
     fullName: row.full_name,
@@ -205,8 +210,8 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     isFounder: Boolean(row.is_founder),
     verificationStatus: row.verification_status,
     status: row.status,
-    ratingAvg: row.rating_avg,
-    ratingCount: row.rating_count,
+    ratingAvg: live.rating,
+    ratingCount: live.reviews,
     completedOrders: row.completed_orders,
     commissionRate: row.commission_rate,
     categoryId: row.category_id ?? "camasir",

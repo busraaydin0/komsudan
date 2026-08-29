@@ -1,11 +1,11 @@
 import { db, toDrop, toProvider } from "./db";
 import type { DropPoint, Provider } from "@/lib/types";
 import { workPhotosForProvider } from "./photos";
-import { ratingFor, reviewsForProvider } from "./reviews";
+import { ratingForProvider, reviewsForProvider } from "@/lib/services/reviewService";
 import { listAvatarUrls } from "@/lib/db/providers";
 
 function hydrate(p: Provider, avatars: Record<string, string>): Provider {
-  const live = ratingFor(p.id, p.rating, p.reviews);
+  const live = ratingForProvider(p.id, { rating: p.rating, reviews: p.reviews });
   return {
     ...p,
     rating: live.rating,

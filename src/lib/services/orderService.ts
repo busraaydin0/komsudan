@@ -75,7 +75,7 @@ import {
 } from "@/lib/db/orders";
 import { getProvider } from "@/server/catalog";
 import { addPhoto, photosForOrder } from "@/server/photos";
-import { reviewForOrder } from "@/server/reviews";
+import { reviewForOrder } from "@/lib/services/reviewService";
 import { ApiError } from "@/server/rules";
 import {
   notifyNewOrder,

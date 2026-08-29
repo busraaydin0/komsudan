@@ -23,6 +23,7 @@ import { upsertCarpet } from "./carpets";
 import { upsertLesson } from "./lessons";
 import { upsertTalk } from "./talks";
 import { upsertGrave } from "./graves";
+import { writeProfileRatingsFromReviews } from "./reviews";
 
 const SEED_PHONES: Record<string, string> = {
   elif: "5321100001",
@@ -470,6 +471,7 @@ export function seedCatalog(database: Database.Database) {
       });
     }
     seedProviderDirectory();
+    writeProfileRatingsFromReviews();
   });
   tx();
 }
