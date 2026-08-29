@@ -139,7 +139,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     table: "provider_couriers",
     domainLib: "courier.ts",
     editor: "CourierServiceEditor",
-    unitQty: "paket",
+    unitQty: "gönderi",
     capacityLabel: "adet yer",
     seatPhrase: "yer",
     offerBio: "Yakın mesafe kurye. Hizmetlerini Hizmet’ten ekle.",
