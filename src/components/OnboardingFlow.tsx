@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { isCatalogCategoryId } from "@/lib/categories/registry";
 import { NEIGHBORHOODS, PACKAGES, PILOT } from "@/lib/data";
 import { DRYING_OPTIONS } from "@/lib/drying";
 import { fetchCategories, patchPreferences, postMyOffer, type ServiceCategory } from "@/lib/api";
@@ -118,23 +119,7 @@ export function OnboardingFlow({
       return;
     }
     await postMyOffer({
-      categoryId:
-        offerCat === "dikis" ||
-        offerCat === "tamir" ||
-        offerCat === "teknoloji" ||
-        offerCat === "araba" ||
-        offerCat === "kurye" ||
-        offerCat === "bahce" ||
-        offerCat === "kargo" ||
-        offerCat === "cikti" ||
-        offerCat === "kislik" ||
-        offerCat === "hali" ||
-        offerCat === "odev" ||
-        offerCat === "dil" ||
-        offerCat === "mezar" ||
-        offerCat === "davet"
-          ? offerCat
-          : "davet",
+      categoryId: isCatalogCategoryId(offerCat) ? offerCat : "davet",
       lat,
       lng,
       neighborhood: neighborhoodName,

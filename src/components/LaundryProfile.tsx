@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isCatalogCategoryId } from "@/lib/categories/registry";
 import { PACKAGES, trustLabel } from "@/lib/data";
 import { DRYING_OPTIONS, dryingFromProvider } from "@/lib/drying";
 import { patchMyProviderProfile } from "@/lib/api";
@@ -32,7 +33,7 @@ export function LaundryProfile({
   const [ok, setOk] = useState("");
 
   useEffect(() => {
-    if (!me || me.categoryId === "davet" || me.categoryId === "dikis" || me.categoryId === "tamir" || me.categoryId === "teknoloji" || me.categoryId === "araba" || me.categoryId === "kurye" || me.categoryId === "bahce" || me.categoryId === "kargo" || me.categoryId === "cikti" || me.categoryId === "kislik" || me.categoryId === "hali" || me.categoryId === "odev" || me.categoryId === "dil" || me.categoryId === "mezar") return;
+    if (!me || isCatalogCategoryId(me.categoryId)) return;
     setBio(me.bio);
     setDryingType(dryingFromProvider(me));
     setExpress(me.express);
@@ -46,7 +47,7 @@ export function LaundryProfile({
     });
   }, [me]);
 
-  if (!me || me.categoryId === "davet" || me.categoryId === "dikis" || me.categoryId === "tamir" || me.categoryId === "teknoloji" || me.categoryId === "araba" || me.categoryId === "kurye" || me.categoryId === "bahce" || me.categoryId === "kargo" || me.categoryId === "cikti" || me.categoryId === "kislik" || me.categoryId === "hali" || me.categoryId === "odev" || me.categoryId === "dil" || me.categoryId === "mezar") return null;
+  if (!me || isCatalogCategoryId(me.categoryId)) return null;
 
   const tone = seatTone(me.remaining, me.capacity);
 

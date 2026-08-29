@@ -1,4 +1,7 @@
-export type PackageId = "yikama" | "katlama" | "tam";
+import type { LaundryPackageId, OrderPackageId } from "./categories/registry";
+
+export type PackageId = LaundryPackageId;
+export type { OrderPackageId };
 export type DropMethod = "kapi" | "nokta";
 export type DryingType = "makine" | "ip" | "ikisi";
 export type MapMode = "2d" | "3d";
@@ -599,7 +602,7 @@ export type ApiLifecycle =
 export type Order = {
   id: string;
   providerId: string;
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil" | "mezar";
+  packageId: OrderPackageId;
   pieces: number;
   express: boolean;
   drop: DropMethod;

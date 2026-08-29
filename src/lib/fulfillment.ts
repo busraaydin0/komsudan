@@ -1,3 +1,4 @@
+import { isCatalogCategoryId } from "@/lib/categories/registry";
 import type { ApiLifecycle, PackageId } from "@/lib/types";
 import { canTransition as deliveryCanTransition } from "@/lib/status";
 import type { FulfillmentMode } from "@/lib/db/categories";
@@ -59,7 +60,7 @@ export const homeVisitStrategy: FulfillmentStrategy = {
 
 export function strategyFor(mode: FulfillmentMode, categoryId?: string): FulfillmentStrategy {
   if (mode === "home_visit") return homeVisitStrategy;
-  if (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti" || categoryId === "kislik" || categoryId === "hali" || categoryId === "odev" || categoryId === "dil" || categoryId === "mezar") {
+  if (isCatalogCategoryId(categoryId)) {
     return foodStrategy;
   }
   return deliveryStrategy;

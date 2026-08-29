@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CATEGORY_ID_ENUM } from "@/lib/categories/registry";
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Saat HH:mm olmalı.");
 
@@ -50,7 +51,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(["camasir", "davet", "dikis", "tamir", "teknoloji", "araba", "kurye", "bahce", "kargo", "cikti", "kislik", "hali", "odev", "dil", "mezar"]).default("camasir"),
+    categoryId: z.enum(CATEGORY_ID_ENUM).default("camasir"),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),

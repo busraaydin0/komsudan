@@ -1,4 +1,5 @@
 import { ApiError } from "@/server/rules";
+import { CATEGORIES, isCatalogCategoryId, type CatalogCategoryId, type CategoryId } from "@/lib/categories/registry";
 import { PACKAGES, PILOT } from "@/lib/data";
 import { dryingBlurb, hasDryerFrom } from "@/lib/drying";
 import { haversineKm } from "@/lib/geo/distance";
@@ -299,7 +300,7 @@ export function patchMyProfile(
   }
   const profile = requireProvider(user);
   const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && (categoryId === "davet" || categoryId === "dikis" || categoryId === "tamir" || categoryId === "teknoloji" || categoryId === "araba" || categoryId === "kurye" || categoryId === "bahce" || categoryId === "kargo" || categoryId === "cikti" || categoryId === "kislik" || categoryId === "hali" || categoryId === "odev" || categoryId === "dil" || categoryId === "mezar")) {
+  if (patch.packages && isCatalogCategoryId(categoryId)) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
   if (patch.packages) {
@@ -530,212 +531,18 @@ export function ensureLaundryOffer(
   return row;
 }
 
-export function ensureDavetOffer(
+function ensureCatalogOffer(
   user: AuthUser,
   input: { lat: number; lng: number; neighborhood: string },
+  categoryId: CatalogCategoryId,
 ) {
   return ensureDirectoryEntry(user, {
     lat: input.lat,
     lng: input.lng,
     neighborhood: input.neighborhood,
-    bio: "Davet ikramlık. Menünü Hizmet’ten ekle.",
+    bio: CATEGORIES[categoryId].offerBio,
     hasDryer: false,
-    categoryId: "davet",
-    packages: [],
-  });
-}
-
-export function ensureDikisOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Dikiş ve tadilat. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "dikis",
-    packages: [],
-  });
-}
-
-export function ensureTamirOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Tamir. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "tamir",
-    packages: [],
-  });
-}
-
-export function ensureTeknolojiOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Teknoloji ve kurulum. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "teknoloji",
-    packages: [],
-  });
-}
-
-export function ensureArabaOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Araba yıkama. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "araba",
-    packages: [],
-  });
-}
-
-export function ensureKuryeOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Yakın mesafe kurye. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "kurye",
-    packages: [],
-  });
-}
-
-export function ensureBahceOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Bahçe ve bitki. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "bahce",
-    packages: [],
-  });
-}
-
-export function ensureKargoOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Kargo ve paket. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "kargo",
-    packages: [],
-  });
-}
-
-export function ensureCiktiOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Evde çıktı. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "cikti",
-    packages: [],
-  });
-}
-
-export function ensureKislikOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Kışlık ve dondurucu. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "kislik",
-    packages: [],
-  });
-}
-
-export function ensureHaliOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Halı yıkama. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "hali",
-    packages: [],
-  });
-}
-
-export function ensureOdevOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Ödev eşliği. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "odev",
-    packages: [],
-  });
-}
-
-export function ensureDilOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Dil pratiği. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "dil",
-    packages: [],
-  });
-}
-
-export function ensureMezarOffer(
-  user: AuthUser,
-  input: { lat: number; lng: number; neighborhood: string },
-) {
-  return ensureDirectoryEntry(user, {
-    lat: input.lat,
-    lng: input.lng,
-    neighborhood: input.neighborhood,
-    bio: "Mezar bakımı. Hizmetlerini Hizmet’ten ekle.",
-    hasDryer: false,
-    categoryId: "mezar",
+    categoryId,
     packages: [],
   });
 }
@@ -743,7 +550,7 @@ export function ensureMezarOffer(
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: "camasir" | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil" | "mezar";
+    categoryId?: CategoryId;
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -752,47 +559,8 @@ export function ensureServiceOffer(
   },
 ) {
   const categoryId = input.categoryId ?? "camasir";
-  if (categoryId === "davet") {
-    return ensureDavetOffer(user, input);
-  }
-  if (categoryId === "dikis") {
-    return ensureDikisOffer(user, input);
-  }
-  if (categoryId === "tamir") {
-    return ensureTamirOffer(user, input);
-  }
-  if (categoryId === "teknoloji") {
-    return ensureTeknolojiOffer(user, input);
-  }
-  if (categoryId === "araba") {
-    return ensureArabaOffer(user, input);
-  }
-  if (categoryId === "kurye") {
-    return ensureKuryeOffer(user, input);
-  }
-  if (categoryId === "bahce") {
-    return ensureBahceOffer(user, input);
-  }
-  if (categoryId === "kargo") {
-    return ensureKargoOffer(user, input);
-  }
-  if (categoryId === "cikti") {
-    return ensureCiktiOffer(user, input);
-  }
-  if (categoryId === "kislik") {
-    return ensureKislikOffer(user, input);
-  }
-  if (categoryId === "hali") {
-    return ensureHaliOffer(user, input);
-  }
-  if (categoryId === "odev") {
-    return ensureOdevOffer(user, input);
-  }
-  if (categoryId === "dil") {
-    return ensureDilOffer(user, input);
-  }
-  if (categoryId === "mezar") {
-    return ensureMezarOffer(user, input);
+  if (isCatalogCategoryId(categoryId)) {
+    return ensureCatalogOffer(user, input, categoryId);
   }
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");

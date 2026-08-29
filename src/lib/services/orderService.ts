@@ -1,4 +1,5 @@
 import { randomInt, randomUUID } from "node:crypto";
+import { capacityLabelForPackage } from "@/lib/categories/registry";
 import { estimateFood, estimateFor, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { loyaltyRate } from "@/lib/loyalty";
 import { getCategoryForProvider } from "@/lib/db/categories";
@@ -248,30 +249,7 @@ function insertPendingOrder(args: {
 }) {
   const now = new Date().toISOString();
   const id = `k-${randomUUID().slice(0, 8)}`;
-  const capacityLabel =
-    args.packageId === "davet"
-      ? "kişilik yer"
-      : args.packageId === "cikti"
-        ? "sayfa yer"
-        : args.packageId === "kislik"
-          ? "birim yer"
-          : args.packageId === "hali"
-            ? "adet yer"
-          : args.packageId === "odev"
-            ? "ders yer"
-          : args.packageId === "dil"
-            ? "görüşme yer"
-          : args.packageId === "mezar"
-            ? "iş yer"
-          : args.packageId === "dikis" ||
-            args.packageId === "tamir" ||
-            args.packageId === "teknoloji" ||
-            args.packageId === "araba" ||
-            args.packageId === "kurye" ||
-            args.packageId === "bahce" ||
-            args.packageId === "kargo"
-          ? "adet yer"
-          : "parça yer";
+  const capacityLabel = capacityLabelForPackage(args.packageId);
   runOrderTx(() => {
     const remaining = getRemaining(args.providerId);
     if (remaining == null) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");

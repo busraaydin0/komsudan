@@ -1,3 +1,5 @@
+import type { OrderPackageId } from "./categories/registry";
+import { usesFoodSm } from "./categories/registry";
 import type { ApiLifecycle, OrderStatus, PackageId } from "./types";
 
 export const LIFECYCLES: ApiLifecycle[] = [
@@ -70,26 +72,10 @@ export function canTransition(from: ApiLifecycle, to: ApiLifecycle, packageId: P
 
 export function nextStatus(
   current: OrderStatus,
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil" | "mezar",
+  packageId: OrderPackageId,
   food = false,
 ): OrderStatus | null {
-  if (
-    food ||
-    packageId === "davet" ||
-    packageId === "dikis" ||
-    packageId === "tamir" ||
-    packageId === "teknoloji" ||
-    packageId === "araba" ||
-    packageId === "kurye" ||
-    packageId === "bahce" ||
-    packageId === "kargo" ||
-    packageId === "cikti" ||
-    packageId === "kislik" ||
-    packageId === "hali" ||
-    packageId === "odev" ||
-    packageId === "dil" ||
-    packageId === "mezar"
-  ) {
+  if (usesFoodSm(packageId, food)) {
     if (current === "onay_bekliyor") return "teslim_alindi";
     if (current === "teslim_alindi") return "hazir";
     if (current === "hazir") return "teslim_edildi";
@@ -118,27 +104,8 @@ export function canReview(status: OrderStatus) {
 export const PICKUP_CODE_LEN = 6;
 export const PICKUP_CODE_TRIES = 5;
 
-export function trackSteps(
-  packageId: PackageId | "davet" | "dikis" | "tamir" | "teknoloji" | "araba" | "kurye" | "bahce" | "kargo" | "cikti" | "kislik" | "hali" | "odev" | "dil" | "mezar",
-  food = false,
-): OrderStatus[] {
-  if (
-    food ||
-    packageId === "davet" ||
-    packageId === "dikis" ||
-    packageId === "tamir" ||
-    packageId === "teknoloji" ||
-    packageId === "araba" ||
-    packageId === "kurye" ||
-    packageId === "bahce" ||
-    packageId === "kargo" ||
-    packageId === "cikti" ||
-    packageId === "kislik" ||
-    packageId === "hali" ||
-    packageId === "odev" ||
-    packageId === "dil" ||
-    packageId === "mezar"
-  ) {
+export function trackSteps(packageId: OrderPackageId, food = false): OrderStatus[] {
+  if (usesFoodSm(packageId, food)) {
     return ["onay_bekliyor", "teslim_alindi", "hazir", "teslim_edildi"];
   }
   if (packageId === "tam") {
