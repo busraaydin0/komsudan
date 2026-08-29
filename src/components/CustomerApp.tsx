@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PILOT, trustLabel } from "@/lib/data";
+import { bayesianRating } from "@/lib/rating";
 import { dryingListLabel } from "@/lib/drying";
 import { dropsForFood, foodCategoryLabel, foodLeadLabel, foodQtyBounds, foodUnitMeta } from "@/lib/food";
 import {
@@ -204,7 +205,7 @@ import {
 import { isCatalogCategoryId, seatPhraseFor, usesFoodSm } from "@/lib/categories/registry";
 import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
 import { canCancel, trackSteps } from "@/lib/status";
-import { PhotoStrip, ReviewComposer, ReviewList } from "@/components/Photos";
+import { PhotoStrip, RatingBreakdownView, ReviewComposer, ReviewList } from "@/components/Photos";
 import { Avatar } from "@/components/Avatar";
 import type {
   DropMethod,
@@ -271,7 +272,13 @@ function sortNearby(rows: { p: Provider; km: number }[], sort: NearbySort) {
       const dir = sort === "priceHigh" ? -1 : 1;
       return (pa - pb) * dir || a.km - b.km;
     }
-    if (sort === "rating") return b.p.rating - a.p.rating || b.p.reviews - a.p.reviews || a.km - b.km;
+    if (sort === "rating") {
+      return (
+        bayesianRating(b.p.rating, b.p.reviews) - bayesianRating(a.p.rating, a.p.reviews) ||
+        b.p.reviews - a.p.reviews ||
+        a.km - b.km
+      );
+    }
     if (sort === "reviews") return b.p.reviews - a.p.reviews || b.p.rating - a.p.rating || a.km - b.km;
     if (sort === "space") return b.p.remaining - a.p.remaining || a.km - b.km;
     return a.km - b.km || b.p.rating - a.p.rating;
@@ -906,7 +913,12 @@ function List({
                     </span>
                   </span>
                   <span className="shrink-0 text-right text-sm">
-                    <span className="block tabular-nums">{p.rating.toFixed(1)}</span>
+                    <span className="block tabular-nums">
+                      ⭐ {p.rating.toFixed(1)}
+                      <span className="ml-1 text-xs font-normal text-[var(--muted)]">
+                        · {p.reviews} değerlendirme
+                      </span>
+                    </span>
                     <span className="text-xs text-[var(--muted)]">
                       {price == null ? listEmptyPriceLabel(p) : listPricedTag(p, price)}
                     </span>
@@ -954,7 +966,7 @@ function ProviderPane({
         <div className="min-w-0">
           <h2 className="font-[family-name:var(--font-display)] text-2xl">{p.name}</h2>
           <p className="text-sm text-[var(--muted)]">
-            {p.neighborhood} · {formatKm(km)} · {p.rating} ({p.reviews} yorum) ·{" "}
+            {p.neighborhood} · {formatKm(km)} · ⭐ {p.rating} · {p.reviews} değerlendirme ·{" "}
             <span
               className={
                 tone === "full"
@@ -970,6 +982,7 @@ function ProviderPane({
         </div>
       </div>
       <p className="mt-3 text-sm leading-relaxed">{p.bio}</p>
+      <RatingBreakdownView rating={p.ratingBreakdown} />
       {(p.workPhotos.length > 0 || p.recentReviews.length > 0) && (
         <>
           <h3 className="mt-4 text-sm font-medium">Yorumlar</h3>

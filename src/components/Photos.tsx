@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Review, WorkPhoto } from "@/lib/types";
+import type { RatingBreakdown, Review, WorkPhoto } from "@/lib/types";
 
 export function PhotoStrip({
   photos,
@@ -73,6 +73,70 @@ export function PhotoAdd({
   );
 }
 
+function StarPick({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number | null;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <div className="mt-2 flex items-center justify-between gap-2">
+      <span className="text-xs text-[var(--muted)]">{label}</span>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            className={`text-sm ${value != null && n <= value ? "text-[var(--clay)]" : "text-[var(--line)]"}`}
+            aria-label={`${label} ${n} yıldız`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function RatingBreakdownView({ rating }: { rating?: RatingBreakdown | null }) {
+  if (!rating || rating.count <= 0) return null;
+  const rows: { label: string; value: number | null }[] = [
+    { label: "Kalite", value: rating.quality },
+    { label: "Zamanlama", value: rating.timeliness },
+    { label: "İletişim", value: rating.communication },
+  ];
+  const visible = rows.filter((r) => r.value != null);
+  if (visible.length === 0 && rating.repeatRate == null) return null;
+  return (
+    <div className="mt-4">
+      <h3 className="text-sm font-medium">Müşteri değerlendirmeleri</h3>
+      <ul className="mt-2 space-y-1.5">
+        {visible.map((r) => (
+          <li key={r.label} className="flex items-center gap-2 text-sm">
+            <span className="w-20 shrink-0 text-xs text-[var(--muted)]">{r.label}</span>
+            <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--line)]">
+              <span
+                className="block h-full rounded-full bg-[var(--teal)]"
+                style={{ width: `${Math.round(((r.value ?? 0) / 5) * 100)}%` }}
+              />
+            </span>
+            <span className="w-8 shrink-0 text-right tabular-nums">{(r.value ?? 0).toFixed(1)}</span>
+          </li>
+        ))}
+      </ul>
+      {rating.repeatRate != null ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          %{Math.round(rating.repeatRate * 100)} tekrar tercih etti
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function ReviewList({ reviews }: { reviews: Review[] }) {
   if (!reviews.length) return null;
   return (
@@ -99,9 +163,21 @@ export function ReviewComposer({
 }: {
   busy: boolean;
   err: string;
-  onSubmit: (input: { rating: number; body: string; files: File[] }) => void;
+  onSubmit: (input: {
+    rating: number;
+    body: string;
+    files: File[];
+    quality?: number | null;
+    timeliness?: number | null;
+    communication?: number | null;
+    wouldRepeat?: boolean | null;
+  }) => void;
 }) {
   const [rating, setRating] = useState(5);
+  const [quality, setQuality] = useState<number | null>(null);
+  const [timeliness, setTimeliness] = useState<number | null>(null);
+  const [communication, setCommunication] = useState<number | null>(null);
+  const [wouldRepeat, setWouldRepeat] = useState<boolean | null>(null);
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<File[]>([]);
 
@@ -110,7 +186,7 @@ export function ReviewComposer({
       className="mt-4 rounded-2xl bg-[var(--paper)] p-3 ring-1 ring-[var(--line)]"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ rating, body, files });
+        onSubmit({ rating, body, files, quality, timeliness, communication, wouldRepeat });
       }}
     >
       <p className="text-sm font-medium">Yorumun</p>
@@ -126,6 +202,33 @@ export function ReviewComposer({
             ★
           </button>
         ))}
+      </div>
+      <StarPick label="Kalite" value={quality} onChange={setQuality} />
+      <StarPick label="Zamanlama" value={timeliness} onChange={setTimeliness} />
+      <StarPick label="İletişim" value={communication} onChange={setCommunication} />
+      <div className="mt-3">
+        <p className="text-xs text-[var(--muted)]">Tekrar bu komşuyu tercih eder misin?</p>
+        <div className="mt-1 flex gap-2">
+          {(
+            [
+              [true, "Evet"],
+              [false, "Hayır"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setWouldRepeat(value)}
+              className={`k-press rounded-full px-3 py-1 text-xs ring-1 ${
+                wouldRepeat === value
+                  ? "bg-[var(--teal)] text-white ring-[var(--teal)]"
+                  : "ring-[var(--line)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
       <textarea
         value={body}

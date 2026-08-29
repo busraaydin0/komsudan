@@ -291,10 +291,25 @@ export async function uploadPortfolioPhoto(providerId: string, file: File) {
   return data;
 }
 
-export async function postReview(orderId: string, input: { rating: number; body: string; files: File[] }) {
+export async function postReview(
+  orderId: string,
+  input: {
+    rating: number;
+    body: string;
+    files: File[];
+    quality?: number | null;
+    timeliness?: number | null;
+    communication?: number | null;
+    wouldRepeat?: boolean | null;
+  },
+) {
   const body = new FormData();
   body.append("rating", String(input.rating));
   body.append("body", input.body);
+  if (input.quality != null) body.append("quality", String(input.quality));
+  if (input.timeliness != null) body.append("timeliness", String(input.timeliness));
+  if (input.communication != null) body.append("communication", String(input.communication));
+  if (input.wouldRepeat != null) body.append("wouldRepeat", input.wouldRepeat ? "yes" : "no");
   for (const file of input.files) body.append("file", file);
   const data = await readJson<{ review: Review }>(
     await fetch(`/api/orders/${orderId}/review`, { method: "POST", body }),

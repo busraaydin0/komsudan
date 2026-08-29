@@ -517,6 +517,15 @@ export type OrderStatusEvent = {
   createdAt: string;
 };
 
+export type RatingBreakdown = {
+  overall: number;
+  count: number;
+  quality: number | null;
+  timeliness: number | null;
+  communication: number | null;
+  repeatRate: number | null;
+};
+
 export type Review = {
   id: string;
   providerId: string;
@@ -526,6 +535,10 @@ export type Review = {
   author: string;
   createdAt: string;
   photos?: WorkPhoto[];
+  quality?: number | null;
+  timeliness?: number | null;
+  communication?: number | null;
+  wouldRepeat?: boolean | null;
 };
 
 export type Provider = {
@@ -535,6 +548,7 @@ export type Provider = {
   loc: LngLat;
   rating: number;
   reviews: number;
+  ratingBreakdown?: RatingBreakdown;
   packages: ServicePackage[];
   capacity: number;
   remaining: number;

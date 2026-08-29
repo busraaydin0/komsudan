@@ -1,7 +1,7 @@
 import { db, toDrop, toProvider } from "./db";
 import type { DropPoint, Provider } from "@/lib/types";
 import { workPhotosForProvider } from "./photos";
-import { ratingForProvider, reviewsForProvider } from "@/lib/services/reviewService";
+import { ratingBreakdown, ratingForProvider, reviewsForProvider } from "@/lib/services/reviewService";
 import { listAvatarUrls } from "@/lib/db/providers";
 
 function hydrate(p: Provider, avatars: Record<string, string>): Provider {
@@ -10,6 +10,7 @@ function hydrate(p: Provider, avatars: Record<string, string>): Provider {
     ...p,
     rating: live.rating,
     reviews: live.reviews,
+    ratingBreakdown: ratingBreakdown(p.id, live),
     avatarUrl: avatars[p.id] || p.avatarUrl || null,
     workPhotos: workPhotosForProvider(p.id, 12),
     recentReviews: reviewsForProvider(p.id).slice(0, 6),

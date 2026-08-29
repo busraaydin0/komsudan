@@ -144,7 +144,7 @@ import {
   type GraveWrite,
 } from "@/lib/db/graves";
 import { getCategory } from "@/lib/db/categories";
-import { ratingForProvider } from "@/lib/services/reviewService";
+import { ratingBreakdown, ratingForProvider } from "@/lib/services/reviewService";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
 import type { AuthUser } from "@/lib/auth/types";
@@ -212,6 +212,7 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     status: row.status,
     ratingAvg: live.rating,
     ratingCount: live.reviews,
+    rating: ratingBreakdown(row.user_id, live),
     completedOrders: row.completed_orders,
     commissionRate: row.commission_rate,
     categoryId: row.category_id ?? "camasir",
