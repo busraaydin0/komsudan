@@ -690,3 +690,22 @@ export type Account = {
   homeLng: number | null;
   homeNeighborhood: string | null;
 };
+
+export type OrderMessage = {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  warning: boolean;
+  readAt: string | null;
+  deleted: boolean;
+  createdAt: string;
+};
+
+export type OrderConversation = {
+  id: string;
+  orderId: string;
+  status: "open" | "closed" | "blocked";
+  createdAt: string;
+  updatedAt: string;
+};

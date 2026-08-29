@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { CategoryId } from "./categories/registry";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderGrave, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTalk, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, OrderConversation, OrderMessage, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderGrave, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTalk, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -163,6 +163,60 @@ export async function patchOrder(
     ),
   );
   return data.order!;
+}
+
+export type OrderThread = {
+  conversation: OrderConversation;
+  messages: OrderMessage[];
+  unreadCount: number;
+};
+
+export async function fetchOrderMessages(orderId: string) {
+  return unwrap(
+    await readJson<{ data?: OrderThread } & Partial<OrderThread>>(
+      await fetch(`/api/orders/${orderId}/messages`),
+    ),
+  );
+}
+
+export async function postOrderMessage(orderId: string, body: string, clientMessageId: string) {
+  return unwrap(
+    await readJson<{ data?: { message: OrderMessage; warning: boolean }; message?: OrderMessage; warning?: boolean }>(
+      await fetch(`/api/orders/${orderId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body, clientMessageId }),
+      }),
+    ),
+  );
+}
+
+export async function patchOrderMessagesRead(orderId: string) {
+  return unwrap(
+    await readJson<{ data?: OrderThread } & Partial<OrderThread>>(
+      await fetch(`/api/orders/${orderId}/messages/read`, { method: "PATCH" }),
+    ),
+  );
+}
+
+export async function reportOrderMessage(orderId: string, messageId: string, reason: string) {
+  return unwrap(
+    await readJson<{ data?: { ok: true } }>(
+      await fetch(`/api/orders/${orderId}/messages/${messageId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      }),
+    ),
+  );
+}
+
+export async function deleteOrderMessage(orderId: string, messageId: string) {
+  return unwrap(
+    await readJson<{ data?: { message: OrderMessage }; message?: OrderMessage }>(
+      await fetch(`/api/orders/${orderId}/messages/${messageId}`, { method: "DELETE" }),
+    ),
+  );
 }
 
 export function useSession() {

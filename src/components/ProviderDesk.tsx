@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PACKAGES } from "@/lib/data";
-import { patchOrder, uploadOrderPhoto, useCatalog, useOrders, useSession } from "@/lib/api";
+import { fetchOrderMessages, patchOrder, uploadOrderPhoto, useCatalog, useOrders, useSession } from "@/lib/api";
+import { MessageBadge, OrderThread } from "@/components/OrderThread";
 import { usesFoodSm } from "@/lib/categories/registry";
 import { tl } from "@/lib/pricing";
 import { canAddPhotos, nextStatus } from "@/lib/status";
@@ -232,6 +233,9 @@ function OrderCard({
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const { account } = useSession();
   const p = providers.find((x) => x.id === order.providerId);
   const pack =
     p?.packages.find((x) => x.id === order.packageId) ??
@@ -240,6 +244,27 @@ function OrderCard({
   const food = order.packageId === "davet";
   const catalog = usesFoodSm(order.packageId);
   const next = nextStatus(order.status, order.packageId, catalog);
+
+  useEffect(() => {
+    let alive = true;
+    void fetchOrderMessages(order.id)
+      .then((data) => {
+        if (alive) setUnread(data.unreadCount ?? 0);
+      })
+      .catch(() => undefined);
+    const t = setInterval(() => {
+      void fetchOrderMessages(order.id)
+        .then((data) => {
+          if (alive) setUnread(data.unreadCount ?? 0);
+        })
+        .catch(() => undefined);
+    }, 15_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [order.id]);
+
   const foodLabel: Partial<Record<OrderStatus, string>> = {
     teslim_alindi: "Hazırlanıyor",
     hazir: "Hazır",
@@ -323,6 +348,14 @@ function OrderCard({
             {busy ? "…" : food && next === "hazir" ? "Hazır" : LABEL[next]}
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setChatOpen((v) => !v)}
+          className="k-press rounded-full px-3 py-1.5 text-xs ring-1 ring-[var(--line)]"
+        >
+          💬 Mesaj
+          <MessageBadge count={chatOpen ? 0 : unread} />
+        </button>
         {canAddPhotos(order.status) && (
           <PhotoAdd
             label="İş fotoğrafı"
@@ -376,6 +409,7 @@ function OrderCard({
           </div>
         </form>
       )}
+      {chatOpen && account?.id && <OrderThread orderId={order.id} selfId={account.id} compact />}
     </li>
   );
 }

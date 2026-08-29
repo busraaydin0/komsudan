@@ -158,6 +158,15 @@ export function notifyPickupCodeRotated(row: OrderRow, code: string) {
 /** Açık siparişi yoksa günde ~bir hatırlatma. GET kutusu açılınca yazılır. */
 const NUDGE_GAP_MS = 18 * 60 * 60 * 1000;
 
+export function notifyOrderMessage(userId: string | null | undefined, orderId: string) {
+  pushTo(userId, {
+    orderId,
+    type: "order_message",
+    title: "Yeni mesaj",
+    body: "Siparişinde yeni bir mesaj var.",
+  });
+}
+
 export function maybeEngagementNudge(user: AuthUser) {
   if (user.role !== "customer") return;
   if (customerHasOpenOrder(user.id)) return;

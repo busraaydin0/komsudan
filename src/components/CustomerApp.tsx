@@ -178,7 +178,8 @@ import {
 import { formatKm, kmBetween } from "@/lib/geo";
 import { tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
-import { postOrder, postReview, patchOrder, useCatalog, useOrders } from "@/lib/api";
+import { postOrder, postReview, patchOrder, useCatalog, useOrders, useSession } from "@/lib/api";
+import { OrderThread } from "@/components/OrderThread";
 import {
   applyQtyAndDrop,
   catalogOfferCount,
@@ -2304,6 +2305,7 @@ function Track({
   const idx = steps.indexOf(order.status);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const { account } = useSession();
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
@@ -2402,6 +2404,7 @@ function Track({
               ? "Komşu kabul etmeden iptal edebilirsin. Tutanak çözülür, para çekilmez."
               : "Durumu Hizmet sekmesinden ilerlet. Canlı sunucudan güncellenir."}
       </p>
+      {account?.id && <OrderThread orderId={order.id} selfId={account.id} />}
       {canCancel(order.status) && (
         <button
           type="button"
