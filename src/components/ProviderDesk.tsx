@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { PACKAGES } from "@/lib/data";
 import { patchOrder, uploadOrderPhoto, useCatalog, useOrders, useSession } from "@/lib/api";
+import { usesFoodSm } from "@/lib/categories/registry";
 import { tl } from "@/lib/pricing";
 import { canAddPhotos, nextStatus } from "@/lib/status";
 import type { DropPoint, Order, OrderStatus, Provider } from "@/lib/types";
@@ -237,20 +238,7 @@ function OrderCard({
     PACKAGES.find((x) => x.id === order.packageId);
   const drop = dropPoints.find((d) => d.id === order.dropPointId);
   const food = order.packageId === "davet";
-  const sewing = order.packageId === "dikis";
-  const repair = order.packageId === "tamir";
-  const tech = order.packageId === "teknoloji";
-  const wash = order.packageId === "araba";
-  const courier = order.packageId === "kurye";
-  const garden = order.packageId === "bahce";
-  const cargo = order.packageId === "kargo";
-  const print = order.packageId === "cikti";
-  const preserve = order.packageId === "kislik";
-  const hali = order.packageId === "hali";
-  const odev = order.packageId === "odev";
-  const dil = order.packageId === "dil";
-  const mezar = order.packageId === "mezar";
-  const catalog = food || sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev || dil || mezar;
+  const catalog = usesFoodSm(order.packageId);
   const next = nextStatus(order.status, order.packageId, catalog);
   const foodLabel: Partial<Record<OrderStatus, string>> = {
     teslim_alindi: "Hazırlanıyor",
@@ -284,7 +272,7 @@ function OrderCard({
         {p?.name} ·{" "}
         {food
           ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : sewing || repair || tech || wash || courier || garden || cargo || print || preserve || hali || odev || dil || mezar
+          : catalog
             ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
             : `${order.pieces} parça · ${pack?.title}`}
       </p>

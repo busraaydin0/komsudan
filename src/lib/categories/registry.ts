@@ -60,6 +60,8 @@ export type CategoryDef = {
   editor: string;
   unitQty: string;
   capacityLabel: string;
+  /** Liste/profil: “bugün N {seatPhrase}”. capacityLabel sipariş hatasıyla aynı olmayabilir. */
+  seatPhrase: string;
   offerBio: string;
 };
 
@@ -74,6 +76,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "FoodMenuEditor",
     unitQty: "kişi",
     capacityLabel: "kişilik yer",
+    seatPhrase: "kişilik yer",
     offerBio: "Davet ikramlık. Menünü Hizmet’ten ekle.",
   },
   dikis: {
@@ -86,6 +89,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "SewingServiceEditor",
     unitQty: "adet",
     capacityLabel: "adet yer",
+    seatPhrase: "yer",
     offerBio: "Dikiş ve tadilat. Hizmetlerini Hizmet’ten ekle.",
   },
   tamir: {
@@ -98,6 +102,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "RepairServiceEditor",
     unitQty: "adet",
     capacityLabel: "adet yer",
+    seatPhrase: "yer",
     offerBio: "Tamir. Hizmetlerini Hizmet’ten ekle.",
   },
   teknoloji: {
@@ -110,6 +115,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "TechServiceEditor",
     unitQty: "adet",
     capacityLabel: "adet yer",
+    seatPhrase: "yer",
     offerBio: "Teknoloji ve kurulum. Hizmetlerini Hizmet’ten ekle.",
   },
   araba: {
@@ -122,6 +128,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "WashServiceEditor",
     unitQty: "araç",
     capacityLabel: "adet yer",
+    seatPhrase: "yer",
     offerBio: "Araba yıkama. Hizmetlerini Hizmet’ten ekle.",
   },
   kurye: {
@@ -134,6 +141,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "CourierServiceEditor",
     unitQty: "paket",
     capacityLabel: "adet yer",
+    seatPhrase: "yer",
     offerBio: "Yakın mesafe kurye. Hizmetlerini Hizmet’ten ekle.",
   },
   bahce: {
@@ -146,6 +154,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "GardenServiceEditor",
     unitQty: "iş",
     capacityLabel: "adet yer",
+    seatPhrase: "yer",
     offerBio: "Bahçe ve bitki. Hizmetlerini Hizmet’ten ekle.",
   },
   kargo: {
@@ -158,6 +167,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "CargoServiceEditor",
     unitQty: "paket",
     capacityLabel: "adet yer",
+    seatPhrase: "yer",
     offerBio: "Kargo ve paket. Hizmetlerini Hizmet’ten ekle.",
   },
   cikti: {
@@ -170,6 +180,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "PrintServiceEditor",
     unitQty: "sayfa",
     capacityLabel: "sayfa yer",
+    seatPhrase: "sayfa yer",
     offerBio: "Evde çıktı. Hizmetlerini Hizmet’ten ekle.",
   },
   kislik: {
@@ -182,6 +193,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "PreserveServiceEditor",
     unitQty: "birim",
     capacityLabel: "birim yer",
+    seatPhrase: "yer",
     offerBio: "Kışlık ve dondurucu. Hizmetlerini Hizmet’ten ekle.",
   },
   hali: {
@@ -194,6 +206,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "CarpetServiceEditor",
     unitQty: "adet",
     capacityLabel: "adet yer",
+    seatPhrase: "adet yer",
     offerBio: "Halı yıkama. Hizmetlerini Hizmet’ten ekle.",
   },
   odev: {
@@ -206,6 +219,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "LessonServiceEditor",
     unitQty: "ders",
     capacityLabel: "ders yer",
+    seatPhrase: "ders yer",
     offerBio: "Ödev eşliği. Hizmetlerini Hizmet’ten ekle.",
   },
   dil: {
@@ -218,6 +232,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "TalkServiceEditor",
     unitQty: "görüşme",
     capacityLabel: "görüşme yer",
+    seatPhrase: "görüşme yer",
     offerBio: "Dil pratiği. Hizmetlerini Hizmet’ten ekle.",
   },
   mezar: {
@@ -230,6 +245,7 @@ const CATALOG: Record<CatalogCategoryId, Omit<CategoryDef, "id" | "usesFoodSm" |
     editor: "GraveServiceEditor",
     unitQty: "işlem",
     capacityLabel: "iş yer",
+    seatPhrase: "iş yer",
     offerBio: "Mezar bakımı. Hizmetlerini Hizmet’ten ekle.",
   },
 };
@@ -248,6 +264,7 @@ const CAMASIR: CategoryDef = {
   editor: "LaundryProfile",
   unitQty: "parça",
   capacityLabel: "parça yer",
+  seatPhrase: "parça yer",
   offerBio: "",
 };
 
@@ -312,6 +329,11 @@ export function usesFoodSm(packageId: string, food = false): boolean {
 export function capacityLabelForPackage(packageId: string): string {
   if (isCatalogCategoryId(packageId)) return CATEGORIES[packageId].capacityLabel;
   return CATEGORIES.camasir.capacityLabel;
+}
+
+export function seatPhraseFor(categoryId?: string | null): string {
+  if (isCategoryId(categoryId)) return CATEGORIES[categoryId].seatPhrase;
+  return CATEGORIES.camasir.seatPhrase;
 }
 
 export const CATEGORY_ID_ENUM = CATEGORY_IDS as unknown as [CategoryId, ...CategoryId[]];

@@ -10,6 +10,7 @@ export {
   isCatalogCategoryId,
   isCategoryId,
   isLaundryPackageId,
+  seatPhraseFor,
   usesFoodSm,
 } from "./registry";
 export type {
