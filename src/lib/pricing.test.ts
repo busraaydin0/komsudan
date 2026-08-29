@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { COMMISSION, estimate, estimateFood, estimateFor, MIN_ORDER } from "./pricing";
+import {
+  COMMISSION,
+  estimate,
+  estimateFood,
+  estimateFor,
+  isSameDaySlot,
+  MIN_ORDER,
+  pickSlotForDay,
+  resolveExpress,
+} from "./pricing";
 import { createOrderSchema } from "./validation/order.schema";
 import type { Provider } from "./types";
 
@@ -67,5 +76,24 @@ describe("Fiyat sunucuda", () => {
     const plain = estimate(8, "tam", false);
     const express = estimate(8, "tam", true);
     expect(express.before).toBeGreaterThan(plain.before);
+  });
+
+  it("bugün slotu aynı gün sayılır, yarın sayılmaz", () => {
+    expect(isSameDaySlot("Bugün 18:00–19:00")).toBe(true);
+    expect(isSameDaySlot("Bugün 19:00–20:00")).toBe(true);
+    expect(isSameDaySlot("Yarın 18:00–19:00")).toBe(false);
+    expect(isSameDaySlot("Yarın 09:00–10:00")).toBe(false);
+  });
+
+  it("aynı gün zamı kutudan değil slottan: bugün = +%25, yarın = yok", () => {
+    expect(resolveExpress(true, "Bugün 18:00–19:00")).toBe(true);
+    expect(resolveExpress(true, "Yarın 18:00–19:00")).toBe(false);
+    expect(resolveExpress(false, "Bugün 18:00–19:00")).toBe(false);
+  });
+
+  it("kutu işaretlenince bugün slotuna, kalkınca yarına geçer", () => {
+    const slots = ["Bugün 18:00–19:00", "Yarın 09:00–10:00", "Yarın 18:00–19:00"];
+    expect(pickSlotForDay(slots, true, "Yarın 18:00–19:00")).toBe("Bugün 18:00–19:00");
+    expect(pickSlotForDay(slots, false, "Bugün 18:00–19:00")).toBe("Yarın 09:00–10:00");
   });
 });

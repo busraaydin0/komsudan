@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { capacityLabelForPackage } from "@/lib/categories/registry";
-import { estimateFood, estimateFor, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
+import { estimateFood, estimateFor, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/pricing";
 import { loyaltyRate } from "@/lib/loyalty";
 import { getCategoryForProvider } from "@/lib/db/categories";
 import { getProduct, toPublicProduct } from "@/lib/db/products";
@@ -319,7 +319,7 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
   const pack = provider.packages.find((p) => p.id === input.packageId);
   if (!pack) throw new ApiError(400, "Bu paket bu komşuda yok.", "VALIDATION_ERROR");
 
-  const express = Boolean(input.express) && provider.express;
+  const express = resolveExpress(provider.express, input.slot);
   if (input.express && !provider.express) {
     throw new ApiError(400, "Bu komşu aynı gün almıyor.", "VALIDATION_ERROR");
   }

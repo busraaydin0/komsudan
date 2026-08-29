@@ -7,7 +7,7 @@ import { dropsForFood, foodQtyBounds, foodUnitMeta } from "@/lib/food";
 import { dropsForGarden, gardenCanOrder, gardenQtyBounds, GARDEN_UNIT } from "@/lib/garden";
 import { dropsForGrave, graveCanOrder, graveQtyBounds, graveUnitMeta } from "@/lib/grave";
 import { dropsForLesson, lessonCanOrder, lessonQtyBounds, LESSON_UNIT } from "@/lib/lesson";
-import { estimateFood, estimateFor, tl } from "@/lib/pricing";
+import { estimateFood, estimateFor, resolveExpress, tl } from "@/lib/pricing";
 import { dropsForPreserve, preserveCanOrder, preserveQtyBounds, preserveUnitMeta } from "@/lib/preserve";
 import { dropsForPrint, printCanOrder, printQtyBounds, PRINT_UNIT } from "@/lib/print";
 import { dropsForRepair, repairCanOrder, repairQtyBounds, repairUnitMeta } from "@/lib/repair";
@@ -254,10 +254,19 @@ export function selectedFallbackName(p: Provider): string {
 
 export function quoteForProvider(
   selected: Provider | undefined,
-  args: { guests: number; pieces: number; pkg: PackageId; express: boolean; loyaltyRate: number; pick: CatalogPick },
+  args: {
+    guests: number;
+    pieces: number;
+    pkg: PackageId;
+    express: boolean;
+    slot?: string;
+    loyaltyRate: number;
+    pick: CatalogPick;
+  },
 ) {
   if (!selected) return ZERO_QUOTE;
-  const { guests, pieces, pkg, express, loyaltyRate, pick } = args;
+  const { guests, pieces, pkg, loyaltyRate, pick } = args;
+  const express = resolveExpress(selected.express, args.slot ?? "");
   const id = selected.categoryId;
   if (id === "davet") {
     if (pick.product) return estimateFood(guests, pick.product.pricePerPerson, loyaltyRate);
@@ -393,7 +402,7 @@ export function placeOrderInput(
     ...base,
     packageId: args.pkg,
     pieces: args.pieces,
-    express: args.express && p.express,
+    express: resolveExpress(p.express, args.slot),
   };
 }
 

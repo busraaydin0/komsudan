@@ -4,6 +4,20 @@ import type { PackageId, Provider } from "./types";
 export const MIN_ORDER = 100;
 export const COMMISSION = 0.1;
 export const EXPRESS_BUMP = 0.25;
+
+/** Pilot slotlar “Bugün 18:00–19:00” / “Yarın …” — gün önekinden aynı gün. */
+export function isSameDaySlot(slot: string) {
+  return slot.trim().toLocaleLowerCase("tr-TR").startsWith("bugün");
+}
+
+/** Aynı gün zamı kutudan değil slottan: bugün seçildiyse +%25, yarınsa yok. */
+export function resolveExpress(providerOffersExpress: boolean, slot: string) {
+  return Boolean(providerOffersExpress && isSameDaySlot(slot));
+}
+
+export function pickSlotForDay(slots: string[], sameDay: boolean, fallback = "") {
+  return slots.find((s) => isSameDaySlot(s) === sameDay) ?? fallback;
+}
 export const PIECES_MIN = 1;
 export const PIECES_MAX = 80;
 export const GUESTS_MIN = 1;

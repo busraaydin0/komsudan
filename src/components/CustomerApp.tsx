@@ -176,7 +176,7 @@ import {
   graveUnitMeta,
 } from "@/lib/grave";
 import { formatKm, kmBetween } from "@/lib/geo";
-import { tl, clampPieces, PIECES_MAX, PIECES_MIN } from "@/lib/pricing";
+import { tl, clampPieces, pickSlotForDay, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/pricing";
 import { seatLabel, seatTone } from "@/lib/seat";
 import { postOrder, postReview, patchOrder, useCatalog, useOrders, useSession } from "@/lib/api";
 import { OrderThread } from "@/components/OrderThread";
@@ -332,7 +332,6 @@ export function CustomerApp({
   const [pieces, setPieces] = useState(16);
   const [guests, setGuests] = useState(8);
   const [allergy, setAllergy] = useState("");
-  const [express, setExpress] = useState(false);
   const [drop, setDrop] = useState<DropMethod>("nokta");
   const [slot, setSlot] = useState("");
   const [note, setNote] = useState("");
@@ -373,11 +372,13 @@ export function CustomerApp({
     talk,
     grave,
   } = catalogPick;
+  const express = resolveExpress(Boolean(selected?.express), slot);
   const quote = quoteForProvider(selected, {
     guests,
     pieces,
     pkg,
     express,
+    slot,
     loyaltyRate,
     pick: catalogPick,
   });
@@ -430,7 +431,6 @@ export function CustomerApp({
       }
       setSlot(selected.slots[0] ?? "");
       setDrop(selected.drops.includes("kapi") ? "kapi" : "nokta");
-      setExpress(false);
       setAllergy("");
       if (!selected.drops.includes("nokta")) setDropId(null);
       else if (!dropId) setDropId(dropPoints[0]?.id ?? null);
@@ -731,7 +731,9 @@ export function CustomerApp({
                 grave={grave}
                 productName={selectedCatalogName(selected, productId)}
                 express={express}
-                onExpress={setExpress}
+                onExpress={(want) => {
+                  setSlot(pickSlotForDay(selected.slots, want, slot));
+                }}
                 drop={drop}
                 onDrop={setDrop}
                 dropId={dropId}
