@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { capacityLabelForPackage } from "@/lib/categories/registry";
 import { estimateFood, estimateFor, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/pricing";
+import { isAllowedOrderSlot } from "@/lib/timeWindow";
 import { loyaltyRate } from "@/lib/loyalty";
 import { getCategoryForProvider } from "@/lib/db/categories";
 import { getProduct, toPublicProduct } from "@/lib/db/products";
@@ -263,8 +264,8 @@ function validateDropAndSlot(provider: NonNullable<ReturnType<typeof getProvider
     dropPointId = input.dropPointId;
   }
 
-  if (!provider.slots.includes(requireSlot(input))) {
-    throw new ApiError(400, "Saat dilimi geçersiz.", "VALIDATION_ERROR");
+  if (!isAllowedOrderSlot(requireSlot(input), provider.slots)) {
+    throw new ApiError(400, "Saat 09:00–19:00 içinde, 15 dakikanın katı olmalı.", "VALIDATION_ERROR");
   }
   return dropPointId;
 }

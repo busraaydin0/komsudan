@@ -178,7 +178,15 @@ import {
   graveUnitMeta,
 } from "@/lib/grave";
 import { formatKm, kmBetween } from "@/lib/geo";
-import { tl, clampPieces, pickSlotForDay, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/pricing";
+import { tl, clampPieces, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/pricing";
+import { TimeScrollPicker } from "@/components/TimeScrollPicker";
+import {
+  DEFAULT_DURATION_MINUTES,
+  defaultPilotSlot,
+  formatPilotSlot,
+  minutesToHmm,
+  parsePilotSlot,
+} from "@/lib/timeWindow";
 import { seatLabel, seatTone } from "@/lib/seat";
 import { postOrder, postReview, patchOrder, useCatalog, useOrders, useSession } from "@/lib/api";
 import { OrderThread } from "@/components/OrderThread";
@@ -431,7 +439,7 @@ export function CustomerApp({
       } else {
         setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
       }
-      setSlot(selected.slots[0] ?? "");
+      setSlot(defaultPilotSlot());
       setDrop(selected.drops.includes("kapi") ? "kapi" : "nokta");
       setAllergy("");
       if (!selected.drops.includes("nokta")) setDropId(null);
@@ -734,7 +742,9 @@ export function CustomerApp({
                 productName={selectedCatalogName(selected, productId)}
                 express={express}
                 onExpress={(want) => {
-                  setSlot(pickSlotForDay(selected.slots, want, slot));
+                  const parsed = parsePilotSlot(slot);
+                  const start = parsed?.startMin ?? 18 * 60;
+                  setSlot(formatPilotSlot(want ? "bugun" : "yarin", start));
                 }}
                 drop={drop}
                 onDrop={setDrop}
@@ -1507,6 +1517,39 @@ function ProviderPane({
   );
 }
 
+function SlotWheel({ slot, onSlot }: { slot: string; onSlot: (s: string) => void }) {
+  const parsed = parsePilotSlot(slot);
+  const day = parsed?.day ?? "bugun";
+  const startMin = parsed?.startMin ?? 10 * 60;
+  const endLabel = minutesToHmm(startMin + DEFAULT_DURATION_MINUTES);
+  return (
+    <>
+      <div className="mt-2 flex gap-2">
+        {(["bugun", "yarin"] as const).map((d) => (
+          <button
+            key={d}
+            type="button"
+            onClick={() => onSlot(formatPilotSlot(d, startMin))}
+            className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
+              day === d ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]" : "ring-[var(--line)]"
+            }`}
+          >
+            {d === "bugun" ? "Bugün" : "Yarın"}
+          </button>
+        ))}
+      </div>
+      <TimeScrollPicker
+        startMin={startMin}
+        durationMinutes={DEFAULT_DURATION_MINUTES}
+        onChange={(m) => onSlot(formatPilotSlot(day, m))}
+      />
+      <p className="mt-1 text-center text-xs text-[var(--muted)]">
+        {minutesToHmm(startMin)}–{endLabel} · {DEFAULT_DURATION_MINUTES} dk
+      </p>
+    </>
+  );
+}
+
 function Checkout({
   p,
   pieces,
@@ -2240,22 +2283,7 @@ function Checkout({
         </div>
       )}
       <h3 className="mt-5 text-sm font-medium">Saat</h3>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {p.slots.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => onSlot(s)}
-            className={`k-chip rounded-full px-3 py-1.5 text-xs ring-1 ${
-              slot === s
-                ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]"
-                : "ring-[var(--line)]"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      <SlotWheel slot={slot} onSlot={onSlot} />
       <textarea
         value={note}
         onChange={(e) => onNote(e.target.value)}

@@ -53,15 +53,34 @@ describe("Tamir dropoff regresyon ve musluk kilidi", () => {
         guestCount: 1,
         drop: "kapi",
         dropPointId: null,
-        slot: "Bugün 18:00–19:00",
+        slot: "Bugün 10:15–11:15",
         note: "",
       },
       user.id,
     );
     expect(order.packageId).toBe("tamir");
     expect(order.fulfillmentType).toBe("dropoff");
+    expect(order.slot).toBe("Bugün 10:15–11:15");
     expect(order.total).toBeGreaterThan(0);
     expect(order.status).toBe("onay_bekliyor");
+  });
+
+  it("15 dakikanın katı olmayan saat reddedilir", async () => {
+    const user = await customer("5550000884");
+    expect(() =>
+      createOrder(
+        {
+          providerId: "hasan",
+          productId: "hasan:laptop",
+          guestCount: 1,
+          drop: "kapi",
+          dropPointId: null,
+          slot: "Bugün 14:07–15:07",
+          note: "",
+        },
+        user.id,
+      ),
+    ).toThrow(ApiError);
   });
 
   it("musluk home_visit siparişi ready false iken açılmaz", async () => {
