@@ -5,11 +5,13 @@ export {
   CATEGORY_ID_ENUM,
   CATEGORY_LIST,
   LAUNDRY_PACKAGE_IDS,
+  canonicalCategoryId,
   capacityLabelForPackage,
   categoryDef,
   isCatalogCategoryId,
   isCategoryId,
   isLaundryPackageId,
+  normalizeCategoryIds,
   seatPhraseFor,
   usesFoodSm,
 } from "./registry";

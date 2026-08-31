@@ -7,6 +7,8 @@ import {
   CATEGORY_IDS,
   CATEGORY_LIST,
   capacityLabelForPackage,
+  canonicalCategoryId,
+  normalizeCategoryIds,
   usesFoodSm,
 } from "./registry";
 
@@ -65,5 +67,11 @@ describe("Kategori registry smoke", () => {
     const schema = z.enum(CATEGORY_ID_ENUM);
     expect(schema.parse("mezar")).toBe("mezar");
     expect(schema.safeParse("foto")).toEqual(expect.objectContaining({ success: false }));
+  });
+
+  it("silinen musluk kategorisi Tamir’e düşer, tekrarları tekler", () => {
+    expect(canonicalCategoryId("musluk")).toBe("tamir");
+    expect(canonicalCategoryId("tamir")).toBe("tamir");
+    expect(normalizeCategoryIds(["camasir", "musluk", "tamir", "foto"])).toEqual(["camasir", "tamir"]);
   });
 });

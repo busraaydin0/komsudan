@@ -308,6 +308,27 @@ export function isCategoryId(id: string | null | undefined): id is CategoryId {
   return Boolean(id && CATEGORY_SET.has(id));
 }
 
+/** Silinen kategori id’leri; musluk ayrı kart değil, Tamir alt-tipi. */
+const RETIRED_CATEGORY_ALIASES: Record<string, CategoryId> = {
+  musluk: "tamir",
+};
+
+export function canonicalCategoryId(id: string): string {
+  return RETIRED_CATEGORY_ALIASES[id] ?? id;
+}
+
+export function normalizeCategoryIds(ids: readonly string[]): CategoryId[] {
+  const seen = new Set<CategoryId>();
+  const out: CategoryId[] = [];
+  for (const raw of ids) {
+    const id = canonicalCategoryId(raw);
+    if (!isCategoryId(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
 export function isCatalogCategoryId(id: string | null | undefined): id is CatalogCategoryId {
   return Boolean(id && CATALOG_SET.has(id));
 }

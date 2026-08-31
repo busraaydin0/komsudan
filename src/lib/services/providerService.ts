@@ -1,5 +1,11 @@
 import { ApiError } from "@/server/rules";
-import { CATEGORIES, isCatalogCategoryId, type CatalogCategoryId, type CategoryId } from "@/lib/categories/registry";
+import {
+  CATEGORIES,
+  canonicalCategoryId,
+  isCatalogCategoryId,
+  type CatalogCategoryId,
+  type CategoryId,
+} from "@/lib/categories/registry";
 import { lockRepairSubtype } from "@/lib/repair";
 import { PACKAGES, PILOT } from "@/lib/data";
 import { dryingBlurb, hasDryerFrom } from "@/lib/drying";
@@ -302,11 +308,12 @@ export function patchMyProfile(
     packages?: { id: PackageId; pricePerPiece: number }[];
   },
 ) {
-  if (patch.categoryId && !getCategory(patch.categoryId)) {
+  const requestedCategoryId = patch.categoryId ? canonicalCategoryId(patch.categoryId) : undefined;
+  if (requestedCategoryId && !getCategory(requestedCategoryId)) {
     throw new ApiError(400, "Kategori bulunamadı.", "VALIDATION_ERROR");
   }
   const profile = requireProvider(user);
-  const categoryId = patch.categoryId ?? profile.category_id ?? "camasir";
+  const categoryId = requestedCategoryId ?? profile.category_id ?? "camasir";
   if (patch.packages && isCatalogCategoryId(categoryId)) {
     throw new ApiError(400, "Bu alanda çamaşır paketi yok. Hizmetlerini Hizmet’ten ekle.", "VALIDATION_ERROR");
   }
@@ -315,7 +322,11 @@ export function patchMyProfile(
   }
   const hasDryer =
     patch.hasDryer ?? (patch.dryingType !== undefined ? hasDryerFrom(patch.dryingType) : undefined);
-  const row = updateProfileFields(user.id, { ...patch, hasDryer });
+  const row = updateProfileFields(user.id, {
+    ...patch,
+    hasDryer,
+    ...(requestedCategoryId ? { categoryId: requestedCategoryId } : {}),
+  });
   if (!row) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
 
   if (patch.packages) {

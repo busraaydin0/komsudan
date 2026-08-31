@@ -1,4 +1,5 @@
 import { ApiError } from "@/server/rules";
+import { normalizeCategoryIds } from "@/lib/categories/registry";
 import { getCategory, listActiveCategories } from "@/lib/db/categories";
 import { updateUserPreferences } from "@/lib/db/auth";
 import { toAuthUser, type AuthUser } from "@/lib/auth/types";
@@ -26,11 +27,11 @@ export function savePreferences(
     skipped?: boolean;
   },
 ): AuthUser {
-  const ids = input.categoryIds ?? user.preferredCategoryIds;
-  for (const id of ids) {
-    if (!getCategory(id)) {
-      throw new ApiError(400, "Kategori bulunamadı.", "VALIDATION_ERROR");
-    }
+  const ids = normalizeCategoryIds(input.categoryIds ?? user.preferredCategoryIds).filter((id) =>
+    getCategory(id),
+  );
+  if (input.categoryIds?.length && ids.length === 0) {
+    throw new ApiError(400, "Kategori bulunamadı.", "VALIDATION_ERROR");
   }
   const intent = input.intent === undefined ? user.preferredIntent : input.intent;
   const finish = Boolean(input.completed || input.skipped);

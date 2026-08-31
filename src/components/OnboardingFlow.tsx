@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { isCatalogCategoryId } from "@/lib/categories/registry";
+import { canonicalCategoryId, isCatalogCategoryId } from "@/lib/categories/registry";
 import { INDEPENDENT_TRADESPERSON_CLAUSE } from "@/lib/legal";
 import { NEIGHBORHOODS, PACKAGES, PILOT } from "@/lib/data";
 import { DRYING_OPTIONS } from "@/lib/drying";
@@ -57,7 +57,19 @@ export function OnboardingFlow({
 
   useEffect(() => {
     void fetchCategories()
-      .then(setCategories)
+      .then((list) => {
+        setCategories(list);
+        const known = new Set(list.map((c) => c.id));
+        setPicked((prev) => {
+          const next = [...new Set(prev.map(canonicalCategoryId).filter((id) => known.has(id)))];
+          return next.length ? next : ["camasir"];
+        });
+        setOfferCat((prev) => {
+          if (!prev) return prev;
+          const id = canonicalCategoryId(prev);
+          return known.has(id) ? id : null;
+        });
+      })
       .catch(() => setCategories([]));
   }, []);
 
@@ -83,8 +95,8 @@ export function OnboardingFlow({
   }
 
   function mapCategoryIds() {
-    if (seek) return picked;
-    return offerCat ? [offerCat] : [];
+    const raw = seek ? picked : offerCat ? [offerCat] : [];
+    return [...new Set(raw.map(canonicalCategoryId))];
   }
 
   function addLaundry() {
@@ -103,11 +115,12 @@ export function OnboardingFlow({
 
   async function persistOffer() {
     if (!offer || !offerCat) return;
+    const categoryId = canonicalCategoryId(offerCat);
     const lat = home?.lat ?? PILOT.center.lat;
     const lng = home?.lng ?? PILOT.center.lng;
     const place = (home?.neighborhood || neighborhood || PILOT.label).trim().slice(0, 80);
     const neighborhoodName = place || PILOT.label;
-    if (offerCat === "camasir") {
+    if (categoryId === "camasir") {
       if (!laundryAdded || !dryingType) return;
       await postMyOffer({
         categoryId: "camasir",
@@ -120,7 +133,7 @@ export function OnboardingFlow({
       return;
     }
     await postMyOffer({
-      categoryId: isCatalogCategoryId(offerCat) ? offerCat : "davet",
+      categoryId: isCatalogCategoryId(categoryId) ? categoryId : "davet",
       lat,
       lng,
       neighborhood: neighborhoodName,

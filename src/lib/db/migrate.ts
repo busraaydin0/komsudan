@@ -797,6 +797,45 @@ function ensureColumns(db: Database.Database) {
   addColumn(db, "provider_products", "lead_hours", "lead_hours INTEGER");
   addColumn(db, "provider_products", "delivery", "delivery TEXT NOT NULL DEFAULT 'ikisi'");
   addColumn(db, "provider_products", "allergens", "allergens TEXT");
+  remapRetiredCategoryIds(db);
+}
+
+function remapRetiredCategoryIds(db: Database.Database) {
+  const hasUsers = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'`)
+    .get();
+  if (!hasUsers) return;
+  const rows = db
+    .prepare(
+      `SELECT id, preferred_category_ids FROM users
+       WHERE preferred_category_ids IS NOT NULL AND preferred_category_ids LIKE '%musluk%'`,
+    )
+    .all() as { id: string; preferred_category_ids: string }[];
+  const upd = db.prepare(`UPDATE users SET preferred_category_ids = ? WHERE id = ?`);
+  for (const row of rows) {
+    try {
+      const parsed = JSON.parse(row.preferred_category_ids) as unknown;
+      if (!Array.isArray(parsed)) continue;
+      const next: string[] = [];
+      const seen = new Set<string>();
+      for (const raw of parsed) {
+        if (typeof raw !== "string" || !raw) continue;
+        const id = raw === "musluk" ? "tamir" : raw;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        next.push(id);
+      }
+      upd.run(JSON.stringify(next), row.id);
+    } catch {
+      /* bozuk JSON’u atla */
+    }
+  }
+  const hasProfiles = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'provider_profiles'`)
+    .get();
+  if (hasProfiles) {
+    db.exec(`UPDATE provider_profiles SET category_id = 'tamir' WHERE category_id = 'musluk'`);
+  }
 }
 
 export function migrate(db: Database.Database) {

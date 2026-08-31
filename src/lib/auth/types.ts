@@ -1,4 +1,5 @@
 import type { Account, PreferredIntent } from "@/lib/types";
+import { normalizeCategoryIds } from "@/lib/categories/registry";
 import type { UserRole, UserRow } from "@/lib/db/auth";
 
 export type AuthUser = {
@@ -23,7 +24,7 @@ function parseCategoryIds(raw: string | null | undefined): string[] {
   try {
     const value = JSON.parse(raw) as unknown;
     if (!Array.isArray(value)) return [];
-    return value.filter((id): id is string => typeof id === "string" && id.length > 0);
+    return normalizeCategoryIds(value.filter((id): id is string => typeof id === "string" && id.length > 0));
   } catch {
     return [];
   }
