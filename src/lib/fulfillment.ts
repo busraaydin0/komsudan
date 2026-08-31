@@ -1,7 +1,8 @@
 import { isCatalogCategoryId } from "@/lib/categories/registry";
-import type { ApiLifecycle, PackageId } from "@/lib/types";
+import type { ApiLifecycle, FulfillmentType, PackageId } from "@/lib/types";
 import { canTransition as deliveryCanTransition } from "@/lib/status";
 import type { FulfillmentMode } from "@/lib/db/categories";
+import { isHomeVisitStatus, type HomeVisitStatus } from "@/lib/homeVisit";
 
 export type FulfillmentStrategy = {
   mode: FulfillmentMode;
@@ -37,31 +38,48 @@ export const foodStrategy: FulfillmentStrategy = {
   canTransition: (from, to) => FOOD_TRANSITIONS[from].includes(to),
 };
 
-/**
- * Eve giden hizmet iskeleti. Adlar Faz 8'de netleşir; şu an geçiş yok.
- * pending → confirmed → on_the_way → in_progress → completed
- * pending → rejected; confirmed/on_the_way → cancelled
- */
-export const HOME_VISIT_SKETCH = {
-  pending: ["confirmed", "rejected"],
-  confirmed: ["on_the_way", "cancelled"],
-  on_the_way: ["in_progress", "cancelled"],
-  in_progress: ["completed"],
-  completed: [] as string[],
-  rejected: [] as string[],
-  cancelled: [] as string[],
-} as const;
+export {
+  HOME_VISIT_STATUSES,
+  canHomeVisitTransition,
+  homeVisitNext,
+  type HomeVisitAction,
+  type HomeVisitActor,
+  type HomeVisitStatus,
+} from "@/lib/homeVisit";
 
+/**
+ * Eve giden hizmet. Geçişler `homeVisit.ts` (rol whitelist).
+ * ready false: sipariş kabulü kapalı — manuel onay olmadan açılmaz.
+ */
 export const homeVisitStrategy: FulfillmentStrategy = {
   mode: "home_visit",
   ready: false,
   canTransition: () => false,
 };
 
-export function strategyFor(mode: FulfillmentMode, categoryId?: string): FulfillmentStrategy {
-  if (mode === "home_visit") return homeVisitStrategy;
+export function strategyFor(
+  mode: FulfillmentMode,
+  categoryId?: string,
+  fulfillmentType?: FulfillmentType | string | null,
+): FulfillmentStrategy {
+  if (fulfillmentType === "home_visit" || mode === "home_visit") return homeVisitStrategy;
   if (isCatalogCategoryId(categoryId)) {
     return foodStrategy;
   }
   return deliveryStrategy;
+}
+
+export function isHomeVisitFulfillment(value: string | null | undefined) {
+  return value === "home_visit";
+}
+
+/** home_visit siparişte stored lifecycle HomeVisitStatus; dropoff ApiLifecycle. */
+export function orderLifecycleOf(row: {
+  fulfillment_type?: string | null;
+  lifecycle?: string | null;
+}) {
+  if (row.fulfillment_type === "home_visit" && isHomeVisitStatus(row.lifecycle)) {
+    return row.lifecycle as HomeVisitStatus;
+  }
+  return row.lifecycle ?? "pending";
 }

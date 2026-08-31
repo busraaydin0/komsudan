@@ -21,12 +21,36 @@ export const createOrderSchema = z.object({
   express: z.boolean().optional().default(false),
   drop: z.enum(["kapi", "nokta"]),
   dropPointId: z.string().min(1).nullable().optional(),
-  slot: z.string().min(1, "Saat dilimi gerekli."),
+  slot: z.string().min(1, "Saat dilimi gerekli.").optional(),
   note: z.string().max(500).optional().default(""),
+  appointmentDate: z.string().trim().min(1).max(32).optional(),
+  appointmentWindowStart: z.string().trim().min(1).max(16).optional(),
+  appointmentWindowEnd: z.string().trim().min(1).max(16).optional(),
+  visitDistrict: z.string().trim().min(1).max(80).optional(),
+  visitNeighborhood: z.string().trim().min(1).max(80).optional(),
+  visitAddress: z.string().trim().min(1).max(200).optional(),
+  addressShareConsent: z.boolean().optional(),
+}).superRefine((val, ctx) => {
+  if (val.appointmentDate) return;
+  if (!val.slot) {
+    ctx.addIssue({ code: "custom", message: "Saat dilimi gerekli.", path: ["slot"] });
+  }
 });
 
 export const patchOrderSchema = z.object({
-  action: z.enum(["accept", "reject", "advance", "deliver"]),
+  action: z.enum([
+    "accept",
+    "reject",
+    "advance",
+    "deliver",
+    "confirm",
+    "start_travel",
+    "start_work",
+    "complete",
+    "cancel",
+    "timeout",
+    "force_cancel",
+  ]),
   code: z.string().optional(),
 });
 

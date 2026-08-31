@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { isCatalogCategoryId } from "@/lib/categories/registry";
+import { INDEPENDENT_TRADESPERSON_CLAUSE } from "@/lib/legal";
 import { NEIGHBORHOODS, PACKAGES, PILOT } from "@/lib/data";
 import { DRYING_OPTIONS } from "@/lib/drying";
 import { fetchCategories, patchPreferences, postMyOffer, type ServiceCategory } from "@/lib/api";
@@ -351,6 +352,7 @@ export function OnboardingFlow({
                   {offerCat === "tamir" && (
                     <p className="mt-3 text-xs text-[var(--muted)]">
                       Hizmetlerini Hizmet sekmesinden ekleyeceksin: tür, fiyat tipi, parça, teslim, inceleme.
+                      Musluk tamiri eve gelir, iş başı. {INDEPENDENT_TRADESPERSON_CLAUSE}
                     </p>
                   )}
                   {offerCat === "teknoloji" && (

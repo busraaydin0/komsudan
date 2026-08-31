@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { db } from "./client";
 import type {
+  FulfillmentType,
   ProviderRepair,
   RepairDelivery,
   RepairJob,
@@ -10,6 +11,7 @@ import type {
   RepairPriceUnit,
   RepairQuoteFrom,
 } from "@/lib/types";
+import { fulfillmentTypeForKind, lockRepairSubtype } from "@/lib/repair";
 
 export type RepairRow = {
   id: string;
@@ -37,6 +39,7 @@ export type RepairRow = {
   work_hours: string | null;
   is_active: number;
   created_at: string;
+  fulfillment_type: string;
 };
 
 export type RepairWrite = {
@@ -60,6 +63,7 @@ export type RepairWrite = {
   notes?: string | null;
   workHours?: string | null;
   isActive?: boolean;
+  fulfillmentType?: FulfillmentType;
 };
 
 function asKind(raw: string | null | undefined): RepairKind {
@@ -70,6 +74,7 @@ function asKind(raw: string | null | undefined): RepairKind {
     raw === "bisiklet" ||
     raw === "oyuncak" ||
     raw === "aksesuar" ||
+    raw === "musluk" ||
     raw === "diger"
   ) {
     return raw;
@@ -138,6 +143,7 @@ export function toPublicRepair(row: RepairRow): ProviderRepair {
     notes: row.notes || null,
     workHours: row.work_hours || null,
     isActive: Boolean(row.is_active),
+    fulfillmentType: row.fulfillment_type === "home_visit" ? "home_visit" : fulfillmentTypeForKind(asKind(row.kind)),
   };
 }
 
@@ -157,6 +163,24 @@ export function countRepairs(providerId: string, activeOnly = true) {
     ? `SELECT COUNT(*) AS n FROM provider_repairs WHERE provider_id = ? AND is_active = 1`
     : `SELECT COUNT(*) AS n FROM provider_repairs WHERE provider_id = ?`;
   return (db().prepare(sql).get(providerId) as { n: number }).n;
+}
+
+function lockedWrite(input: {
+  kind?: RepairKind;
+  priceType?: RepairPriceType;
+  priceUnit?: RepairPriceUnit;
+}) {
+  const locked = lockRepairSubtype({
+    kind: input.kind ?? "diger",
+    priceType: input.priceType,
+    priceUnit: input.priceUnit,
+  });
+  return {
+    kind: locked.kind ?? "diger",
+    price_type: locked.priceType ?? "sabit",
+    price_unit: locked.priceUnit ?? "adet",
+    fulfillment_type: locked.fulfillmentType,
+  };
 }
 
 export function upsertRepair(row: {
@@ -183,16 +207,19 @@ export function upsertRepair(row: {
 }) {
   const now = new Date().toISOString();
   const flags = deliveryFlags(row.delivery);
+  const locked = lockedWrite(row);
   db()
     .prepare(
       `INSERT INTO provider_repairs (
          id, provider_id, name, description, kind, item, job, photo_url, price, price_type,
          price_unit, parts, lead_days, max_per_week, delivery_adres, delivery_nokta, delivery_yakin,
-         work_radius_km, inspect_required, quote_from, warranty_days, notes, work_hours, is_active, created_at
+         work_radius_km, inspect_required, quote_from, warranty_days, notes, work_hours, is_active, created_at,
+         fulfillment_type
        ) VALUES (
          @id, @provider_id, @name, @description, @kind, @item, @job, NULL, @price, @price_type,
          @price_unit, @parts, @lead_days, @max_per_week, @delivery_adres, @delivery_nokta, @delivery_yakin,
-         @work_radius_km, @inspect_required, @quote_from, @warranty_days, @notes, @work_hours, 1, @now
+         @work_radius_km, @inspect_required, @quote_from, @warranty_days, @notes, @work_hours, 1, @now,
+         @fulfillment_type
        )
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
@@ -215,6 +242,7 @@ export function upsertRepair(row: {
          warranty_days = excluded.warranty_days,
          notes = excluded.notes,
          work_hours = excluded.work_hours,
+         fulfillment_type = excluded.fulfillment_type,
          is_active = 1`,
     )
     .run({
@@ -222,12 +250,10 @@ export function upsertRepair(row: {
       provider_id: row.provider_id,
       name: row.name,
       description: row.description ?? null,
-      kind: row.kind ?? "diger",
       item: row.item ?? null,
       job: row.job ?? "onarim",
       price: row.price,
-      price_type: row.priceType ?? "sabit",
-      price_unit: row.priceUnit ?? "adet",
+      ...locked,
       parts: row.parts ?? "either",
       lead_days: row.leadDays ?? null,
       max_per_week: row.maxPerWeek ?? null,
@@ -252,18 +278,17 @@ function deliveryFlags(input?: RepairDelivery) {
 
 export function insertRepair(providerId: string, input: RepairWrite): RepairRow {
   const flags = deliveryFlags(input.delivery);
+  const locked = lockedWrite(input);
   const row = {
     id: randomUUID(),
     provider_id: providerId,
     name: input.name,
     description: input.description ?? null,
-    kind: input.kind ?? "diger",
     item: input.item ?? null,
     job: input.job ?? "onarim",
     photo_url: input.photoUrl ?? null,
     price: input.price,
-    price_type: input.priceType ?? "sabit",
-    price_unit: input.priceUnit ?? "adet",
+    ...locked,
     parts: input.parts ?? "either",
     lead_days: input.leadDays ?? null,
     max_per_week: input.maxPerWeek ?? null,
@@ -282,11 +307,13 @@ export function insertRepair(providerId: string, input: RepairWrite): RepairRow 
       `INSERT INTO provider_repairs (
          id, provider_id, name, description, kind, item, job, photo_url, price, price_type,
          price_unit, parts, lead_days, max_per_week, delivery_adres, delivery_nokta, delivery_yakin,
-         work_radius_km, inspect_required, quote_from, warranty_days, notes, work_hours, is_active, created_at
+         work_radius_km, inspect_required, quote_from, warranty_days, notes, work_hours, is_active, created_at,
+         fulfillment_type
        ) VALUES (
          @id, @provider_id, @name, @description, @kind, @item, @job, @photo_url, @price, @price_type,
          @price_unit, @parts, @lead_days, @max_per_week, @delivery_adres, @delivery_nokta, @delivery_yakin,
-         @work_radius_km, @inspect_required, @quote_from, @warranty_days, @notes, @work_hours, @is_active, @created_at
+         @work_radius_km, @inspect_required, @quote_from, @warranty_days, @notes, @work_hours, @is_active, @created_at,
+         @fulfillment_type
        )`,
     )
     .run(row);
@@ -297,6 +324,7 @@ export function updateRepair(id: string, providerId: string, input: RepairWrite)
   const current = getRepair(id);
   if (!current || current.provider_id !== providerId) return undefined;
   const flags = deliveryFlags(input.delivery);
+  const locked = lockedWrite(input);
   db()
     .prepare(
       `UPDATE provider_repairs SET
@@ -321,6 +349,7 @@ export function updateRepair(id: string, providerId: string, input: RepairWrite)
          warranty_days = @warranty_days,
          notes = @notes,
          work_hours = @work_hours,
+         fulfillment_type = @fulfillment_type,
          is_active = @is_active
        WHERE id = @id AND provider_id = @providerId`,
     )
@@ -329,13 +358,11 @@ export function updateRepair(id: string, providerId: string, input: RepairWrite)
       providerId,
       name: input.name,
       description: input.description ?? null,
-      kind: input.kind ?? "diger",
       item: input.item ?? null,
       job: input.job ?? "onarim",
       photo_url: input.photoUrl === undefined ? current.photo_url : input.photoUrl,
       price: input.price,
-      price_type: input.priceType ?? "sabit",
-      price_unit: input.priceUnit ?? "adet",
+      ...locked,
       parts: input.parts ?? "either",
       lead_days: input.leadDays ?? null,
       max_per_week: input.maxPerWeek ?? null,

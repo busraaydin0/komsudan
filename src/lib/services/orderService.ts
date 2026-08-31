@@ -31,11 +31,19 @@ import { getTalk, toPublicTalk } from "@/lib/db/talks";
 import { dropsForGrave, graveCanOrder, graveQtyBounds, graveUnitMeta } from "@/lib/grave";
 import { getGrave, toPublicGrave } from "@/lib/db/graves";
 import { getCargo, toPublicCargo } from "@/lib/db/cargos";
-import { strategyFor } from "@/lib/fulfillment";
+import { strategyFor, homeVisitStrategy, isHomeVisitFulfillment } from "@/lib/fulfillment";
+import {
+  homeVisitNext,
+  isHomeVisitStatus,
+  pilotFromHomeVisit,
+  type HomeVisitAction,
+  type HomeVisitActor,
+} from "@/lib/homeVisit";
+import { getAppointmentForOrder, insertAppointment } from "@/lib/db/appointments";
+import { visitAddressForViewer, type VisitAddressViewer } from "@/lib/visitAddress";
 import {
   canAddPhotos,
   canCancel,
-  isLifecycle,
   lifecycleOf,
   nextStatus,
   PICKUP_CODE_LEN,
@@ -84,7 +92,7 @@ import {
 } from "@/lib/services/notificationService";
 import { authorizePayment, capturePayment, paymentForOrder, voidPayment } from "@/lib/services/paymentService";
 
-export type OrderAction = "accept" | "reject" | "advance" | "deliver";
+export type OrderAction = "accept" | "reject" | "advance" | "deliver" | HomeVisitAction;
 
 function genCode() {
   return randomInt(0, 10 ** PICKUP_CODE_LEN)
@@ -108,12 +116,29 @@ function ensurePickupCode(row: OrderRow) {
   row.pickup_code = code;
 }
 
-function toOrder(row: OrderRow): Order {
+function viewerFor(user: AuthUser | undefined, row: OrderRow): VisitAddressViewer {
+  if (!user) return "customer";
+  if (user.role === "admin") return "admin";
+  if (user.id === row.provider_id) return "provider";
+  return "customer";
+}
+
+function toOrder(row: OrderRow, viewer?: AuthUser): Order {
   ensurePickupCode(row);
   const drop = row.drop_method as DropMethod;
   const status = row.status as OrderStatus;
   const pay = paymentForOrder(row.id);
   const payStatus = (pay?.status ?? row.payment_status) as PaymentStatus;
+  const fulfillmentType = row.fulfillment_type === "home_visit" ? "home_visit" : "dropoff";
+  const visit = visitAddressForViewer({
+    fulfillmentType,
+    lifecycle: row.lifecycle,
+    viewer: viewerFor(viewer, row),
+    district: row.visit_district,
+    neighborhood: row.visit_neighborhood,
+    address: row.visit_address,
+  });
+  const apt = fulfillmentType === "home_visit" ? getAppointmentForOrder(row.id) : undefined;
   return {
     id: row.id,
     providerId: row.provider_id,
@@ -128,6 +153,13 @@ function toOrder(row: OrderRow): Order {
     productName: row.product_name,
     guestCount: row.guest_count,
     allergyNote: row.allergy_note,
+    fulfillmentType,
+    visitDistrict: visit.district,
+    visitNeighborhood: visit.neighborhood,
+    visitAddress: visit.address,
+    appointment: apt
+      ? { date: apt.date, windowStart: apt.window_start, windowEnd: apt.window_end }
+      : null,
     total: row.total,
     commission: row.commission,
     status,
@@ -139,7 +171,7 @@ function toOrder(row: OrderRow): Order {
     paidAt: payStatus === "captured" ? (pay?.updatedAt ?? row.paid_at) : row.paid_at,
     payment: pay,
     customerId: row.user_id,
-    lifecycle: lifecycleOf(status, row.lifecycle),
+    lifecycle: (fulfillmentType === "home_visit" ? row.lifecycle : lifecycleOf(status, row.lifecycle)) as Order["lifecycle"],
     deliveryMode: (row.delivery_mode as "door" | "point" | null) ?? deliveryMode(drop),
     estimatedWeight: row.estimated_weight ?? row.pieces,
     pricePerKgSnapshot: row.price_per_kg_snapshot ?? 0,
@@ -176,7 +208,7 @@ export function getOrderFor(user: AuthUser, id: string): Order {
   if (!row || !canSeeOrder(user, row)) {
     throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
   }
-  return toOrder(row);
+  return toOrder(row, user);
 }
 
 export function listOrdersFor(user: AuthUser): Order[] {
@@ -186,7 +218,7 @@ export function listOrdersFor(user: AuthUser): Order[] {
       : user.role === "provider"
         ? listOrderRowsForProvider(user.id)
         : listOrderRowsForCustomer(user.id);
-  return rows.map(toOrder);
+  return rows.map((row) => toOrder(row, user));
 }
 
 export function createOrder(input: CreateOrderInput, userId: string): Order {
@@ -212,6 +244,12 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
   return createLaundryOrder(input, userId, provider);
 }
 
+function requireSlot(input: CreateOrderInput) {
+  const slot = (input.slot ?? "").trim();
+  if (!slot) throw new ApiError(400, "Saat dilimi gerekli.", "VALIDATION_ERROR");
+  return slot;
+}
+
 function validateDropAndSlot(provider: NonNullable<ReturnType<typeof getProvider>>, input: CreateOrderInput) {
   if (!provider.drops.includes(input.drop)) {
     throw new ApiError(400, "Bu teslimat yöntemi kapalı.", "VALIDATION_ERROR");
@@ -225,7 +263,7 @@ function validateDropAndSlot(provider: NonNullable<ReturnType<typeof getProvider
     dropPointId = input.dropPointId;
   }
 
-  if (!provider.slots.includes(input.slot)) {
+  if (!provider.slots.includes(requireSlot(input))) {
     throw new ApiError(400, "Saat dilimi geçersiz.", "VALIDATION_ERROR");
   }
   return dropPointId;
@@ -246,6 +284,12 @@ function insertPendingOrder(args: {
   productName?: string | null;
   guestCount?: number | null;
   allergyNote?: string | null;
+  fulfillmentType?: "dropoff" | "home_visit";
+  visitDistrict?: string | null;
+  visitNeighborhood?: string | null;
+  visitAddress?: string | null;
+  addressShareConsent?: boolean;
+  appointment?: { date: string; windowStart: string; windowEnd: string } | null;
 }) {
   const now = new Date().toISOString();
   const id = `k-${randomUUID().slice(0, 8)}`;
@@ -283,7 +327,21 @@ function insertPendingOrder(args: {
       product_name: args.productName ?? null,
       guest_count: args.guestCount ?? null,
       allergy_note: args.allergyNote ?? null,
+      fulfillment_type: args.fulfillmentType ?? "dropoff",
+      visit_district: args.visitDistrict ?? null,
+      visit_neighborhood: args.visitNeighborhood ?? null,
+      visit_address: args.visitAddress ?? null,
+      address_share_consent: args.addressShareConsent ? 1 : 0,
     });
+    if (args.fulfillmentType === "home_visit" && args.appointment) {
+      insertAppointment({
+        orderId: id,
+        date: args.appointment.date,
+        windowStart: args.appointment.windowStart,
+        windowEnd: args.appointment.windowEnd,
+        at: now,
+      });
+    }
     recordTransition({
       orderId: id,
       fromStatus: null,
@@ -319,7 +377,7 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
   const pack = provider.packages.find((p) => p.id === input.packageId);
   if (!pack) throw new ApiError(400, "Bu paket bu komşuda yok.", "VALIDATION_ERROR");
 
-  const express = resolveExpress(provider.express, input.slot);
+  const express = resolveExpress(provider.express, requireSlot(input));
   if (input.express && !provider.express) {
     throw new ApiError(400, "Bu komşu aynı gün almıyor.", "VALIDATION_ERROR");
   }
@@ -339,7 +397,7 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     express,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -389,7 +447,7 @@ function createDavetOrder(input: CreateOrderInput, userId: string, provider: Non
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -438,7 +496,7 @@ function createDikisOrder(input: CreateOrderInput, userId: string, provider: Non
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -469,6 +527,11 @@ function createTamirOrder(input: CreateOrderInput, userId: string, provider: Non
     throw new ApiError(400, "Bu iş için önce inceleme. Fiyat ürünü görünce netleşir.", "VALIDATION_ERROR");
   }
 
+  const fulfillmentType = card.fulfillmentType === "home_visit" ? "home_visit" : "dropoff";
+  if (fulfillmentType === "home_visit" && !homeVisitStrategy.ready) {
+    throw new ApiError(409, "Eve gelen tamir henüz açık değil.", "CATEGORY_NOT_READY");
+  }
+
   const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
   const { min, max } = repairQtyBounds(card);
   const unit = repairUnitMeta(card.priceUnit).qty;
@@ -476,27 +539,65 @@ function createTamirOrder(input: CreateOrderInput, userId: string, provider: Non
     throw new ApiError(400, `Miktar ${min}–${max} ${unit} olmalı.`, "VALIDATION_ERROR");
   }
 
-  const allowedDrops = dropsForRepair(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
+  let dropPointId: string | null = null;
+  let slot = "";
+  let drop = input.drop;
+  let appointment: { date: string; windowStart: string; windowEnd: string } | null = null;
+  let visitDistrict: string | null = null;
+  let visitNeighborhood: string | null = null;
+  let visitAddress: string | null = null;
+  let addressShareConsent = false;
+
+  if (fulfillmentType === "home_visit") {
+    drop = "kapi";
+    const date = (input.appointmentDate ?? "").trim();
+    const windowStart = (input.appointmentWindowStart ?? "").trim();
+    const windowEnd = (input.appointmentWindowEnd ?? "").trim();
+    if (!date || !windowStart || !windowEnd) {
+      throw new ApiError(400, "Randevu tarihi ve saat aralığı gerekli.", "VALIDATION_ERROR");
+    }
+    visitDistrict = (input.visitDistrict ?? "").trim().slice(0, 80) || null;
+    visitNeighborhood = (input.visitNeighborhood ?? "").trim().slice(0, 80) || null;
+    visitAddress = (input.visitAddress ?? "").trim().slice(0, 200) || null;
+    if (!visitDistrict || !visitNeighborhood || !visitAddress) {
+      throw new ApiError(400, "İlçe, mahalle ve tam adres gerekli.", "VALIDATION_ERROR");
+    }
+    if (!input.addressShareConsent) {
+      throw new ApiError(400, "Adres paylaşımı için açık rıza gerekli.", "VALIDATION_ERROR");
+    }
+    addressShareConsent = true;
+    appointment = { date, windowStart, windowEnd };
+    slot = `${date} ${windowStart}–${windowEnd}`;
+  } else {
+    const allowedDrops = dropsForRepair(card, provider.drops);
+    if (!allowedDrops.includes(input.drop)) {
+      throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
+    }
+    dropPointId = validateDropAndSlot(provider, input);
+    slot = requireSlot(input);
   }
 
-  const dropPointId = validateDropAndSlot(provider, input);
   const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
   const id = insertPendingOrder({
     providerId: provider.id,
     packageId: "tamir",
     pieces: qty,
     express: false,
-    drop: input.drop,
+    drop,
     dropPointId,
-    slot: input.slot,
+    slot,
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
     productId: row.id,
     productName: row.name,
     guestCount: qty,
+    fulfillmentType,
+    visitDistrict,
+    visitNeighborhood,
+    visitAddress,
+    addressShareConsent,
+    appointment,
   });
   const order = getOrder(id)!;
   notifyNewOrder({
@@ -542,7 +643,7 @@ function createTeknolojiOrder(input: CreateOrderInput, userId: string, provider:
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -593,7 +694,7 @@ function createArabaOrder(input: CreateOrderInput, userId: string, provider: Non
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -644,7 +745,7 @@ function createKuryeOrder(input: CreateOrderInput, userId: string, provider: Non
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -695,7 +796,7 @@ function createBahceOrder(input: CreateOrderInput, userId: string, provider: Non
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -746,7 +847,7 @@ function createKargoOrder(input: CreateOrderInput, userId: string, provider: Non
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -797,7 +898,7 @@ function createCiktiOrder(input: CreateOrderInput, userId: string, provider: Non
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -849,7 +950,7 @@ function createKislikOrder(input: CreateOrderInput, userId: string, provider: No
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -900,7 +1001,7 @@ function createHaliOrder(input: CreateOrderInput, userId: string, provider: NonN
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -951,7 +1052,7 @@ function createOdevOrder(input: CreateOrderInput, userId: string, provider: NonN
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -1002,7 +1103,7 @@ function createDilOrder(input: CreateOrderInput, userId: string, provider: NonNu
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -1054,7 +1155,7 @@ function createMezarOrder(input: CreateOrderInput, userId: string, provider: Non
     express: false,
     drop: input.drop,
     dropPointId,
-    slot: input.slot,
+    slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
@@ -1076,9 +1177,9 @@ function currentLifecycle(row: OrderRow): ApiLifecycle {
   return lifecycleOf(row.status as OrderStatus, row.lifecycle);
 }
 
-function assertFulfillmentReady(providerId: string) {
+function assertFulfillmentReady(providerId: string, fulfillmentType?: string) {
   const cat = getCategoryForProvider(providerId);
-  const strat = strategyFor(cat.fulfillment_mode, cat.id);
+  const strat = strategyFor(cat.fulfillment_mode, cat.id, fulfillmentType);
   if (!strat.ready) {
     throw new ApiError(409, "Bu hizmet tipi henüz açık değil.", "CATEGORY_NOT_READY");
   }
@@ -1086,7 +1187,14 @@ function assertFulfillmentReady(providerId: string) {
 }
 
 function assertCanMove(row: OrderRow, from: ApiLifecycle, to: ApiLifecycle, packageId: PackageId) {
-  const strat = assertFulfillmentReady(row.provider_id);
+  const strat = strategyFor(
+    getCategoryForProvider(row.provider_id).fulfillment_mode,
+    getCategoryForProvider(row.provider_id).id,
+    row.fulfillment_type,
+  );
+  if (!strat.ready) {
+    throw new ApiError(409, "Bu hizmet tipi henüz açık değil.", "CATEGORY_NOT_READY");
+  }
   if (strat.canTransition(from, to, packageId)) return;
   if (to === "ironing" && packageId !== "tam") {
     throw new ApiError(409, "Ütü bu pakette yok.", "INVALID_TRANSITION");
@@ -1137,6 +1245,9 @@ export function applyStatus(
   const row = getOrderRow(id);
   if (!row || !canSeeOrder(user, row)) {
     throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
+  }
+  if (isHomeVisitFulfillment(row.fulfillment_type)) {
+    throw new ApiError(400, "Bu siparişte durum gönderilmez, aksiyon gönder.", "VALIDATION_ERROR");
   }
   const from = currentLifecycle(row);
   const pack = row.package_id as PackageId;
@@ -1213,6 +1324,9 @@ export function applyStatus(
 export function applyOrderAction(id: string, action: OrderAction, user: AuthUser, code?: string): Order {
   const row = getOrderRow(id);
   if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
+  if (isHomeVisitFulfillment(row.fulfillment_type)) {
+    return applyHomeVisitOrderAction(id, action, user);
+  }
   if (!canMutateOrder(user, row)) {
     throw new ApiError(403, "Bu siparişi yalnızca hizmet veren ilerletebilir.", "FORBIDDEN");
   }
@@ -1235,16 +1349,103 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
       throw new ApiError(409, "Kod ancak hazır siparişte geçer.", "INVALID_TRANSITION");
     }
     next = "completed";
-  } else {
+  } else if (action === "advance") {
     const n = nextStatus(order.status, order.packageId, Boolean(order.productId));
     if (!n) throw new ApiError(409, "Daha ileri durum yok.", "INVALID_TRANSITION");
     if (n === "teslim_edildi") {
       throw new ApiError(409, "Teslim için müşterinin kodunu gir.", "INVALID_TRANSITION");
     }
     next = lifecycleOf(n);
+  } else {
+    throw new ApiError(400, "Bu sipariş için bu aksiyon yok.", "VALIDATION_ERROR");
   }
 
   return applyStatus(id, user, next, code);
+}
+
+function homeVisitActorOf(user: AuthUser, row: OrderRow): HomeVisitActor {
+  if (user.role === "admin") return "admin";
+  if (user.id === row.provider_id) return "provider";
+  if (user.id === row.user_id) return "customer";
+  throw new ApiError(403, "Bu siparişe erişemezsin.", "FORBIDDEN");
+}
+
+function resolveHomeVisitAction(action: OrderAction, from: string): HomeVisitAction {
+  if (action === "accept" || action === "confirm") return "confirm";
+  if (action === "reject") return "reject";
+  if (action === "cancel") return "cancel";
+  if (action === "start_travel") return "start_travel";
+  if (action === "start_work") return "start_work";
+  if (action === "complete" || action === "deliver") return "complete";
+  if (action === "timeout") return "timeout";
+  if (action === "force_cancel") return "force_cancel";
+  if (action === "advance") {
+    if (from === "confirmed") return "start_travel";
+    if (from === "on_the_way") return "start_work";
+  }
+  throw new ApiError(400, "Bu sipariş için bu aksiyon yok.", "VALIDATION_ERROR");
+}
+
+function applyHomeVisitOrderAction(id: string, action: OrderAction, user: AuthUser): Order {
+  const row = getOrderRow(id);
+  if (!row || !canSeeOrder(user, row)) {
+    throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
+  }
+  if (!isHomeVisitStatus(row.lifecycle)) {
+    throw new ApiError(409, "Bu sipariş eve gelen akışta değil.", "INVALID_TRANSITION");
+  }
+  const actor = homeVisitActorOf(user, row);
+  const hvAction = resolveHomeVisitAction(action, row.lifecycle);
+  const next = homeVisitNext(row.lifecycle, hvAction, actor);
+  if (!next) {
+    throw new ApiError(409, "Bu duruma geçilemez.", "INVALID_TRANSITION");
+  }
+
+  const now = new Date().toISOString();
+  const nextPilot = pilotFromHomeVisit(next);
+  const voidPay = next === "rejected" || next === "cancelled";
+  const capture = next === "completed";
+
+  runOrderTx(() => {
+    if (capture) {
+      updateOrderStatus({
+        id,
+        status: nextPilot,
+        lifecycle: next,
+        updatedAt: now,
+        pickupCode: null,
+        resetAttempts: true,
+        paymentStatus: "captured",
+        paidAt: now,
+        finalPrice: row.total,
+      });
+    } else if (voidPay) {
+      updateOrderStatus({
+        id,
+        status: nextPilot,
+        lifecycle: next,
+        updatedAt: now,
+        paymentStatus: "voided",
+      });
+    } else {
+      updateOrderStatus({ id, status: nextPilot, lifecycle: next, updatedAt: now });
+    }
+    recordTransition({
+      orderId: id,
+      fromStatus: row.status,
+      toStatus: nextPilot,
+      fromLifecycle: row.lifecycle,
+      toLifecycle: next,
+      actorId: user.id,
+      actorRole: actor,
+      at: now,
+    });
+    if (voidPay) addRemaining(row.provider_id, row.pieces);
+    if (capture) capturePayment(id, now);
+    if (voidPay) voidPayment(id, now);
+  });
+
+  return toOrder(getOrderRow(id)!, user);
 }
 
 const PHOTO_KINDS: OrderPhotoKind[] = ["dropoff", "pickup", "damage"];
@@ -1259,12 +1460,10 @@ export function listOrderHistory(user: AuthUser, id: string): OrderStatusEvent[]
   getOrderFor(user, id);
   return listHistoryRows(id).map((row) => ({
     id: row.id,
-    from: row.from_lifecycle && isLifecycle(row.from_lifecycle)
-      ? row.from_lifecycle
-      : row.from_status
-        ? lifecycleOf(row.from_status as OrderStatus, row.from_lifecycle)
-        : null,
-    to: lifecycleOf(row.to_status as OrderStatus, row.to_lifecycle),
+    from: row.from_lifecycle || (row.from_status
+      ? lifecycleOf(row.from_status as OrderStatus, row.from_lifecycle)
+      : null),
+    to: row.to_lifecycle || lifecycleOf(row.to_status as OrderStatus, row.to_lifecycle),
     actorId: row.actor_id,
     actorRole: row.actor_role,
     note: row.note,

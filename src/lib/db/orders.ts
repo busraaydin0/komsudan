@@ -34,6 +34,13 @@ export type OrderRow = {
   product_name: string | null;
   guest_count: number | null;
   allergy_note: string | null;
+  fulfillment_type: string;
+  visit_district: string | null;
+  visit_neighborhood: string | null;
+  visit_address: string | null;
+  address_share_consent: number;
+  dispute_window_hours: number | null;
+  cancel_free_hours: number | null;
 };
 
 export type InsertOrderInput = {
@@ -62,6 +69,11 @@ export type InsertOrderInput = {
   product_name?: string | null;
   guest_count?: number | null;
   allergy_note?: string | null;
+  fulfillment_type?: string;
+  visit_district?: string | null;
+  visit_neighborhood?: string | null;
+  visit_address?: string | null;
+  address_share_consent?: number;
 };
 
 export function getRemaining(providerId: string) {
@@ -124,14 +136,16 @@ export function insertOrderRow(input: InsertOrderInput) {
         pickup_code, code_attempts, paid_at, payment_status, user_id,
         price_per_kg_snapshot, estimated_weight, actual_weight, estimated_price, final_price,
         delivery_mode, scheduled_window_start, scheduled_window_end, lifecycle,
-        product_id, product_name, guest_count, allergy_note
+        product_id, product_name, guest_count, allergy_note,
+        fulfillment_type, visit_district, visit_neighborhood, visit_address, address_share_consent
       ) VALUES (
         @id, @provider_id, @package_id, @pieces, @express, @drop_method, @drop_point_id,
         @slot, @note, @total, @commission, @status, @created_at, @updated_at,
         NULL, 0, NULL, 'authorized', @user_id,
         @price_per_kg_snapshot, @estimated_weight, NULL, @estimated_price, NULL,
         @delivery_mode, @scheduled_window_start, NULL, @lifecycle,
-        @product_id, @product_name, @guest_count, @allergy_note
+        @product_id, @product_name, @guest_count, @allergy_note,
+        @fulfillment_type, @visit_district, @visit_neighborhood, @visit_address, @address_share_consent
       )`,
     )
     .run({
@@ -139,6 +153,11 @@ export function insertOrderRow(input: InsertOrderInput) {
       product_name: null,
       guest_count: null,
       allergy_note: null,
+      fulfillment_type: "dropoff",
+      visit_district: null,
+      visit_neighborhood: null,
+      visit_address: null,
+      address_share_consent: 0,
       ...input,
     });
 }

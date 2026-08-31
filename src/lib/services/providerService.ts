@@ -1,5 +1,6 @@
 import { ApiError } from "@/server/rules";
 import { CATEGORIES, isCatalogCategoryId, type CatalogCategoryId, type CategoryId } from "@/lib/categories/registry";
+import { lockRepairSubtype } from "@/lib/repair";
 import { PACKAGES, PILOT } from "@/lib/data";
 import { dryingBlurb, hasDryerFrom } from "@/lib/drying";
 import { haversineKm } from "@/lib/geo/distance";
@@ -736,10 +737,12 @@ export function removeMyService(user: AuthUser, serviceId: string) {
 const MAX_REPAIRS = 12;
 
 function assertRepairWrite(input: RepairWrite) {
-  const type = input.priceType ?? "sabit";
+  const locked = lockRepairSubtype(input);
+  const type = locked.priceType ?? "sabit";
   if (type !== "inceleme" && input.price < 1) {
     throw new ApiError(400, "Sabit veya başlangıç fiyatı 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
   }
+  if (locked.kind === "musluk") return;
   const d = input.delivery;
   if (d && !d.adres && !d.nokta && !d.yakin) {
     throw new ApiError(400, "En az bir teslim yöntemi seç.", "VALIDATION_ERROR");

@@ -8,7 +8,7 @@ import {
   postMyRepair,
   uploadMyRepairPhoto,
 } from "@/lib/api";
-import {
+  import {
   REPAIR_DELIVERIES,
   REPAIR_JOBS,
   REPAIR_KINDS,
@@ -16,6 +16,7 @@ import {
   REPAIR_PRICE_TYPES,
   REPAIR_PRICE_UNITS,
   REPAIR_QUOTES,
+  isMuslukKind,
   repairKindLabel,
   repairPriceTypeLabel,
   repairUnitMeta,
@@ -140,7 +141,19 @@ export function RepairServiceEditor({
   if (!me || me.categoryId !== "tamir") return null;
 
   function patch<K extends keyof Draft>(key: K, value: Draft[K]) {
-    setDraft((prev) => ({ ...prev, [key]: value }));
+    setDraft((prev) => {
+      if (key === "kind" && isMuslukKind(value as RepairKind)) {
+        return {
+          ...prev,
+          kind: "musluk",
+          priceType: "sabit",
+          priceUnit: "is",
+          name: prev.name.trim() ? prev.name : "Musluk tamiri",
+          job: "onarim",
+        };
+      }
+      return { ...prev, [key]: value };
+    });
     setErr("");
   }
 
@@ -214,7 +227,7 @@ export function RepairServiceEditor({
       setErr("Sabit veya başlangıç fiyatı tam sayı ₺ olsun.");
       return;
     }
-    if (!body.delivery.adres && !body.delivery.nokta && !body.delivery.yakin) {
+    if (!isMuslukKind(body.kind) && !body.delivery.adres && !body.delivery.nokta && !body.delivery.yakin) {
       setErr("En az bir teslim yöntemi seç.");
       return;
     }
@@ -398,6 +411,11 @@ export function RepairServiceEditor({
 
           <fieldset>
             <legend className="text-xs text-[var(--muted)]">Fiyatlandırma</legend>
+            {isMuslukKind(draft.kind) ? (
+              <p className="mt-1.5 text-sm text-[var(--muted)]">
+                Eve gelir, iş başı sabit fiyat. Saatlik ücret yok.
+              </p>
+            ) : null}
             <label className="mt-1.5 block text-xs text-[var(--muted)]">
               Fiyat
               <input
@@ -408,35 +426,41 @@ export function RepairServiceEditor({
                 className="mt-1 w-full rounded-2xl bg-[var(--paper)] px-3 py-2 text-sm tabular-nums text-[var(--ink)] ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
               />
             </label>
-            <p className="mt-2 text-xs text-[var(--muted)]">Fiyat Tipi</p>
-            <div className="mt-1.5 grid gap-1.5">
-              {REPAIR_PRICE_TYPES.map((t) => (
-                <label key={t.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="repair-price-type"
-                    checked={draft.priceType === t.id}
-                    onChange={() => patch("priceType", t.id)}
-                  />
-                  {t.label}
-                </label>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-[var(--muted)]">Ücret Birimi</p>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              {REPAIR_PRICE_UNITS.map((u) => (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => patch("priceUnit", u.id)}
-                  className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
-                    draft.priceUnit === u.id ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
-                  }`}
-                >
-                  {u.label}
-                </button>
-              ))}
-            </div>
+            {isMuslukKind(draft.kind) ? (
+              <p className="mt-2 text-xs text-[var(--muted)]">Birim: iş · Tip: sabit</p>
+            ) : (
+              <div>
+                <p className="mt-2 text-xs text-[var(--muted)]">Fiyat Tipi</p>
+                <div className="mt-1.5 grid gap-1.5">
+                  {REPAIR_PRICE_TYPES.map((t) => (
+                    <label key={t.id} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="repair-price-type"
+                        checked={draft.priceType === t.id}
+                        onChange={() => patch("priceType", t.id)}
+                      />
+                      {t.label}
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-[var(--muted)]">Ücret Birimi</p>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  {REPAIR_PRICE_UNITS.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => patch("priceUnit", u.id)}
+                      className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
+                        draft.priceUnit === u.id ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
+                      }`}
+                    >
+                      {u.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </fieldset>
 
           <fieldset>
@@ -480,21 +504,27 @@ export function RepairServiceEditor({
             <span className="mt-0.5 block">adet / hafta</span>
           </label>
 
-          <fieldset>
-            <legend className="text-xs text-[var(--muted)]">Teslim Yöntemi</legend>
-            <div className="mt-1.5 grid gap-1.5">
-              {REPAIR_DELIVERIES.map((d) => (
-                <label key={d.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={draft.delivery[d.id]}
-                    onChange={() => toggleDelivery(d.id)}
-                  />
-                  {d.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          {isMuslukKind(draft.kind) ? (
+            <p className="text-xs text-[var(--muted)]">
+              Teslim yok: eve gelirsin. Randevu siparişte seçilir.
+            </p>
+          ) : (
+            <fieldset>
+              <legend className="text-xs text-[var(--muted)]">Teslim Yöntemi</legend>
+              <div className="mt-1.5 grid gap-1.5">
+                {REPAIR_DELIVERIES.map((d) => (
+                  <label key={d.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={draft.delivery[d.id]}
+                      onChange={() => toggleDelivery(d.id)}
+                    />
+                    {d.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
 
           <label className="block text-xs text-[var(--muted)]">
             Hizmet Bölgesi

@@ -141,7 +141,9 @@ export const repairCreateSchema = z
   .object({
     name: z.string().trim().min(2, "Hizmet adı en az 2 karakter.").max(80),
     description: z.string().trim().max(400).optional().nullable(),
-    kind: z.enum(["elektronik", "ev", "mobilya", "bisiklet", "oyuncak", "aksesuar", "diger"]).optional(),
+    kind: z
+      .enum(["elektronik", "ev", "mobilya", "bisiklet", "oyuncak", "aksesuar", "musluk", "diger"])
+      .optional(),
     item: z.string().trim().max(80).optional().nullable(),
     job: z.enum(["onarim", "parca", "montaj", "bakim", "temizlik", "diger"]).optional(),
     price: z.number({ error: "Fiyat gerekli." }).int().min(0).max(50_000, "Fiyat 0–50.000 ₺."),
@@ -164,6 +166,7 @@ export const repairCreateSchema = z
     if (type !== "inceleme" && val.price < 1) {
       ctx.addIssue({ code: "custom", message: "Sabit veya başlangıç fiyatı 1 ₺ ve üzeri olsun.", path: ["price"] });
     }
+    if (val.kind === "musluk") return;
     if (val.delivery && !val.delivery.adres && !val.delivery.nokta && !val.delivery.yakin) {
       ctx.addIssue({ code: "custom", message: "En az bir teslim yöntemi seç.", path: ["delivery"] });
     }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { CategoryId } from "./categories/registry";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, OrderConversation, OrderMessage, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderGrave, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTalk, ProviderTech, ProviderWash, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, OrderConversation, OrderMessage, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderGrave, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTalk, ProviderTech, ProviderWash, RepairKind, Review, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -619,7 +619,7 @@ export async function deleteMyService(id: string) {
 export async function postMyRepair(body: {
   name: string;
   description?: string | null;
-  kind?: "elektronik" | "ev" | "mobilya" | "bisiklet" | "oyuncak" | "aksesuar" | "diger";
+  kind?: RepairKind;
   item?: string | null;
   job?: "onarim" | "parca" | "montaj" | "bakim" | "temizlik" | "diger";
   price: number;

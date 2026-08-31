@@ -1,5 +1,6 @@
 import type {
   DropMethod,
+  FulfillmentType,
   ProviderRepair,
   RepairDelivery,
   RepairJob,
@@ -17,8 +18,35 @@ export const REPAIR_KINDS: { id: RepairKind; label: string }[] = [
   { id: "bisiklet", label: "Bisiklet" },
   { id: "oyuncak", label: "Oyuncak" },
   { id: "aksesuar", label: "Aksesuar" },
+  { id: "musluk", label: "Musluk tamiri" },
   { id: "diger", label: "Diğer" },
 ];
+
+/** Alt-tipe sabit: musluk home_visit + iş başı. Kullanıcı seçmez. */
+export function fulfillmentTypeForKind(kind?: RepairKind | null): FulfillmentType {
+  return kind === "musluk" ? "home_visit" : "dropoff";
+}
+
+export function isMuslukKind(kind?: RepairKind | null) {
+  return kind === "musluk";
+}
+
+export function lockRepairSubtype<T extends {
+  kind?: RepairKind;
+  priceType?: RepairPriceType;
+  priceUnit?: RepairPriceUnit;
+  fulfillmentType?: FulfillmentType;
+}>(input: T): T & { fulfillmentType: FulfillmentType } {
+  if (input.kind === "musluk") {
+    return {
+      ...input,
+      fulfillmentType: "home_visit",
+      priceType: "sabit",
+      priceUnit: "is",
+    };
+  }
+  return { ...input, fulfillmentType: "dropoff" };
+}
 
 export const REPAIR_JOBS: { id: RepairJob; label: string }[] = [
   { id: "onarim", label: "Onarım" },
@@ -109,9 +137,10 @@ export function repairLeadLabel(days?: number | null) {
 }
 
 export function dropsForRepair(
-  repair: Pick<ProviderRepair, "delivery"> | undefined,
+  repair: Pick<ProviderRepair, "delivery" | "fulfillmentType"> | undefined,
   providerDrops: DropMethod[],
 ) {
+  if (repair?.fulfillmentType === "home_visit") return ["kapi"] as DropMethod[];
   if (!repair) return providerDrops;
   const want: DropMethod[] = [];
   if (repair.delivery.nokta) want.push("nokta");

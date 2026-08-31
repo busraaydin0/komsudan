@@ -28,6 +28,8 @@ import {
   repairQuoteLabel,
   repairUnitMeta,
 } from "@/lib/repair";
+import { homeVisitStrategy } from "@/lib/fulfillment";
+import { ADDRESS_SHARE_NOTICE } from "@/lib/legal";
 import {
   dropsForTech,
   techCanOrder,
@@ -1089,7 +1091,12 @@ function ProviderPane({
                       </span>
                       {(item.description || repairKindLabel(item.kind) || repairJobLabel(item.job)) && (
                         <span className="mt-0.5 block text-xs text-[var(--muted)]">
-                          {[repairKindLabel(item.kind), repairJobLabel(item.job), item.item, item.description]
+                          {[
+                            repairKindLabel(item.kind),
+                            item.fulfillmentType === "home_visit" ? "eve gelir" : repairJobLabel(item.job),
+                            item.item,
+                            item.description,
+                          ]
                             .filter(Boolean)
                             .join(" · ")}
                         </span>
@@ -2166,6 +2173,13 @@ function Checkout({
         </label>
       )}
       <h3 className="mt-5 text-sm font-medium">Teslimat</h3>
+      {tamir && repair?.fulfillmentType === "home_visit" ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          {homeVisitStrategy.ready
+            ? ADDRESS_SHARE_NOTICE
+            : "Eve gelen musluk tamiri henüz siparişe açık değil. Randevu ve adres, açılınca istenecek."}
+        </p>
+      ) : null}
       <div className="mt-2 flex flex-wrap gap-2">
         {foodDrops.map((d) => (
           <button

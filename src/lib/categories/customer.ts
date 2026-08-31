@@ -4,6 +4,7 @@ import { cargoCanOrder, cargoQtyBounds, CARGO_UNIT, dropsForCargo } from "@/lib/
 import { carpetCanOrder, carpetQtyBounds, CARPET_UNIT, dropsForCarpet } from "@/lib/carpet";
 import { courierCanOrder, courierQtyBounds, COURIER_UNIT, dropsForCourier } from "@/lib/courier";
 import { dropsForFood, foodQtyBounds, foodUnitMeta } from "@/lib/food";
+import { homeVisitStrategy } from "@/lib/fulfillment";
 import { dropsForGarden, gardenCanOrder, gardenQtyBounds, GARDEN_UNIT } from "@/lib/garden";
 import { dropsForGrave, graveCanOrder, graveQtyBounds, graveUnitMeta } from "@/lib/grave";
 import { dropsForLesson, lessonCanOrder, lessonQtyBounds, LESSON_UNIT } from "@/lib/lesson";
@@ -334,6 +335,9 @@ export function placeBlockReason(p: Provider, pick: CatalogPick, allergy: string
   if (p.categoryId === "tamir" && !repairCanOrder(pick.repair)) {
     return "Bu iş için önce inceleme. Fiyat ürünü görünce netleşir.";
   }
+  if (p.categoryId === "tamir" && pick.repair?.fulfillmentType === "home_visit" && !homeVisitStrategy.ready) {
+    return "Eve gelen tamir henüz açık değil.";
+  }
   if (p.categoryId === "teknoloji" && !techCanOrder(pick.tech)) {
     return "Bu iş için önce inceleme. Fiyat cihazı görünce netleşir.";
   }
@@ -374,7 +378,7 @@ export function placeOrderInput(
     providerId: p.id,
     drop: args.drop,
     dropPointId: args.drop === "nokta" ? args.dropPointId : null,
-    slot: args.slot,
+    slot: args.slot ?? "",
     note: args.note,
   };
   if (p.categoryId === "davet") {
@@ -443,7 +447,9 @@ export function checkoutMeta(p: Provider, pick: CatalogPick): CheckoutMeta {
         bounds: repairQtyBounds(pick.repair, remaining),
         drops: dropsForRepair(pick.repair, laundryDrops),
         unitPrice: pick.repair?.price ?? 0,
-        canPlace: repairCanOrder(pick.repair),
+        canPlace:
+          repairCanOrder(pick.repair) &&
+          (pick.repair?.fulfillmentType !== "home_visit" || homeVisitStrategy.ready),
         productId: pick.repair?.id,
       };
     case "teknoloji":

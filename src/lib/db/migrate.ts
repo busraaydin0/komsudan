@@ -767,6 +767,27 @@ function ensureColumns(db: Database.Database) {
   addColumn(db, "orders", "product_name", "product_name TEXT");
   addColumn(db, "orders", "guest_count", "guest_count INTEGER");
   addColumn(db, "orders", "allergy_note", "allergy_note TEXT");
+  addColumn(db, "orders", "fulfillment_type", "fulfillment_type TEXT NOT NULL DEFAULT 'dropoff'");
+  addColumn(db, "orders", "visit_district", "visit_district TEXT");
+  addColumn(db, "orders", "visit_neighborhood", "visit_neighborhood TEXT");
+  addColumn(db, "orders", "visit_address", "visit_address TEXT");
+  addColumn(db, "orders", "address_share_consent", "address_share_consent INTEGER NOT NULL DEFAULT 0");
+  addColumn(db, "orders", "dispute_window_hours", "dispute_window_hours INTEGER");
+  addColumn(db, "orders", "cancel_free_hours", "cancel_free_hours INTEGER");
+  addColumn(db, "provider_repairs", "fulfillment_type", "fulfillment_type TEXT NOT NULL DEFAULT 'dropoff'");
+  addColumn(db, "provider_profiles", "kyc_status", "kyc_status TEXT");
+  addColumn(db, "provider_profiles", "criminal_record_declared", "criminal_record_declared INTEGER NOT NULL DEFAULT 0");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS appointments (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL UNIQUE REFERENCES orders(id),
+      date TEXT NOT NULL,
+      window_start TEXT NOT NULL,
+      window_end TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_appointments_order ON appointments(order_id);
+  `);
   addColumn(db, "provider_products", "photo_url", "photo_url TEXT");
   addColumn(db, "provider_products", "description", "description TEXT");
   addColumn(db, "provider_products", "category", "category TEXT");

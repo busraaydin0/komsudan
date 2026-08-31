@@ -34,7 +34,17 @@ export type SewingPriceUnit = "adet" | "cift" | "metre" | "kg" | "parca" | "saat
 export type SewingMaterial = "customer" | "provider" | "either";
 export type SewingDelivery = { adres: boolean; nokta: boolean; yakin: boolean };
 
-export type RepairKind = "elektronik" | "ev" | "mobilya" | "bisiklet" | "oyuncak" | "aksesuar" | "diger";
+export type FulfillmentType = "dropoff" | "home_visit";
+
+export type RepairKind =
+  | "elektronik"
+  | "ev"
+  | "mobilya"
+  | "bisiklet"
+  | "oyuncak"
+  | "aksesuar"
+  | "musluk"
+  | "diger";
 export type RepairJob = "onarim" | "parca" | "montaj" | "bakim" | "temizlik" | "diger";
 export type RepairPriceType = "sabit" | "baslangic" | "inceleme";
 export type RepairPriceUnit = "adet" | "parca" | "urun" | "saat" | "is";
@@ -460,6 +470,8 @@ export type ProviderRepair = {
   notes?: string | null;
   workHours?: string | null;
   isActive?: boolean;
+  /** Kartın akışı. musluk → home_visit; diğerleri dropoff. Client seçmez. */
+  fulfillmentType?: FulfillmentType;
 };
 
 /** Dikiş & tadilat hizmet kartı. Fiyat seçilen birim başı; siparişte sunucu çarpar. */
@@ -509,8 +521,8 @@ export type WorkPhoto = {
 
 export type OrderStatusEvent = {
   id: string;
-  from: ApiLifecycle | null;
-  to: ApiLifecycle;
+  from: string | null;
+  to: string;
   actorId: string | null;
   actorRole: string | null;
   note: string | null;
@@ -627,6 +639,15 @@ export type Order = {
   productName?: string | null;
   guestCount?: number | null;
   allergyNote?: string | null;
+  fulfillmentType?: FulfillmentType;
+  visitDistrict?: string | null;
+  visitNeighborhood?: string | null;
+  visitAddress?: string | null;
+  appointment?: {
+    date: string;
+    windowStart: string;
+    windowEnd: string;
+  } | null;
   total: number;
   commission: number;
   status: OrderStatus;
@@ -655,11 +676,18 @@ export type CreateOrderInput = {
   express?: boolean;
   drop: DropMethod;
   dropPointId: string | null;
-  slot: string;
+  slot?: string;
   note: string;
   productId?: string;
   guestCount?: number;
   allergyNote?: string;
+  appointmentDate?: string;
+  appointmentWindowStart?: string;
+  appointmentWindowEnd?: string;
+  visitDistrict?: string;
+  visitNeighborhood?: string;
+  visitAddress?: string;
+  addressShareConsent?: boolean;
 };
 
 export type AppNotification = {
