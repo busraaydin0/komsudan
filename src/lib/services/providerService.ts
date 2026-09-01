@@ -284,11 +284,11 @@ export function listProviderPackages(id: string) {
 }
 
 export function requireProvider(user: AuthUser) {
-  if (user.role !== "provider" && user.role !== "admin") {
-    throw new ApiError(403, "Bu işlem hizmet veren hesabı ister.", "FORBIDDEN");
-  }
   const row = getProfile(user.id);
   if (!row) throw new ApiError(403, "Hizmet veren profilin yok.", "FORBIDDEN");
+  if (user.role !== "provider" && user.role !== "admin") {
+    setUserRole(user.id, "provider");
+  }
   return row;
 }
 

@@ -64,6 +64,7 @@ import type {
 } from "@/lib/types";
 import type { AuthUser } from "@/lib/auth/types";
 import { deliveredCount } from "@/lib/db/auth";
+import { getProfile } from "@/lib/db/providers";
 import {
   addRemaining,
   bumpCodeAttempts,
@@ -213,10 +214,11 @@ export function getOrderFor(user: AuthUser, id: string): Order {
 }
 
 export function listOrdersFor(user: AuthUser): Order[] {
+  const asProvider = user.role === "provider" || Boolean(getProfile(user.id));
   const rows =
     user.role === "admin"
       ? listOrderRowsAll()
-      : user.role === "provider"
+      : asProvider
         ? listOrderRowsForProvider(user.id)
         : listOrderRowsForCustomer(user.id);
   return rows.map((row) => toOrder(row, user));

@@ -113,6 +113,13 @@ export function ProviderDesk() {
 
         <LaundryProfile me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
 
+        {!providers.some((p) => p.id === account?.id) && (
+          <p className="k-rise mt-6 text-sm text-[var(--muted)]">
+            Hizmet kartın burada görünmüyor. Keşifte “Hizmet vermek istiyorum”u işaretleyip alanı kaydet; kart ve gelen
+            işler bu sekmede açılır.
+          </p>
+        )}
+
         <FoodMenuEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
 
         <SewingServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />

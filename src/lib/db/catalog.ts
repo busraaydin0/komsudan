@@ -38,6 +38,7 @@ export function toProvider(row: {
   const graves = listGraves(p.id).map(toPublicGrave);
   return {
     ...p,
+    id: row.id,
     remaining: row.remaining,
     workPhotos: p.workPhotos ?? [],
     avatarUrl: p.avatarUrl ?? null,

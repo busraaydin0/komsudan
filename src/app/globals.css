@@ -439,6 +439,8 @@ input:focus-visible {
   .k-pulse-dot,
   .katla-pin.is-on .face {
     animation: none !important;
+    opacity: 1;
+    transform: none;
   }
 
   .k-press:hover,

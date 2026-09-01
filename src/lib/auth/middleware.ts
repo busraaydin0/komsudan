@@ -2,6 +2,7 @@ import { ApiError } from "@/server/rules";
 import { verifyAccess } from "./jwt";
 import { ACCESS_COOKIE, REFRESH_COOKIE, SESSION_COOKIE, readCookie } from "./cookies";
 import { loadUser, loadUserBySession } from "@/lib/services/authService";
+import { getProfile } from "@/lib/db/providers";
 import type { AuthUser } from "./types";
 import type { UserRole } from "@/lib/db/auth";
 
@@ -25,6 +26,7 @@ export async function requireAuth(request?: Request, role?: UserRole): Promise<A
   const user = await getAuth(request);
   if (!user) throw new ApiError(401, "Giriş gerekli.", "UNAUTHORIZED");
   if (role && user.role !== role && user.role !== "admin") {
+    if (role === "provider" && getProfile(user.id)) return user;
     throw new ApiError(403, "Bu işlem için yetkin yok.", "FORBIDDEN");
   }
   return user;

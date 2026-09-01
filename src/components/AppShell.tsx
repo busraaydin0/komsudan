@@ -114,13 +114,13 @@ export function AppShell() {
           onBackToMap={() => go("harita")}
         />
       </div>
-          {tab === "hizmet" && (
-        <div className="relative z-10 h-full overflow-y-auto">
+      {tab === "hizmet" && (
+        <div className="absolute inset-0 z-10 overflow-y-auto">
           <ProviderDesk />
         </div>
       )}
       {tab === "hesap" && (
-        <div className="relative z-10 h-full overflow-y-auto">
+        <div className="absolute inset-0 z-10 overflow-y-auto">
           <AccountScreen
             account={account}
             loyalty={loyalty}
