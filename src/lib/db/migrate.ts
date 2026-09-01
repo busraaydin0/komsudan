@@ -183,7 +183,7 @@ function ensureColumns(db: Database.Database) {
     UPDATE service_categories SET is_active = 1 WHERE is_active IS NULL;
     UPDATE service_categories SET
       name = 'Çamaşır Yıkama',
-      blurb = 'Yıka, katla, kapıda veya noktada bırak',
+      blurb = 'Yıka, katla, kapıda veya gel al noktasında bırak',
       sort_order = 1
     WHERE id = 'camasir';
     UPDATE service_categories SET

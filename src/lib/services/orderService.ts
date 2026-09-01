@@ -259,7 +259,7 @@ function validateDropAndSlot(provider: NonNullable<ReturnType<typeof getProvider
   let dropPointId: string | null = null;
   if (input.drop === "nokta") {
     if (!input.dropPointId || !dropPointExists(input.dropPointId)) {
-      throw new ApiError(400, "Nötr nokta seç.", "VALIDATION_ERROR");
+      throw new ApiError(400, "Gel al noktası seç.", "VALIDATION_ERROR");
     }
     dropPointId = input.dropPointId;
   }

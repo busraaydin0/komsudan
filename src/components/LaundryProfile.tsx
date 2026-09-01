@@ -215,7 +215,7 @@ export function LaundryProfile({
               drops.includes(d) ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
             }`}
           >
-            {d === "kapi" ? "Kapı" : "Nötr nokta"}
+            {d === "kapi" ? "Kapı" : "Gel al noktası"}
           </button>
         ))}
       </div>

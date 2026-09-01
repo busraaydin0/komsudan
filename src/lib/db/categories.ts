@@ -53,7 +53,7 @@ export function getCategoryForProvider(providerId: string): CategoryRow {
       fulfillment_mode: "delivery",
       pricing_model: "per_piece",
       is_active: 1,
-      blurb: "Yıka, katla, kapıda veya noktada bırak",
+      blurb: "Yıka, katla, kapıda veya gel al noktasında bırak",
       sort_order: 1,
     }
   );

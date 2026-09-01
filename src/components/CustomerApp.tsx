@@ -597,7 +597,7 @@ export function CustomerApp({
                 <path d="M9 7V5.8A3 3 0 0 1 12 3a3 3 0 0 1 3 2.8V7" stroke="currentColor" strokeWidth="2.2" />
               </svg>
             </span>
-            Nötr nokta
+            Gel al noktası
           </span>
         </div>
         {far && (
@@ -2259,7 +2259,7 @@ function Checkout({
                     ? sewingDropLabel(d, service?.delivery)
                     : d === "kapi"
                       ? "Kapı"
-                      : "Nötr nokta"}
+                      : "Gel al noktası"}
           </button>
         ))}
       </div>

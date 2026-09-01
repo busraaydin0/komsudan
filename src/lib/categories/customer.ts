@@ -67,7 +67,7 @@ export type CatalogPick = {
 };
 
 const HELLO: Record<CatalogCategoryId, string> = {
-  davet: "Eve kimse girmez. Yemek kapıda veya nötr noktada teslim.",
+  davet: "Eve kimse girmez. Yemek kapıda veya gel al noktasında teslim.",
   dikis: "Eve kimse girmez. Dikim kapıda, adresten veya noktada teslim.",
   tamir: "Eve kimse girmez. Tamir atölyede; kapıda, noktada veya yakın buluşmada teslim.",
   teknoloji: "Format ve kurulum atölyede veya yerinde; kapıda, noktada veya yerinde teslim.",
@@ -155,7 +155,7 @@ export function helloBlurb(categoryIds?: string[]): string {
   if (categoryIds?.length === 1 && isCatalogCategoryId(categoryIds[0])) {
     return HELLO[categoryIds[0]];
   }
-  return "Eve kimse girmez. Çamaşırı kapıda veya nötr noktada bırak.";
+  return "Eve kimse girmez. Çamaşırı kapıda veya gel al noktasında bırak.";
 }
 
 export function notePlaceholder(categoryId?: string): string {

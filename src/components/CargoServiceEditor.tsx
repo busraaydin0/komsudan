@@ -397,7 +397,7 @@ export function CargoServiceEditor({
               onChange={(e) => patch("points", e.target.value)}
               maxLength={400}
               rows={2}
-              placeholder="Site kapısı, AVM giriş, nötr nokta…"
+              placeholder="Site kapısı, AVM giriş, gel al noktası…"
               className="mt-1 w-full resize-none rounded-2xl bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
             />
           </label>

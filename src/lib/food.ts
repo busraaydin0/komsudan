@@ -20,7 +20,7 @@ export const FOOD_PRICE_UNITS: { id: FoodPriceUnit; label: string; qty: string }
 
 export const FOOD_DELIVERIES: { id: FoodDelivery; label: string }[] = [
   { id: "kapi", label: "Kapı" },
-  { id: "nokta", label: "Nötr nokta" },
+  { id: "nokta", label: "Gel al noktası" },
   { id: "ikisi", label: "İkisi" },
 ];
 

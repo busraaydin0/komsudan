@@ -181,7 +181,7 @@ export function MapCanvas({
       el.className = "katla-drop";
       el.dataset.drop = d.id;
       el.title = d.name;
-      el.setAttribute("aria-label", `Nötr nokta: ${d.name}`);
+      el.setAttribute("aria-label", `Gel al noktası: ${d.name}`);
       el.style.setProperty("--pin-delay", `${80 + i * 40}ms`);
       const mark = document.createElement("span");
       mark.className = "mark";

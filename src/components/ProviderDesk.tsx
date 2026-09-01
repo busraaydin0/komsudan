@@ -307,7 +307,7 @@ function OrderCard({
       <p className="mt-1 text-sm text-[var(--muted)]">
         {new Date(order.createdAt).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
         {" · "}
-        {order.drop === "kapi" ? "Kapı teslim" : drop?.name ?? "Nötr nokta"} · {order.slot}
+        {order.drop === "kapi" ? "Kapı teslim" : drop?.name ?? "Gel al noktası"} · {order.slot}
       </p>
       {order.note && <p className="mt-1 text-sm">Not: {order.note}</p>}
       {order.photos.length > 0 && <PhotoStrip photos={order.photos} size="sm" />}
