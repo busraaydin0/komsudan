@@ -49,8 +49,8 @@ export function TimeScrollPicker({
         ref={scroller}
         role="listbox"
         aria-label="Saat"
-        className="h-full overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ scrollSnapType: "y mandatory", WebkitOverflowScrolling: "touch" }}
+        className="h-full overflow-y-auto overscroll-y-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ scrollSnapType: "y mandatory", WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
         onScroll={emitFromScroll}
       >
         <div aria-hidden style={{ height: ITEM * 2 }} />

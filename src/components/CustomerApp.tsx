@@ -642,20 +642,18 @@ export function CustomerApp({
       )}
 
       <section
-        className={`absolute inset-x-0 z-10 mx-auto max-w-lg px-3 transition-[height,max-height,top] duration-300 ease-[var(--ease-out)] ${
+        className={`absolute inset-x-0 z-10 mx-auto max-w-lg min-h-0 overflow-hidden px-3 transition-[height,max-height,top] duration-300 ease-[var(--ease-out)] ${
           pane === "orders"
             ? "top-[calc(env(safe-area-inset-top)+4.25rem)] bottom-[var(--tabbar)]"
             : `bottom-[var(--tabbar)] ${
-                sheet === "list"
-                  ? listTall
-                    ? "h-[calc(100dvh-var(--tabbar)-5.5rem)] max-h-[calc(100dvh-var(--tabbar)-5.5rem)]"
-                    : "h-[38vh] max-h-[38vh]"
-                  : "max-h-[calc(100dvh-var(--tabbar)-5.5rem)]"
+                sheet === "list" && !listTall
+                  ? "h-[38vh] max-h-[38vh]"
+                  : "h-[calc(100dvh-var(--tabbar)-5.5rem)] max-h-[calc(100dvh-var(--tabbar)-5.5rem)]"
               }`
         }`}
       >
         <div
-          className="h-full overflow-y-auto overscroll-contain rounded-t-3xl bg-[var(--card)] shadow-[var(--shadow-sheet)] ring-1 ring-[var(--line)]"
+          className="h-full min-h-0 overflow-y-auto overscroll-contain rounded-t-3xl bg-[var(--card)] shadow-[var(--shadow-sheet)] ring-1 ring-[var(--line)]"
           onScroll={onListScroll}
         >
           <div className="sticky top-0 z-10 flex justify-center bg-[var(--card)] pt-2 pb-1">
