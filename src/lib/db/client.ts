@@ -32,6 +32,7 @@ function open() {
   const file = process.env.KOMSU_DB_PATH ?? path.join(dir, "komsudan.db");
   const database = new Database(file);
   database.pragma("journal_mode = WAL");
+  database.pragma("busy_timeout = 5000");
   database.pragma("foreign_keys = ON");
   g.__komsuDb = database;
   prepare(database);

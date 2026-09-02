@@ -44,7 +44,9 @@ export function LoginGate({
       setDemo(res.demoCode);
       setStep("otp");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Kod gönderilemedi.");
+      const timed =
+        e instanceof DOMException || (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError"));
+      setErr(timed ? "Sunucu meşguldü. Biraz sonra tekrar dene." : e instanceof Error ? e.message : "Kod gönderilemedi.");
     } finally {
       setBusy(false);
     }
@@ -60,7 +62,9 @@ export function LoginGate({
       if (n === "done") await onReady();
       else setStep(n);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Kod doğrulanamadı.");
+      const timed =
+        e instanceof DOMException || (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError"));
+      setErr(timed ? "Sunucu meşguldü. Biraz sonra tekrar dene." : e instanceof Error ? e.message : "Kod doğrulanamadı.");
     } finally {
       setBusy(false);
     }

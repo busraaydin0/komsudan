@@ -127,7 +127,7 @@ function viewerFor(user: AuthUser | undefined, row: OrderRow): VisitAddressViewe
   return "other";
 }
 
-function toOrder(row: OrderRow, viewer?: AuthUser): Order {
+function toOrder(row: OrderRow, viewer?: AuthUser, lean = false): Order {
   ensurePickupCode(row);
   const drop = row.drop_method as DropMethod;
   const status = row.status as OrderStatus;
@@ -168,8 +168,8 @@ function toOrder(row: OrderRow, viewer?: AuthUser): Order {
     commission: row.commission,
     status,
     createdAt: row.created_at,
-    photos: photosForOrder(row.id),
-    review: reviewForOrder(row.id),
+    photos: lean ? [] : photosForOrder(row.id),
+    review: lean ? null : reviewForOrder(row.id),
     pickupCode: status === "hazir" ? row.pickup_code : null,
     paymentStatus: payStatus,
     paidAt: payStatus === "captured" ? (pay?.updatedAt ?? row.paid_at) : row.paid_at,
@@ -229,7 +229,7 @@ export function listOrdersFor(user: AuthUser): Order[] {
         : listOrderRowsForCustomer(user.id);
   return rows.flatMap((row) => {
     try {
-      return [toOrder(row, user)];
+      return [toOrder(row, user, true)];
     } catch (e) {
       logger.error({ err: e, orderId: row.id }, "Sipariş satırı okunamadı.");
       return [];

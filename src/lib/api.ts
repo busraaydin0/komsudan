@@ -43,7 +43,7 @@ export function useCatalog(categoryIds?: string[]) {
 
   useEffect(() => {
     void reload();
-    const t = setInterval(() => void reload(), 2500);
+    const t = setInterval(() => void reload(), 12000);
     return () => clearInterval(t);
   }, [reload]);
 
@@ -72,7 +72,7 @@ export function useOrders() {
 
   useEffect(() => {
     void reload();
-    const t = setInterval(() => void reload(), 2500);
+    const t = setInterval(() => void reload(), 8000);
     return () => clearInterval(t);
   }, [reload]);
 
@@ -257,6 +257,7 @@ export async function requestOtp(phone: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone }),
+      signal: AbortSignal.timeout(8000),
     }),
   );
 }
@@ -267,6 +268,7 @@ export async function verifyOtp(phone: string, code: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone, code }),
+      signal: AbortSignal.timeout(8000),
     }),
   );
   return data.account;
