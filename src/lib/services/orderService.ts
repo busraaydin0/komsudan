@@ -119,10 +119,11 @@ function ensurePickupCode(row: OrderRow) {
 }
 
 function viewerFor(user: AuthUser | undefined, row: OrderRow): VisitAddressViewer {
-  if (!user) return "customer";
+  if (!user) return "other";
   if (user.role === "admin") return "admin";
   if (user.id === row.provider_id) return "provider";
-  return "customer";
+  if (user.id === row.user_id) return "customer";
+  return "other";
 }
 
 function toOrder(row: OrderRow, viewer?: AuthUser): Order {
@@ -183,7 +184,11 @@ function toOrder(row: OrderRow, viewer?: AuthUser): Order {
   };
 }
 
+/** Şimdilik: giriş yapan herkes tüm siparişleri listelesin / açsın (pilot). */
+const PILOT_SEE_ALL_ORDERS = true;
+
 export function canSeeOrder(user: AuthUser, row: OrderRow) {
+  if (PILOT_SEE_ALL_ORDERS) return true;
   if (user.role === "admin") return true;
   if (row.user_id === user.id) return true;
   if (row.provider_id === user.id) return true;
@@ -216,7 +221,7 @@ export function getOrderFor(user: AuthUser, id: string): Order {
 export function listOrdersFor(user: AuthUser): Order[] {
   const asProvider = user.role === "provider" || Boolean(getProfile(user.id));
   const rows =
-    user.role === "admin"
+    user.role === "admin" || PILOT_SEE_ALL_ORDERS
       ? listOrderRowsAll()
       : asProvider
         ? listOrderRowsForProvider(user.id)

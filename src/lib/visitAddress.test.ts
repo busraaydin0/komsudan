@@ -26,6 +26,12 @@ describe("home_visit adres görünürlüğü", () => {
     expect(v.address).toBe(full.address);
   });
 
+  it("siparişin tarafı olmayan tam sokak adresi görmez", () => {
+    const v = visitAddressForViewer({ ...full, lifecycle: "confirmed", viewer: "other" });
+    expect(v.district).toBe("Çankaya");
+    expect(v.address).toBeNull();
+  });
+
   it("dropoff siparişte adres alanı boş kalır", () => {
     const v = visitAddressForViewer({
       ...full,

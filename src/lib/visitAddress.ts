@@ -14,7 +14,7 @@ export type VisitAddressView = {
   address: string | null;
 };
 
-export type VisitAddressViewer = "customer" | "provider" | "admin";
+export type VisitAddressViewer = "customer" | "provider" | "admin" | "other";
 
 /** Tam adres yalnız home_visit ve confirmed+ provider’a. Route’ta değil, burada. */
 export function visitAddressForViewer(args: {
@@ -34,6 +34,10 @@ export function visitAddressForViewer(args: {
   const neighborhood = args.neighborhood?.trim() || null;
   const address = args.address?.trim() || null;
   const coarse = { district, neighborhood, address: null as string | null };
+
+  if (args.viewer === "other") {
+    return coarse;
+  }
 
   if (args.viewer === "customer" || args.viewer === "admin") {
     return { district, neighborhood, address };
