@@ -701,6 +701,21 @@ export type AppNotification = {
   createdAt: string;
 };
 
+export type WalletSnapshot = {
+  balance: number;
+  canPay: 0 | 1;
+  methods: { id: string; label: string; hint: string }[];
+};
+
+export type WalletActivity = {
+  id: string;
+  amount: number;
+  kind: string;
+  method: string | null;
+  orderId: string | null;
+  createdAt: string;
+};
+
 export type PreferredIntent = "seek" | "offer" | "both";
 
 export type Account = {

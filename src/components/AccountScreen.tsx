@@ -19,6 +19,7 @@ import {
 import { tl } from "@/lib/pricing";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
 import { Avatar } from "@/components/Avatar";
+import { WalletPanel } from "@/components/WalletPanel";
 
 function PermRow({
   title,
@@ -252,6 +253,7 @@ export function AccountScreen({
             <span className="text-xs text-[var(--clay)]">Düzenle</span>
           </button>
         )}
+        <WalletPanel />
         {loyalty && (
           <section className="k-rise overflow-hidden rounded-3xl bg-[var(--teal)] p-5 text-[var(--paper)] shadow-[var(--shadow-card)]">
             <p className="text-[11px] font-medium tracking-[0.18em] uppercase opacity-80">Sadakat</p>

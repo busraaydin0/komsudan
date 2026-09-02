@@ -94,6 +94,7 @@ import {
   notifyStatusChange,
 } from "@/lib/services/notificationService";
 import { authorizePayment, capturePayment, paymentForOrder, voidPayment } from "@/lib/services/paymentService";
+import { holdForOrder } from "@/lib/services/walletService";
 
 export type OrderAction = "accept" | "reject" | "advance" | "deliver" | HomeVisitAction;
 
@@ -316,6 +317,7 @@ function insertPendingOrder(args: {
     if (remaining < args.pieces) {
       throw new ApiError(409, `Bugün yalnızca ${remaining} ${capacityLabel} var.`, "CAPACITY");
     }
+    holdForOrder(args.userId, id, args.quote.total);
     addRemaining(args.providerId, -args.pieces);
     insertOrderRow({
       id,

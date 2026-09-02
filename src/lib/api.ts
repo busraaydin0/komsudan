@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { CategoryId } from "./categories/registry";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, OrderConversation, OrderMessage, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderGrave, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTalk, ProviderTech, ProviderWash, RepairKind, Review, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, OrderConversation, OrderMessage, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderGrave, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTalk, ProviderTech, ProviderWash, RepairKind, Review, WalletActivity, WalletSnapshot, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -138,6 +138,40 @@ export async function markAllNotificationsRead() {
     }>(await fetch("/api/notifications/read-all", { method: "POST" })),
   );
   return { notifications: data.notifications ?? [], unread: data.unread ?? 0 };
+}
+
+export async function fetchWallet(amount?: number) {
+  const qs = amount != null && amount > 0 ? `?amount=${encodeURIComponent(String(amount))}` : "";
+  const data = unwrap(
+    await readJson<{
+      data?: { wallet: WalletSnapshot; activity: WalletActivity[]; presets: number[] };
+      wallet?: WalletSnapshot;
+      activity?: WalletActivity[];
+      presets?: number[];
+    }>(await fetch(`/api/me/wallet${qs}`)),
+  );
+  return {
+    wallet: data.wallet!,
+    activity: data.activity ?? [],
+    presets: data.presets ?? [100, 250, 500, 1000],
+  };
+}
+
+export async function postWalletTopup(method: string, amount: number) {
+  const data = unwrap(
+    await readJson<{
+      data?: { wallet: WalletSnapshot; activity: WalletActivity[] };
+      wallet?: WalletSnapshot;
+      activity?: WalletActivity[];
+    }>(
+      await fetch("/api/me/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method, amount }),
+      }),
+    ),
+  );
+  return { wallet: data.wallet!, activity: data.activity ?? [] };
 }
 
 export async function postOrder(input: CreateOrderInput) {

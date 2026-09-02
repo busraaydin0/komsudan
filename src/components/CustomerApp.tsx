@@ -179,6 +179,7 @@ import {
 } from "@/lib/grave";
 import { formatKm, kmBetween } from "@/lib/geo";
 import { tl, clampPieces, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/pricing";
+import { INSUFFICIENT_BALANCE_MESSAGE } from "@/lib/walletMethods";
 import { TimeScrollPicker } from "@/components/TimeScrollPicker";
 import {
   DEFAULT_DURATION_MINUTES,
@@ -188,7 +189,7 @@ import {
   parsePilotSlot,
 } from "@/lib/timeWindow";
 import { seatLabel, seatTone } from "@/lib/seat";
-import { postOrder, postReview, patchOrder, useCatalog, useOrders, useSession } from "@/lib/api";
+import { postOrder, postReview, patchOrder, fetchWallet, useCatalog, useOrders, useSession } from "@/lib/api";
 import { OrderThread } from "@/components/OrderThread";
 import {
   applyQtyAndDrop,
@@ -353,6 +354,7 @@ export function CustomerApp({
   const listDrag = useRef<{ y: number } | null>(null);
   const [err, setErr] = useState("");
   const [placing, setPlacing] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   const home =
     homeLat != null && homeLng != null ? { lat: homeLat, lng: homeLng } : null;
@@ -394,6 +396,14 @@ export function CustomerApp({
     loyaltyRate,
     pick: catalogPick,
   });
+  const payGate: 0 | 1 | null =
+    walletBalance == null ? null : walletBalance >= quote.total ? 1 : 0;
+
+  useEffect(() => {
+    void fetchWallet(quote.total)
+      .then((data) => setWalletBalance(data.wallet.balance))
+      .catch(() => setWalletBalance(null));
+  }, [quote.total, sheet, placing]);
 
   useEffect(() => {
     function apply(loc: LngLat | null) {
@@ -504,6 +514,7 @@ export function CustomerApp({
         }),
       );
       await Promise.all([reloadOrders(), reloadCatalog()]);
+      void fetchWallet().then((data) => setWalletBalance(data.wallet.balance)).catch(() => null);
       setActiveId(order.id);
       setSheet("track");
       onPlacedOrder?.();
@@ -758,6 +769,8 @@ export function CustomerApp({
                 onNote={setNote}
                 quote={quote}
                 loyaltyLabel={loyaltyLabel}
+                walletBalance={walletBalance}
+                payGate={payGate}
                 err={err}
                 placing={placing}
                 onBack={() => setSheet("provider")}
@@ -1596,6 +1609,8 @@ function Checkout({
   onNote,
   quote,
   loyaltyLabel,
+  walletBalance,
+  payGate,
   err,
   placing,
   onBack,
@@ -1636,6 +1651,8 @@ function Checkout({
   onNote: (s: string) => void;
   quote: { total: number; before: number; loyaltyRate: number; commission: number; providerNet: number };
   loyaltyLabel: string;
+  walletBalance: number | null;
+  payGate: 0 | 1 | null;
   err: string;
   placing: boolean;
   onBack: () => void;
@@ -2301,7 +2318,10 @@ function Checkout({
         className="mt-4 w-full resize-none rounded-2xl bg-[var(--paper)] px-3 py-2 text-sm ring-1 ring-[var(--line)] outline-none transition-[box-shadow] duration-200 focus:ring-[var(--teal)]"
         rows={2}
       />
-      {err && <p className="k-rise mt-2 text-sm text-[var(--clay)]">{err}</p>}
+      {canPlace && payGate === 0 ? (
+        <p className="k-rise mt-2 text-sm text-[var(--clay)]">{INSUFFICIENT_BALANCE_MESSAGE}</p>
+      ) : null}
+      {err && payGate !== 0 ? <p className="k-rise mt-2 text-sm text-[var(--clay)]">{err}</p> : null}
       </div>
       <div className="sticky bottom-0 z-10 border-t border-[var(--line)] bg-[var(--card)] px-4 pb-4 pt-3">
         <p className="font-[family-name:var(--font-display)] text-2xl tabular-nums">
@@ -2315,7 +2335,10 @@ function Checkout({
             : unitPriced
               ? `${unit.qty} × ${unit.label.toLowerCase()} fiyatı. `
               : `Min. ${tl(100)}. `}
-          {canPlace ? "Siparişte karttan ön otorizasyon; teslim kodu doğrulanınca tahsilat." : ""}
+          {canPlace && walletBalance != null
+            ? `Bakiye ${tl(walletBalance)}. Ödeme ${payGate === 1 ? "1 · alınır" : "0 · alınmaz"}. `
+            : ""}
+          {canPlace ? "Tutar bakiyeden düşer; teslim kodunda tahsil kesinleşir." : ""}
         </p>
         <button
           type="button"
@@ -2380,7 +2403,7 @@ function Track({
       )}
       {order.status === "iptal" && (
         <p className="mt-3 text-sm text-[var(--clay)]">
-          Sipariş iptal edildi. Ön otorizasyon çözüldü, para çekilmedi.
+          Sipariş iptal edildi. Bakiyedeki tutanak çözüldü, para çekilmedi.
         </p>
       )}
       {order.status === "hazir" && order.pickupCode && (
@@ -2399,7 +2422,7 @@ function Track({
       )}
       {order.paymentStatus === "authorized" && order.status !== "iptal" && order.status !== "hazir" && (
         <p className="mt-3 text-xs text-[var(--muted)]">
-          Kartta {tl(order.total)} tutanak (ön otorizasyon). Teslim kodundan sonra geçer.
+          Bakiyede {tl(order.total)} tutanak. Teslim kodundan sonra kesinleşir.
         </p>
       )}
       {order.paymentStatus === "captured" && (

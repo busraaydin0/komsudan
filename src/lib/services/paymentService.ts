@@ -8,6 +8,8 @@ import {
   updatePaymentStatus,
   type PaymentRow,
 } from "@/lib/db/payments";
+import { getOrderRow } from "@/lib/db/orders";
+import { releaseHold } from "@/lib/services/walletService";
 
 export type { AppPayment };
 
@@ -74,6 +76,8 @@ export function voidPayment(orderId: string, at: string) {
     throw new ApiError(409, "Bu ödeme çözülemez.", "PAYMENT_STATE");
   }
   updatePaymentStatus(orderId, "voided", at);
+  const order = getOrderRow(orderId);
+  if (order?.user_id) releaseHold(order.user_id, orderId, row.amount);
   return paymentForOrder(orderId)!;
 }
 
