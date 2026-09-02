@@ -56,7 +56,7 @@ function monthLabel(key: string) {
   return label.charAt(0).toLocaleUpperCase("tr-TR") + label.slice(1);
 }
 
-export function ProviderDesk() {
+export function ProviderDesk({ onEditDiscovery }: { onEditDiscovery?: () => void }) {
   const { account } = useSession();
   const { providers, dropPoints, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload, err: ordersErr } = useOrders();
@@ -89,7 +89,13 @@ export function ProviderDesk() {
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
             Hizmet veren
           </p>
-          <p className="text-xs text-[var(--muted)]">Çukurambar pilotu</p>
+          {onEditDiscovery ? (
+            <button type="button" onClick={onEditDiscovery} className="k-press mt-1 text-xs text-[var(--muted)]">
+              ← Hizmet al / ver
+            </button>
+          ) : (
+            <p className="text-xs text-[var(--muted)]">Çukurambar pilotu</p>
+          )}
         </div>
       </header>
 

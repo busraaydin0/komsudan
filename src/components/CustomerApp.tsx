@@ -311,6 +311,7 @@ type Props = {
   onOpenOrders?: () => void;
   onPlacedOrder?: () => void;
   onBackToMap?: () => void;
+  onEditDiscovery?: () => void;
 };
 
 export function CustomerApp({
@@ -325,6 +326,7 @@ export function CustomerApp({
   onOpenOrders,
   onPlacedOrder,
   onBackToMap,
+  onEditDiscovery,
 }: Props) {
   const { providers, dropPoints, ready, reload: reloadCatalog } = useCatalog(
     categoryIds?.length ? categoryIds : undefined,
@@ -678,6 +680,7 @@ export function CustomerApp({
                 ready={ready}
                 onPick={openProvider}
                 onSortChange={() => setListTall(true)}
+                onEditDiscovery={onEditDiscovery}
                 onTrack={
                   orders[0]
                     ? () => {
@@ -822,12 +825,14 @@ function List({
   onPick,
   onTrack,
   onSortChange,
+  onEditDiscovery,
 }: {
   ranked: { p: Provider; km: number }[];
   ready: boolean;
   onPick: (id: string) => void;
   onTrack?: () => void;
   onSortChange?: () => void;
+  onEditDiscovery?: () => void;
 }) {
   const [sort, setSort] = useState<NearbySort>("near");
   const sorted = useMemo(() => sortNearby(ranked, sort), [ranked, sort]);
@@ -839,8 +844,15 @@ function List({
 
   return (
     <div className="p-4 pt-2">
+      {onEditDiscovery && (
+        <button type="button" onClick={onEditDiscovery} className="k-press text-xs text-[var(--muted)]">
+          ← Hizmet al / ver
+        </button>
+      )}
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="font-[family-name:var(--font-display)] text-xl">Yakındakiler</h2>
+        <h2 className={`font-[family-name:var(--font-display)] text-xl ${onEditDiscovery ? "mt-1" : ""}`}>
+          Yakındakiler
+        </h2>
         {onTrack && (
           <button type="button" onClick={onTrack} className="k-press text-xs text-[var(--teal)]">
             Siparişimi gör

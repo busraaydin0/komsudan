@@ -112,11 +112,12 @@ export function AppShell() {
           onOpenOrders={() => go("siparis")}
           onPlacedOrder={() => go("siparis")}
           onBackToMap={() => go("harita")}
+          onEditDiscovery={() => setEditDiscovery(true)}
         />
       </div>
       {tab === "hizmet" && (
         <div className="absolute inset-0 z-10 overflow-y-auto">
-          <ProviderDesk />
+          <ProviderDesk onEditDiscovery={() => setEditDiscovery(true)} />
         </div>
       )}
       {tab === "hesap" && (
