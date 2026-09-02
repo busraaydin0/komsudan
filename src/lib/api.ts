@@ -53,14 +53,19 @@ export function useCatalog(categoryIds?: string[]) {
 export function useOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [ready, setReady] = useState(false);
+  const [err, setErr] = useState("");
 
   const reload = useCallback(async () => {
     try {
-      const data = unwrap(await readJson<{ data?: { orders: Order[] }; orders?: Order[] }>(await fetch("/api/orders")));
-      setOrders(data.orders ?? []);
+      const res = await fetch("/api/orders", { credentials: "same-origin" });
+      const data = unwrap(await readJson<{ data?: { orders: Order[] }; orders?: Order[] }>(res));
+      const list = Array.isArray(data.orders) ? data.orders : [];
+      setOrders(list);
+      setErr("");
       setReady(true);
-    } catch {
+    } catch (e) {
       setOrders([]);
+      setErr(e instanceof Error ? e.message : "Siparişler alınamadı.");
       setReady(true);
     }
   }, []);
@@ -71,7 +76,7 @@ export function useOrders() {
     return () => clearInterval(t);
   }, [reload]);
 
-  return { orders, ready, reload };
+  return { orders, ready, reload, err };
 }
 
 export function useNotifications() {

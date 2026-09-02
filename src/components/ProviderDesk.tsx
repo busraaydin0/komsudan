@@ -59,7 +59,7 @@ function monthLabel(key: string) {
 export function ProviderDesk() {
   const { account } = useSession();
   const { providers, dropPoints, reload: reloadCatalog } = useCatalog();
-  const { orders, ready, reload } = useOrders();
+  const { orders, ready, reload, err: ordersErr } = useOrders();
   const wallet = orders
     .filter((o) => o.paymentStatus === "captured")
     .reduce((s, o) => s + (o.total - o.commission), 0);
@@ -111,44 +111,8 @@ export function ProviderDesk() {
           </div>
         </div>
 
-        <LaundryProfile me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        {!providers.some((p) => p.id === account?.id) && (
-          <p className="k-rise mt-6 text-sm text-[var(--muted)]">
-            Hizmet kartın burada görünmüyor. Keşifte “Hizmet vermek istiyorum”u işaretleyip alanı kaydet; kart ve gelen
-            işler bu sekmede açılır.
-          </p>
-        )}
-
-        <FoodMenuEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <SewingServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <RepairServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <TechServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <WashServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <CourierServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <GardenServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <CargoServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <PrintServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <PreserveServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <CarpetServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <LessonServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <TalkServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <GraveServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
         <h2 className="k-rise mt-8 font-[family-name:var(--font-display)] text-xl">Gelen siparişler</h2>
+        {ordersErr ? <p className="mt-2 text-sm text-[var(--clay)]">{ordersErr}</p> : null}
         {!ready ? (
           <ul className="mt-3 space-y-3">
             {[0, 1].map((i) => (
@@ -219,6 +183,43 @@ export function ProviderDesk() {
             )}
           </div>
         )}
+
+        <LaundryProfile me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        {!providers.some((p) => p.id === account?.id) && (
+          <p className="k-rise mt-6 text-sm text-[var(--muted)]">
+            Hizmet kartın burada görünmüyor. Keşifte “Hizmet vermek istiyorum”u işaretleyip alanı kaydet; kart ve gelen
+            işler bu sekmede açılır.
+          </p>
+        )}
+
+        <FoodMenuEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <SewingServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <RepairServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <TechServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <WashServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <CourierServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <GardenServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <CargoServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <PrintServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <PreserveServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <CarpetServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <LessonServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <TalkServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+
+        <GraveServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
       </main>
     </div>
   );
@@ -297,8 +298,8 @@ function OrderCard({
       className="k-rise rounded-3xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)] transition-shadow duration-200 hover:shadow-[0_10px_28px_rgba(28,23,18,0.08)]"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <p className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE[order.status]}`}>
-        {catalog && foodLabel[order.status] ? foodLabel[order.status] : LABEL[order.status]}
+      <p className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE[order.status] ?? "bg-[var(--paper)] text-[var(--muted)]"}`}>
+        {catalog && foodLabel[order.status] ? foodLabel[order.status] : (LABEL[order.status] ?? order.status)}
       </p>
       <p className="mt-2 font-medium">
         {p?.name} ·{" "}

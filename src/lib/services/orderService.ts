@@ -86,6 +86,7 @@ import {
 import { getProvider } from "@/server/catalog";
 import { addPhoto, photosForOrder } from "@/server/photos";
 import { reviewForOrder } from "@/lib/services/reviewService";
+import { logger } from "@/lib/logger";
 import { ApiError } from "@/server/rules";
 import {
   notifyNewOrder,
@@ -226,7 +227,14 @@ export function listOrdersFor(user: AuthUser): Order[] {
       : asProvider
         ? listOrderRowsForProvider(user.id)
         : listOrderRowsForCustomer(user.id);
-  return rows.map((row) => toOrder(row, user));
+  return rows.flatMap((row) => {
+    try {
+      return [toOrder(row, user)];
+    } catch (e) {
+      logger.error({ err: e, orderId: row.id }, "Sipariş satırı okunamadı.");
+      return [];
+    }
+  });
 }
 
 export function createOrder(input: CreateOrderInput, userId: string): Order {
