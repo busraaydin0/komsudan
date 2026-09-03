@@ -78,6 +78,13 @@ export function hasHoldForOrder(orderId: string): boolean {
   return Boolean(row);
 }
 
+export function hasEarnForOrder(orderId: string): boolean {
+  const row = db()
+    .prepare("SELECT id FROM wallet_ledger WHERE order_id = ? AND kind = 'earn' LIMIT 1")
+    .get(orderId) as { id: string } | undefined;
+  return Boolean(row);
+}
+
 export function hasReleaseForOrder(orderId: string): boolean {
   const row = db()
     .prepare("SELECT id FROM wallet_ledger WHERE order_id = ? AND kind = 'release' LIMIT 1")

@@ -815,7 +815,42 @@ function ensureColumns(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_wallet_ledger_user ON wallet_ledger(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_wallet_ledger_order ON wallet_ledger(order_id);
   `);
+  backfillCapturedEarnings(db);
   remapRetiredCategoryIds(db);
+}
+
+function backfillCapturedEarnings(db: Database.Database) {
+  const hasPay = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'payments'`).get();
+  const hasLed = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'wallet_ledger'`).get();
+  const hasOrders = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'orders'`).get();
+  if (!hasPay || !hasLed || !hasOrders) return;
+  const rows = db
+    .prepare(
+      `SELECT p.order_id AS orderId, p.amount AS amount, p.commission AS commission, o.provider_id AS providerId
+       FROM payments p
+       JOIN orders o ON o.id = p.order_id
+       WHERE p.status = 'captured'`,
+    )
+    .all() as { orderId: string; amount: number; commission: number; providerId: string }[];
+  const at = new Date().toISOString();
+  const hasEarn = db.prepare(`SELECT id FROM wallet_ledger WHERE order_id = ? AND kind = 'earn' LIMIT 1`);
+  const wallet = db.prepare(`SELECT user_id FROM wallets WHERE user_id = ?`);
+  const insWallet = db.prepare(`INSERT INTO wallets (user_id, balance, updated_at) VALUES (?, 0, ?)`);
+  const add = db.prepare(`UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?`);
+  const led = db.prepare(
+    `INSERT INTO wallet_ledger (id, user_id, amount, kind, method, order_id, created_at)
+     VALUES (?, ?, ?, 'earn', NULL, ?, ?)`,
+  );
+  for (const row of rows) {
+    if (hasEarn.get(row.orderId)) continue;
+    const net = Math.max(0, row.amount - row.commission);
+    if (net <= 0 || !row.providerId) continue;
+    const user = db.prepare(`SELECT id FROM users WHERE id = ?`).get(row.providerId);
+    if (!user) continue;
+    if (!wallet.get(row.providerId)) insWallet.run(row.providerId, at);
+    add.run(net, at, row.providerId);
+    led.run(`wl-bf-${row.orderId}`.slice(0, 24), row.providerId, net, row.orderId, at);
+  }
 }
 
 function remapRetiredCategoryIds(db: Database.Database) {

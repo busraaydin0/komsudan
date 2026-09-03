@@ -9,7 +9,7 @@ import {
   type PaymentRow,
 } from "@/lib/db/payments";
 import { getOrderRow } from "@/lib/db/orders";
-import { releaseHold } from "@/lib/services/walletService";
+import { creditOnCapture, releaseHold } from "@/lib/services/walletService";
 
 export type { AppPayment };
 
@@ -65,6 +65,11 @@ export function capturePayment(orderId: string, at: string) {
     throw new ApiError(409, "Bu ödeme tahsil edilemez.", "PAYMENT_STATE");
   }
   updatePaymentStatus(orderId, "captured", at);
+  const order = getOrderRow(orderId);
+  if (order) {
+    const net = Math.max(0, row.amount - row.commission);
+    creditOnCapture(order.provider_id, orderId, net);
+  }
   return paymentForOrder(orderId)!;
 }
 

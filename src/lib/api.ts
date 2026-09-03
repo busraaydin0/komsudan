@@ -174,6 +174,23 @@ export async function postWalletTopup(method: string, amount: number) {
   return { wallet: data.wallet!, activity: data.activity ?? [] };
 }
 
+export async function postWalletPayout(method: string, amount: number) {
+  const data = unwrap(
+    await readJson<{
+      data?: { wallet: WalletSnapshot; activity: WalletActivity[] };
+      wallet?: WalletSnapshot;
+      activity?: WalletActivity[];
+    }>(
+      await fetch("/api/me/wallet/payout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method, amount }),
+      }),
+    ),
+  );
+  return { wallet: data.wallet!, activity: data.activity ?? [] };
+}
+
 export async function postOrder(input: CreateOrderInput) {
   const data = unwrap(
     await readJson<{ data?: { order: Order }; order?: Order }>(

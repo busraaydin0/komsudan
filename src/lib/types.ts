@@ -704,7 +704,9 @@ export type AppNotification = {
 export type WalletSnapshot = {
   balance: number;
   canPay: 0 | 1;
+  canWithdraw?: 0 | 1;
   methods: { id: string; label: string; hint: string }[];
+  payoutMethods?: { id: string; label: string; hint: string }[];
 };
 
 export type WalletActivity = {

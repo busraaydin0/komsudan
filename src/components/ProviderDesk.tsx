@@ -24,6 +24,7 @@ import { CarpetServiceEditor } from "@/components/CarpetServiceEditor";
 import { LessonServiceEditor } from "@/components/LessonServiceEditor";
 import { TalkServiceEditor } from "@/components/TalkServiceEditor";
 import { GraveServiceEditor } from "@/components/GraveServiceEditor";
+import { ProviderPayoutPanel } from "@/components/ProviderPayoutPanel";
 
 const LABEL: Record<OrderStatus, string> = {
   onay_bekliyor: "Bekliyor",
@@ -60,9 +61,6 @@ export function ProviderDesk({ onEditDiscovery }: { onEditDiscovery?: () => void
   const { account } = useSession();
   const { providers, dropPoints, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload, err: ordersErr } = useOrders();
-  const wallet = orders
-    .filter((o) => o.paymentStatus === "captured")
-    .reduce((s, o) => s + (o.total - o.commission), 0);
   const open = orders.filter((o) => o.status !== "teslim_edildi" && o.status !== "iptal");
   const [openMonth, setOpenMonth] = useState<string | null>(null);
   const months = useMemo(() => {
@@ -105,17 +103,12 @@ export function ProviderDesk({ onEditDiscovery }: { onEditDiscovery?: () => void
             className="k-rise rounded-2xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]"
             style={{ animationDelay: "40ms" }}
           >
-            <p className="text-xs text-[var(--muted)]">Cüzdan (tahsil)</p>
-            <p className="font-[family-name:var(--font-display)] text-2xl tabular-nums">{tl(wallet)}</p>
-          </div>
-          <div
-            className="k-rise rounded-2xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]"
-            style={{ animationDelay: "90ms" }}
-          >
             <p className="text-xs text-[var(--muted)]">Açık iş</p>
             <p className="font-[family-name:var(--font-display)] text-2xl tabular-nums">{open.length}</p>
           </div>
         </div>
+
+        <ProviderPayoutPanel />
 
         <h2 className="k-rise mt-8 font-[family-name:var(--font-display)] text-xl">Gelen siparişler</h2>
         {ordersErr ? <p className="mt-2 text-sm text-[var(--clay)]">{ordersErr}</p> : null}

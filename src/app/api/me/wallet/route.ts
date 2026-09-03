@@ -3,7 +3,7 @@ import { requireAuth } from "@/lib/auth/middleware";
 import { parseBody } from "@/lib/validation/parse";
 import { walletTopupSchema } from "@/lib/validation/wallet.schema";
 import { getWallet, listWalletActivity, topupWallet } from "@/lib/services/walletService";
-import { TOPUP_PRESETS } from "@/lib/walletMethods";
+import { PAYOUT_METHODS, TOPUP_PRESETS } from "@/lib/walletMethods";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,7 @@ export async function GET(req: Request) {
       wallet: getWallet(user.id, amount),
       activity: listWalletActivity(user.id),
       presets: TOPUP_PRESETS,
+      payoutMethods: PAYOUT_METHODS,
     });
   } catch (e) {
     return fail(e);
