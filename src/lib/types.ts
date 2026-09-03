@@ -754,3 +754,14 @@ export type OrderConversation = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type MessageInboxThread = {
+  orderId: string;
+  peerName: string;
+  title: string;
+  status: string;
+  preview: string;
+  unread: number;
+  updatedAt: string;
+  conversationStatus: OrderConversation["status"];
+};

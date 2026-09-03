@@ -99,6 +99,60 @@ export function countUnreadForViewer(conversationId: string, viewerId: string): 
   return Number(row.n);
 }
 
+export type InboxRow = {
+  order_id: string;
+  provider_id: string;
+  user_id: string | null;
+  status: string;
+  product_name: string | null;
+  package_id: string;
+  conversation_id: string | null;
+  conversation_status: string | null;
+  updated_at: string;
+  preview: string | null;
+  unread: number;
+  peer_name: string | null;
+};
+
+export function listInboxRows(userId: string): InboxRow[] {
+  return db()
+    .prepare(
+      `SELECT
+         o.id AS order_id,
+         o.provider_id,
+         o.user_id,
+         o.status,
+         o.product_name,
+         o.package_id,
+         c.id AS conversation_id,
+         c.status AS conversation_status,
+         COALESCE(c.updated_at, o.created_at) AS updated_at,
+         (
+           SELECT CASE WHEN m.deleted_at IS NOT NULL THEN 'Bu mesaj kaldırıldı' ELSE m.body END
+           FROM messages m
+           WHERE m.conversation_id = c.id AND m.moderation_status != 'block'
+           ORDER BY m.created_at DESC LIMIT 1
+         ) AS preview,
+         (
+           SELECT COUNT(*) FROM messages m
+           WHERE m.conversation_id = c.id
+             AND m.sender_id != ?
+             AND m.read_at IS NULL
+             AND m.deleted_at IS NULL
+             AND m.moderation_status != 'block'
+         ) AS unread,
+         CASE WHEN o.user_id = ? THEN pu.name ELSE cu.name END AS peer_name
+       FROM orders o
+       LEFT JOIN conversations c ON c.order_id = o.id
+       LEFT JOIN users pu ON pu.id = o.provider_id
+       LEFT JOIN users cu ON cu.id = o.user_id
+       WHERE o.user_id = ? OR o.provider_id = ?
+       ORDER BY COALESCE(c.updated_at, o.created_at) DESC
+       LIMIT 80`,
+    )
+    .all(userId, userId, userId, userId) as InboxRow[];
+}
+
 export function markMessagesRead(conversationId: string, viewerId: string, at: string) {
   return db()
     .prepare(

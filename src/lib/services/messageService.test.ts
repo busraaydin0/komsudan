@@ -5,6 +5,7 @@ import { latestNotificationOfType } from "@/lib/db/notifications";
 import { requestOtp, verifyOtp, loadUser } from "./authService";
 import {
   deleteOrderMessage,
+  listMessageInbox,
   listOrderMessages,
   MSG_BLOCKED_COPY,
   MSG_PER_MINUTE,
@@ -123,5 +124,14 @@ describe("sipariş mesajı", () => {
     } catch (e) {
       expect((e as ApiError).code).toBe("MESSAGE_RATE_LIMITED");
     }
+  });
+
+  it("gelen kutusu yalnız sipariş taraflarını listeler", async () => {
+    const user = await customer("5550000406");
+    seedOrder("ord-msg-inbox", user.id);
+    sendOrderMessage(user, "ord-msg-inbox", { body: "Kapıda 18 gibi olur muyum?" });
+    const inbox = listMessageInbox(user);
+    expect(inbox.threads.some((t) => t.orderId === "ord-msg-inbox")).toBe(true);
+    expect(inbox.threads.find((t) => t.orderId === "ord-msg-inbox")?.preview).toContain("Kapıda");
   });
 });

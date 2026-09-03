@@ -53,7 +53,8 @@ Test: `npm test`
 | URL | Ne |
 |---|---|
 | `/` | Harita, yakındakiler |
-| `/?tab=siparis` | Siparişim |
+| `/?tab=siparis` | Sipariş |
+| `/?tab=mesaj` | Mesajlar |
 | `/?tab=hizmet` | Hizmet masası (kart + gelen iş) |
 | `/?tab=hesap` | Hesap, bildirim |
 

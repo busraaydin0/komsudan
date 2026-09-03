@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { CategoryId } from "./categories/registry";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, Order, OrderConversation, OrderMessage, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderGrave, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTalk, ProviderTech, ProviderWash, RepairKind, Review, WalletActivity, WalletSnapshot, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, MessageInboxThread, Order, OrderConversation, OrderMessage, Provider, ProviderCargo, ProviderCarpet, ProviderCourier, ProviderGarden, ProviderGrave, ProviderLesson, ProviderPreserve, ProviderPrint, ProviderProduct, ProviderRepair, ProviderService, ProviderTalk, ProviderTech, ProviderWash, RepairKind, Review, WalletActivity, WalletSnapshot, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -110,6 +110,39 @@ export function useNotifications() {
   }, [reload]);
 
   return { notifications, unread, ready, reload };
+}
+
+export function useInbox() {
+  const [threads, setThreads] = useState<MessageInboxThread[]>([]);
+  const [unreadTotal, setUnreadTotal] = useState(0);
+  const [ready, setReady] = useState(false);
+
+  const reload = useCallback(async () => {
+    try {
+      const data = unwrap(
+        await readJson<{
+          data?: { threads: MessageInboxThread[]; unreadTotal: number };
+          threads?: MessageInboxThread[];
+          unreadTotal?: number;
+        }>(await fetch("/api/me/messages")),
+      );
+      setThreads(data.threads ?? []);
+      setUnreadTotal(data.unreadTotal ?? 0);
+      setReady(true);
+    } catch {
+      setThreads([]);
+      setUnreadTotal(0);
+      setReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+    const t = setInterval(() => void reload(), 8000);
+    return () => clearInterval(t);
+  }, [reload]);
+
+  return { threads, unreadTotal, ready, reload };
 }
 
 export async function markNotificationRead(id: string) {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PACKAGES } from "@/lib/data";
 import { fetchOrderMessages, patchOrder, uploadOrderPhoto, useCatalog, useOrders, useSession } from "@/lib/api";
-import { MessageBadge, OrderThread } from "@/components/OrderThread";
+import { MessageBadge } from "@/components/OrderThread";
 import { usesFoodSm } from "@/lib/categories/registry";
 import { tl } from "@/lib/pricing";
 import { canAddPhotos, nextStatus } from "@/lib/status";
@@ -57,7 +57,13 @@ function monthLabel(key: string) {
   return label.charAt(0).toLocaleUpperCase("tr-TR") + label.slice(1);
 }
 
-export function ProviderDesk({ onEditDiscovery }: { onEditDiscovery?: () => void }) {
+export function ProviderDesk({
+  onEditDiscovery,
+  onOpenMessages,
+}: {
+  onEditDiscovery?: () => void;
+  onOpenMessages?: (orderId: string) => void;
+}) {
   const { account } = useSession();
   const { providers, dropPoints, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload, err: ordersErr } = useOrders();
@@ -136,6 +142,7 @@ export function ProviderDesk({ onEditDiscovery }: { onEditDiscovery?: () => void
                       dropPoints={dropPoints}
                       onChanged={reloadAll}
                       delay={i * 40}
+                      onOpenMessages={onOpenMessages}
                     />
                   ))}
                 </ul>
@@ -170,6 +177,7 @@ export function ProviderDesk({ onEditDiscovery }: { onEditDiscovery?: () => void
                                 dropPoints={dropPoints}
                                 onChanged={reloadAll}
                                 delay={i * 30}
+                                onOpenMessages={onOpenMessages}
                               />
                             ))}
                           </ul>
@@ -230,19 +238,19 @@ function OrderCard({
   dropPoints,
   onChanged,
   delay,
+  onOpenMessages,
 }: {
   order: Order;
   providers: Provider[];
   dropPoints: DropPoint[];
   onChanged: () => void;
   delay: number;
+  onOpenMessages?: (orderId: string) => void;
 }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState("");
-  const [chatOpen, setChatOpen] = useState(false);
   const [unread, setUnread] = useState(0);
-  const { account } = useSession();
   const p = providers.find((x) => x.id === order.providerId);
   const pack =
     p?.packages.find((x) => x.id === order.packageId) ??
@@ -357,11 +365,11 @@ function OrderCard({
         )}
         <button
           type="button"
-          onClick={() => setChatOpen((v) => !v)}
+          onClick={() => onOpenMessages?.(order.id)}
           className="k-press rounded-full px-3 py-1.5 text-xs ring-1 ring-[var(--line)]"
         >
-          💬 Mesaj
-          <MessageBadge count={chatOpen ? 0 : unread} />
+          Mesajlar
+          <MessageBadge count={unread} />
         </button>
         {canAddPhotos(order.status) && (
           <PhotoAdd
@@ -416,7 +424,6 @@ function OrderCard({
           </div>
         </form>
       )}
-      {chatOpen && account?.id && <OrderThread orderId={order.id} selfId={account.id} compact />}
     </li>
   );
 }

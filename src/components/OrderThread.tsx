@@ -14,10 +14,12 @@ export function OrderThread({
   orderId,
   selfId,
   compact,
+  fill,
 }: {
   orderId: string;
   selfId: string;
   compact?: boolean;
+  fill?: boolean;
 }) {
   const [messages, setMessages] = useState<OrderMessage[]>([]);
   const [unread, setUnread] = useState(0);
@@ -73,7 +75,8 @@ export function OrderThread({
   }
 
   return (
-    <div className={compact ? "mt-3" : "mt-5"}>
+    <div className={fill ? "" : compact ? "mt-3" : "mt-5"}>
+      {!fill && (
       <div className="flex items-center gap-2">
         <h3 className="text-sm font-medium">Mesaj</h3>
         {unread > 0 && (
@@ -82,7 +85,8 @@ export function OrderThread({
           </span>
         )}
       </div>
-      <ul className="mt-2 max-h-48 space-y-1.5 overflow-y-auto">
+      )}
+      <ul className={`mt-2 space-y-1.5 overflow-y-auto ${fill ? "max-h-[min(28rem,52dvh)]" : "max-h-48"}`}>
         {messages.map((m) => {
           const mine = m.senderId === selfId;
           return (

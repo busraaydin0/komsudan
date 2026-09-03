@@ -14,6 +14,7 @@ import {
   insertMessage,
   insertModerationEvent,
   insertReport,
+  listInboxRows,
   listVisibleMessages,
   markMessagesRead,
   softDeleteMessage,
@@ -116,6 +117,21 @@ function audit(messageId: string, action: string, reason: string | null) {
     actor_type: "system",
     created_at: new Date().toISOString(),
   });
+}
+
+export function listMessageInbox(user: AuthUser) {
+  const threads = listInboxRows(user.id).map((row) => ({
+    orderId: row.order_id,
+    peerName: row.peer_name?.trim() || "Komşu",
+    title: row.product_name?.trim() || "Sipariş",
+    status: row.status,
+    preview: row.preview?.trim() || "Henüz mesaj yok.",
+    unread: Number(row.unread) || 0,
+    updatedAt: row.updated_at,
+    conversationStatus: (row.conversation_status ?? "open") as OrderConversation["status"],
+  }));
+  const unreadTotal = threads.reduce((s, t) => s + t.unread, 0);
+  return { threads, unreadTotal };
 }
 
 export function listOrderMessages(user: AuthUser, orderId: string) {

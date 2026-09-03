@@ -8,6 +8,7 @@ import { CustomerApp } from "@/components/CustomerApp";
 import { LoginGate } from "@/components/LoginGate";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { PermissionPrompt } from "@/components/PermissionPrompt";
+import { MessagesScreen } from "@/components/MessagesScreen";
 import { ProviderDesk } from "@/components/ProviderDesk";
 import { TabBar, type AppTab } from "@/components/TabBar";
 import { useSession } from "@/lib/api";
@@ -18,7 +19,7 @@ function readTab(intent?: PreferredIntent | null): AppTab {
   if (typeof window === "undefined") return "harita";
   const q = new URLSearchParams(window.location.search).get("tab");
   if (q === "masa") return "hizmet";
-  if (q === "siparis" || q === "hizmet" || q === "harita" || q === "hesap") return q;
+  if (q === "siparis" || q === "hizmet" || q === "harita" || q === "hesap" || q === "mesaj") return q;
   return intent === "offer" ? "hizmet" : "harita";
 }
 
@@ -27,6 +28,7 @@ export function AppShell() {
   const [askPerms, setAskPerms] = useState(false);
   const [editDiscovery, setEditDiscovery] = useState(false);
   const [discoveryDone, setDiscoveryDone] = useState(false);
+  const [chatOrderId, setChatOrderId] = useState<string | null>(null);
   const { account, loyalty, ready, reload } = useSession();
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export function AppShell() {
   }, [ready, account]);
 
   function go(next: AppTab) {
+    if (next !== "mesaj") setChatOrderId(null);
     setTab(next);
     const url = next === "harita" ? "/" : `/?tab=${next}`;
     window.history.replaceState(null, "", url);
@@ -55,6 +58,7 @@ export function AppShell() {
 
   function openNotice(n: { type: string }) {
     if (n.type === "nudge") go("harita");
+    else if (n.type === "order_message") go("mesaj");
     else if (n.type.startsWith("order_") || n.type === "pickup_code") go("siparis");
     else go("hesap");
   }
@@ -88,7 +92,7 @@ export function AppShell() {
     return <div className="h-dvh bg-[var(--paper)]" />;
   }
 
-  const hideMap = tab === "hizmet" || tab === "hesap";
+  const hideMap = tab === "hizmet" || tab === "hesap" || tab === "mesaj";
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[var(--paper)]">
@@ -113,11 +117,29 @@ export function AppShell() {
           onPlacedOrder={() => go("siparis")}
           onBackToMap={() => go("harita")}
           onEditDiscovery={() => setEditDiscovery(true)}
+          onOpenMessages={(orderId) => {
+            setChatOrderId(orderId);
+            go("mesaj");
+          }}
         />
       </div>
+      {tab === "mesaj" && (
+        <div className="absolute inset-0 z-10 overflow-y-auto">
+          <MessagesScreen
+            openOrderId={chatOrderId}
+            onOpenThread={setChatOrderId}
+          />
+        </div>
+      )}
       {tab === "hizmet" && (
         <div className="absolute inset-0 z-10 overflow-y-auto">
-          <ProviderDesk onEditDiscovery={() => setEditDiscovery(true)} />
+          <ProviderDesk
+            onEditDiscovery={() => setEditDiscovery(true)}
+            onOpenMessages={(orderId) => {
+              setChatOrderId(orderId);
+              go("mesaj");
+            }}
+          />
         </div>
       )}
       {tab === "hesap" && (
@@ -132,7 +154,13 @@ export function AppShell() {
           />
         </div>
       )}
-      <TabBar tab={tab} onTab={go} />
+      <TabBar
+        tab={tab}
+        onTab={(t) => {
+          if (t === "mesaj") setChatOrderId(null);
+          go(t);
+        }}
+      />
     </div>
   );
 }

@@ -189,8 +189,7 @@ import {
   parsePilotSlot,
 } from "@/lib/timeWindow";
 import { seatLabel, seatTone } from "@/lib/seat";
-import { postOrder, postReview, patchOrder, fetchWallet, useCatalog, useOrders, useSession } from "@/lib/api";
-import { OrderThread } from "@/components/OrderThread";
+import { postOrder, postReview, patchOrder, fetchWallet, useCatalog, useOrders } from "@/lib/api";
 import {
   applyQtyAndDrop,
   catalogOfferCount,
@@ -313,6 +312,7 @@ type Props = {
   onPlacedOrder?: () => void;
   onBackToMap?: () => void;
   onEditDiscovery?: () => void;
+  onOpenMessages?: (orderId: string) => void;
 };
 
 export function CustomerApp({
@@ -328,6 +328,7 @@ export function CustomerApp({
   onPlacedOrder,
   onBackToMap,
   onEditDiscovery,
+  onOpenMessages,
 }: Props) {
   const { providers, dropPoints, ready, reload: reloadCatalog } = useCatalog(
     categoryIds?.length ? categoryIds : undefined,
@@ -807,6 +808,7 @@ export function CustomerApp({
                   else setSheet("list");
                 }}
                 onReload={() => void Promise.all([reloadOrders(), reloadCatalog()])}
+                onOpenMessages={onOpenMessages}
               />
               </>
             )}
@@ -2369,12 +2371,14 @@ function Track({
   backLabel,
   onBack,
   onReload,
+  onOpenMessages,
 }: {
   order: Order;
   provider: Provider | undefined;
   backLabel: string;
   onBack: () => void;
   onReload: () => void;
+  onOpenMessages?: (orderId: string) => void;
 }) {
   const food = order.packageId === "davet";
   const catalog = usesFoodSm(order.packageId);
@@ -2382,7 +2386,6 @@ function Track({
   const idx = steps.indexOf(order.status);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const { account } = useSession();
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
@@ -2481,7 +2484,15 @@ function Track({
               ? "Komşu kabul etmeden iptal edebilirsin. Tutanak çözülür, para çekilmez."
               : "Durumu Hizmet sekmesinden ilerlet. Canlı sunucudan güncellenir."}
       </p>
-      {account?.id && <OrderThread orderId={order.id} selfId={account.id} />}
+      {onOpenMessages && (
+        <button
+          type="button"
+          onClick={() => onOpenMessages(order.id)}
+          className="k-press mt-4 w-full rounded-2xl bg-[var(--card)] py-3 text-sm ring-1 ring-[var(--line)]"
+        >
+          Mesajlar’da aç
+        </button>
+      )}
       {canCancel(order.status) && (
         <button
           type="button"
