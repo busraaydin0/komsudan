@@ -47,6 +47,8 @@ export type OrderRow = {
   promised_delivery_date: string | null;
   capacity_allocations: string | null;
   delay_count: number;
+  respond_by: string | null;
+  respond_reminder_sent: number;
 };
 
 export type InsertOrderInput = {
@@ -70,6 +72,7 @@ export type InsertOrderInput = {
   size: LaundrySize;
   machine_units: number;
   estimated_delivery_date?: string | null;
+  respond_by?: string | null;
   product_id?: string | null;
   product_name?: string | null;
   guest_count?: number | null;
@@ -126,7 +129,7 @@ export function insertOrderRow(input: InsertOrderInput) {
         delivery_mode, scheduled_window_start, scheduled_window_end, lifecycle,
         product_id, product_name, guest_count, allergy_note,
         fulfillment_type, visit_district, visit_neighborhood, visit_address, address_share_consent,
-        size, machine_units, price_change, estimated_delivery_date
+        size, machine_units, price_change, estimated_delivery_date, respond_by
       ) VALUES (
         @id, @provider_id, @package_id, @express, @drop_method, @drop_point_id,
         @slot, @note, @total, @commission, @status, @created_at, @updated_at,
@@ -134,7 +137,7 @@ export function insertOrderRow(input: InsertOrderInput) {
         @delivery_mode, @scheduled_window_start, NULL, @lifecycle,
         @product_id, @product_name, @guest_count, @allergy_note,
         @fulfillment_type, @visit_district, @visit_neighborhood, @visit_address, @address_share_consent,
-        @size, @machine_units, 'none', @estimated_delivery_date
+        @size, @machine_units, 'none', @estimated_delivery_date, @respond_by
       )`,
     )
     .run({
@@ -148,6 +151,7 @@ export function insertOrderRow(input: InsertOrderInput) {
       visit_address: null,
       address_share_consent: 0,
       estimated_delivery_date: input.estimated_delivery_date ?? null,
+      respond_by: input.respond_by ?? null,
       ...input,
     });
 }

@@ -24,6 +24,38 @@ function migrationApplied(db: Database.Database, id: string) {
 }
 
 /** 0017 sonrası parça/kg kolonları kalkar; boy+ek kolonları kalır. */
+function ensureAppointmentsP11(db: Database.Database) {
+  if (!migrationApplied(db, "0019_appointments_p11.sql")) return;
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_stats (
+      provider_id TEXT PRIMARY KEY REFERENCES providers(id),
+      expired_count INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+  addColumn(db, "orders", "respond_by", "respond_by TEXT");
+  addColumn(db, "orders", "respond_reminder_sent", "respond_reminder_sent INTEGER NOT NULL DEFAULT 0");
+  const hasKind = db.prepare(`PRAGMA table_info(appointments)`).all() as { name: string }[];
+  if (hasKind.length && !hasKind.some((c) => c.name === "kind")) {
+    db.exec(`
+      CREATE TABLE appointments_p11 (
+        id TEXT PRIMARY KEY,
+        order_id TEXT NOT NULL REFERENCES orders(id),
+        kind TEXT NOT NULL CHECK (kind IN ('pickup', 'delivery')),
+        date TEXT NOT NULL,
+        window_start TEXT NOT NULL,
+        window_end TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (order_id, kind)
+      );
+      INSERT INTO appointments_p11 (id, order_id, kind, date, window_start, window_end, created_at)
+      SELECT id, order_id, 'pickup', date, window_start, window_end, created_at FROM appointments;
+      DROP TABLE appointments;
+      ALTER TABLE appointments_p11 RENAME TO appointments;
+      CREATE INDEX IF NOT EXISTS idx_appointments_order ON appointments(order_id);
+    `);
+  }
+}
+
 function ensureCapacityCalendar(db: Database.Database) {
   if (!migrationApplied(db, "0018_capacity_calendar.sql")) return;
   db.exec(`
@@ -222,6 +254,7 @@ function ensureColumns(db: Database.Database) {
   `);
   ensureOrderSizeModel(db);
   ensureCapacityCalendar(db);
+  ensureAppointmentsP11(db);
   backfillHistory(db);
   backfillPayments(db);
   backfillCategories(db);
