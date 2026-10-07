@@ -1,6 +1,6 @@
 # Komşudan
 
-Çukurambar (Ankara) komşu hizmet PWA’sı. Pilot: çamaşırı **kapıda** veya **gel al noktasında** bırak; komşu yıkayıp katlar. Eve kimse girmez.
+Çukurambar (Ankara) komşu hizmet PWA’sı. Pilot: çamaşırı **kapında** bırak; komşu yıkayıp katlar. Eve kimse girmez.
 
 Klasör adı `katla`, npm paketi `komsudan`. Arayüz Türkçe.
 
@@ -18,7 +18,7 @@ Git’te yok (ve olmamalı):
 - `data/uploads/`
 - `.env` sırları
 
-İlk `npm run dev` boş SQLite açar (`data/komsudan.db`). Migration + seed: örnek komşular, gel al noktaları, yorumlar. OTP geliştirmede yanıtta `demoCode` döner.
+İlk `npm run dev` boş SQLite açar (`data/komsudan.db`). Migration + seed: örnek komşular, yorumlar. OTP geliştirmede yanıtta `demoCode` döner.
 
 ---
 
@@ -60,7 +60,7 @@ Test: `npm test`
 
 `/hizmet` → `/?tab=hizmet`.
 
-Harita: 2D / 3D. Yuvarlak pin = hizmet veren. Kesik kare = gel al noktası.
+Harita: 2D / 3D. Yuvarlak pin = hizmet veren.
 
 Giriş: telefon + SMS kodu. Dev’de kod JSON’da `demoCode`. Sipariş için ad, kimlik ve cihaz kilidi (passkey) gerekir. Keşifte “arıyorum / veriyorum” (çamaşır).
 
@@ -81,9 +81,10 @@ curl -s -X POST http://localhost:3000/api/auth/otp/verify \
 ## Ürün notları
 
 - **Fiyat ve durum client’tan gelmez.** Tutar sunucuda.
-- Teslim yeri kullanıcıya **Gel al noktası** diye yazılır. API değeri hâlâ `drop: "nokta"`.
+- Teslim: yalnız **kapı** (`drop: "kapi"`). Hazır olunca müşteri **teslim kodu** gösterir; komşu masada girer.
 - Saat: 09:00–19:00, 15 dk adım, süre 60 dk. Kaydırmalı tekerlek. `Bugün 10:15–11:15`.
-- Pilot kategori: **Çamaşır Yıkama**. Eve girilmez; kapı veya gel al noktası.
+- Pilot kategori: **Çamaşır Yıkama**. Eve girilmez; kapı teslim.
+- Sadakat kademesi pilotta kapalı (`LOYALTY_ENABLED = false`). v0.3 kararları: `docs/v0.3-karar-kaydi.md`.
 
 Ödeme: siparişte authorize / teslimde capture (simülasyon). Bildirim: uygulama içi; gerçek SMS/push yok.
 
@@ -105,7 +106,7 @@ PWA şimdi; sonra RN / Flutter aynı **JSON API**’yi yer. Backend’i tek sefe
 
 Cevap zarfı: `{ "data": {} }` veya `{ "error": { "code", "message" } }`.
 
-Pilot köprü: parça/birim fiyatı + Türkçe statü (`onay_bekliyor`). Hedefte kg + İngilizce lifecycle (`pending`). İkisi birden dönebilir.
+Pilot köprü: **parça sayımı** / birim fiyatı + Türkçe statü (`onay_bekliyor`). Hedefte İngilizce lifecycle (`pending`). İkisi birden dönebilir.
 
 **Deploy:** kalıcı `next start`. Ölçek: Turso veya Postgres; SQL yalnız `src/lib/db/`.
 
