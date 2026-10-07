@@ -74,9 +74,8 @@ export function notifyStatusChange(input: {
   from: ApiLifecycle;
   next: ApiLifecycle;
   actorId: string;
-  pickupCode?: string | null;
 }) {
-  const { row, from, next, actorId, pickupCode } = input;
+  const { row, from, next, actorId } = input;
   const customerId = row.user_id;
   const providerId = row.provider_id;
   const other = actorId === customerId ? providerId : customerId;
@@ -85,7 +84,6 @@ export function notifyStatusChange(input: {
     machineUnits: row.machine_units,
     productName: row.product_name,
     orderId: row.id,
-    pickupCode: pickupCode ?? undefined,
   };
 
   if (next === "accepted" || (next === "dropped_off" && from === "pending")) {
@@ -193,22 +191,6 @@ export function notifyOrderDelayed(row: OrderRow, nextDate: string, reason: stri
     type: "order_delayed",
     title: "Teslim tarihi güncellendi",
     body: `Yeni teslim: ${label}. Gerekçe: ${reason.slice(0, 120)}. İstersen ücretsiz iptal edebilirsin.`,
-  });
-}
-
-export function notifyPickupCodeRotated(row: OrderRow, code: string) {
-  const copy = pickOrderNotice("pickup", {
-    packageId: row.package_id,
-    machineUnits: row.machine_units,
-    productName: row.product_name,
-    orderId: row.id,
-    pickupCode: code,
-  });
-  pushTo(row.user_id, {
-    orderId: row.id,
-    type: "pickup_code",
-    title: copy.title,
-    body: copy.body,
   });
 }
 

@@ -225,35 +225,20 @@ export function listHistoryRows(orderId: string): HistoryRow[] {
     .all(orderId) as HistoryRow[];
 }
 
-export function setPickupCode(id: string, code: string) {
-  db().prepare("UPDATE orders SET pickup_code = ? WHERE id = ?").run(code, id);
-}
-
-export function bumpCodeAttempts(id: string, attempts: number, updatedAt: string) {
-  db().prepare("UPDATE orders SET code_attempts = ?, updated_at = ? WHERE id = ?").run(attempts, updatedAt, id);
-}
-
-export function rotatePickupCode(id: string, code: string, updatedAt: string) {
-  db()
-    .prepare("UPDATE orders SET pickup_code = ?, code_attempts = 0, updated_at = ? WHERE id = ?")
-    .run(code, updatedAt, id);
-}
-
 export function updateOrderStatus(input: {
   id: string;
   status: string;
   lifecycle: string;
   updatedAt: string;
-  pickupCode?: string | null;
   resetAttempts?: boolean;
   paymentStatus?: string;
   paidAt?: string | null;
 }) {
-  if (input.pickupCode !== undefined && input.resetAttempts && input.paymentStatus === "captured") {
+  if (input.resetAttempts && input.paymentStatus === "captured") {
     db()
       .prepare(
-        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'captured', paid_at = ?, pickup_code = NULL,
-         code_attempts = 0, updated_at = ? WHERE id = ?`,
+        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'captured', paid_at = ?,
+         pickup_code = NULL, code_attempts = 0, updated_at = ? WHERE id = ?`,
       )
       .run(input.status, input.lifecycle, input.paidAt, input.updatedAt, input.id);
     return;
@@ -264,14 +249,6 @@ export function updateOrderStatus(input: {
         `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'voided', pickup_code = NULL, updated_at = ? WHERE id = ?`,
       )
       .run(input.status, input.lifecycle, input.updatedAt, input.id);
-    return;
-  }
-  if (input.pickupCode) {
-    db()
-      .prepare(
-        "UPDATE orders SET status = ?, lifecycle = ?, pickup_code = ?, code_attempts = 0, updated_at = ? WHERE id = ?",
-      )
-      .run(input.status, input.lifecycle, input.pickupCode, input.updatedAt, input.id);
     return;
   }
   db()

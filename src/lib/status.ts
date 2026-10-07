@@ -96,9 +96,6 @@ export function canReview(status: OrderStatus) {
   return status === "teslim_edildi";
 }
 
-export const PICKUP_CODE_LEN = 6;
-export const PICKUP_CODE_TRIES = 5;
-
 export function trackSteps(packageId: OrderPackageId): OrderStatus[] {
   if (packageId === "tam") {
     return ["onay_bekliyor", "teslim_alindi", "yikaniyor", "utuleniyor", "hazir", "teslim_edildi"];

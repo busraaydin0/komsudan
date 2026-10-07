@@ -150,7 +150,6 @@ export type Order = {
   machineUnits: number;
   express: boolean;
   drop: DropMethod;
-  dropPointId: string | null;
   slot: string;
   pickup: AppointmentWindow | null;
   delivery: AppointmentWindow | null;

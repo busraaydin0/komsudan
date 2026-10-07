@@ -121,7 +121,6 @@ function toOrder(row: OrderRow, viewer?: AuthUser, lean = false): Order {
     machineUnits: row.machine_units,
     express: Boolean(row.express),
     drop,
-    dropPointId: row.drop_point_id,
     slot: row.slot,
     pickup: (() => {
       const a = lean ? null : listAppointmentsForOrder(row.id).find((x) => x.kind === "pickup");
@@ -264,7 +263,6 @@ function insertPendingOrder(args: {
   addons: OrderAddonLine[];
   express: boolean;
   drop: DropMethod;
-  dropPointId: string | null;
   slot: string;
   pickup: AppointmentWindow;
   delivery: AppointmentWindow;
@@ -284,7 +282,7 @@ function insertPendingOrder(args: {
       package_id: args.packageId,
       express: args.express ? 1 : 0,
       drop_method: args.drop,
-      drop_point_id: args.dropPointId,
+      drop_point_id: null,
       slot: args.slot,
       note: args.note,
       total: args.quote.total,
@@ -410,7 +408,6 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     addons,
     express,
     drop: "kapi",
-    dropPointId: null,
     slot,
     pickup: input.pickup,
     delivery: input.delivery,

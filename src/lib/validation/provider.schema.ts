@@ -75,8 +75,3 @@ export const slotCreateSchema = z.object({
   deliveryMode: z.enum(["door", "point", "both"]),
 });
 
-export const dropCreateSchema = z.object({
-  label: z.string().trim().min(2).max(80),
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-});
