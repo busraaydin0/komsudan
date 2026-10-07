@@ -20,12 +20,12 @@ describe("çamaşır DB ayağa kalkışı", () => {
       "0007_payments.sql",
       "0008_categories.sql",
       "0009_onboarding.sql",
-      "0010_washes.sql",
       "0011_appointments.sql",
       "0012_disputes.sql",
       "0013_review_dimensions.sql",
       "0014_order_messages.sql",
       "0015_wallets.sql",
+      "0016_drop_points_v03.sql",
     ]);
 
     const providers = d.prepare("SELECT id, category_id FROM providers ORDER BY id").all() as {
@@ -60,7 +60,7 @@ describe("çamaşır DB ayağa kalkışı", () => {
     const kept = d
       .prepare(
         `SELECT name FROM sqlite_master WHERE type = 'table'
-         AND name IN ('provider_washes','appointments','availability_slots','wallets')
+         AND name IN ('appointments','availability_slots','wallets','drop_points','provider_drop_points')
          ORDER BY name`,
       )
       .all() as { name: string }[];

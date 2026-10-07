@@ -10,7 +10,7 @@ Kaynak: `docs/daraltma-envanteri.md` D bölümü. Silinen dosyalar geri alınmad
 | `src/lib/homeVisit.ts` | **Silindi.** Tip B SM (`ready` false). |
 | `src/lib/homeVisit.test.ts` | **Silindi.** |
 | `src/lib/fulfillment.ts` | **Ayıklandı.** Yalnız `deliveryStrategy`. `strategyFor` her zaman onu döner. `foodStrategy` / `homeVisitStrategy` / `isHomeVisitFulfillment` yok. |
-| `src/lib/visitAddress.ts` + test | **Duruyor (belirsiz).** `orderService` artık bağlamıyor. Tam adres yalnız `home_visit` + confirmed+. Çamaşır kapı/nokta. |
+| `src/lib/visitAddress.ts` + test | **Kaldırıldı** (diskte yoktu; home-visit Faz 8). |
 | `src/lib/timeWindow.ts` + test | **Ayıklandı, dosya duruyor.** `musluk` süresi silindi. `durationMinutesFor` her zaman 60 dk. Slot tekerleği çamaşırda kullanılıyor. |
 | `src/lib/loyalty.ts` | **Duruyor.** Silinmedi. Kullanım aşağıda. |
 | `src/lib/geo.ts`, `src/lib/geo/distance.ts` | **Dokunulmadı.** Haversine; kategori metni yok. |
