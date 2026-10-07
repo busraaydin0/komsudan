@@ -13,12 +13,14 @@ import type { OrderAddonLine } from "@/lib/laundryModel";
 import {
   getCapacitySettings,
   listCapacityDays,
+  listCapacityDaysForProviders,
+  listCapacitySettings,
   parseWorkingDays,
   releaseAllocations,
   reserveAllocations,
 } from "@/lib/db/providerCapacity";
 import type { PackageId, ProviderCapacitySummary } from "@/lib/types";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 
 export function settingsFromRow(row: NonNullable<ReturnType<typeof getCapacitySettings>>): CapacitySettings {
   return {
@@ -108,25 +110,42 @@ export function releaseOrderCapacity(providerId: string, allocations: ScheduleAl
   releaseAllocations(providerId, allocations);
 }
 
-export function capacitySummaryForProvider(providerId: string, now = new Date()): ProviderCapacitySummary {
-  const row = getCapacitySettings(providerId);
-  if (!row) {
-    return {
-      configured: false,
-      maxUnitsPerOrder: 0,
-      earliestDelivery: null,
-      earliestDeliveryLabel: null,
-      weekLoad: [],
-      weekTone: "full",
-    };
+function loadDayUsageFromRows(
+  providerId: string,
+  fromIso: string,
+  days: number,
+  settings: CapacitySettings,
+  rows: { providerId: string; date: string; maxUnits: number; usedUnits: number }[],
+): DayUsage[] {
+  const map = new Map(rows.filter((r) => r.providerId === providerId).map((r) => [r.date, r]));
+  const out: DayUsage[] = [];
+  let cursor = fromIso;
+  for (let i = 0; i < days; i++) {
+    const hit = map.get(cursor);
+    out.push({
+      date: cursor,
+      maxUnits: hit?.maxUnits ?? settings.halfUnitsPerDay,
+      usedUnits: hit?.usedUnits ?? 0,
+    });
+    cursor = addCalendarDaysIso(cursor, 1);
   }
+  return out;
+}
+
+function capacitySummaryFromSettings(
+  providerId: string,
+  row: NonNullable<ReturnType<typeof getCapacitySettings>>,
+  dayRows: { providerId: string; date: string; maxUnits: number; usedUnits: number }[],
+  now: Date,
+): ProviderCapacitySummary {
   const settings = settingsFromRow(row);
   const today = isoDateInIstanbul(now);
-  const usage = loadDayUsage(providerId, today, 7, settings);
-  const week = weekLoadRatios(settings, usage, today);
+  const usage7 = loadDayUsageFromRows(providerId, today, 7, settings, dayRows);
+  const week = weekLoadRatios(settings, usage7, today);
+  const usage90 = loadDayUsageFromRows(providerId, today, 90, settings, dayRows);
   const probe = computeSchedule(
     settings,
-    loadDayUsage(providerId, today, 90, settings),
+    usage90,
     {
       packageId: "katlama",
       machineUnits: 2,
@@ -144,6 +163,36 @@ export function capacitySummaryForProvider(providerId: string, now = new Date())
     weekLoad: week.map((w) => ({ date: w.date, freeRatio: w.freeRatio, usedRatio: w.usedRatio })),
     weekTone: weekTone(freeRatios),
   };
+}
+
+export function capacitySummariesForProviders(
+  providerIds: string[],
+  now = new Date(),
+): Map<string, ProviderCapacitySummary> {
+  const out = new Map<string, ProviderCapacitySummary>();
+  if (providerIds.length === 0) return out;
+  const settingsRows = listCapacitySettings(providerIds);
+  const settingsById = new Map(settingsRows.map((r) => [r.provider_id, r]));
+  const today = isoDateInIstanbul(now);
+  const to90 = addCalendarDaysIso(today, 89);
+  const dayRows = listCapacityDaysForProviders(providerIds, today, to90);
+  const empty: ProviderCapacitySummary = {
+    configured: false,
+    maxUnitsPerOrder: 0,
+    earliestDelivery: null,
+    earliestDeliveryLabel: null,
+    weekLoad: [],
+    weekTone: "full",
+  };
+  for (const id of providerIds) {
+    const row = settingsById.get(id);
+    out.set(id, row ? capacitySummaryFromSettings(id, row, dayRows, now) : empty);
+  }
+  return out;
+}
+
+export function capacitySummaryForProvider(providerId: string, now = new Date()): ProviderCapacitySummary {
+  return capacitySummariesForProviders([providerId], now).get(providerId)!;
 }
 
 export function providerMatchesOrderSize(summary: ProviderCapacitySummary, machineUnits: number) {

@@ -7,6 +7,7 @@ import { seedCatalog } from "./seed";
 const g = globalThis as typeof globalThis & {
   __komsuDb?: Database.Database;
   __komsuSeeding?: boolean;
+  __komsuDbReady?: boolean;
 };
 
 export function uploadsDir() {
@@ -15,7 +16,17 @@ export function uploadsDir() {
   return dir;
 }
 
-function prepare(database: Database.Database) {
+function applyPragmas(database: Database.Database) {
+  database.pragma("journal_mode = WAL");
+  database.pragma("busy_timeout = 5000");
+  database.pragma("foreign_keys = ON");
+  database.pragma("synchronous = NORMAL");
+  database.pragma("cache_size = -8000");
+  database.pragma("temp_store = MEMORY");
+}
+
+function bootstrapOnce(database: Database.Database) {
+  if (g.__komsuDbReady) return;
   migrate(database);
   g.__komsuSeeding = true;
   try {
@@ -23,6 +34,7 @@ function prepare(database: Database.Database) {
   } finally {
     g.__komsuSeeding = false;
   }
+  g.__komsuDbReady = true;
 }
 
 function open() {
@@ -31,16 +43,13 @@ function open() {
   uploadsDir();
   const file = process.env.KOMSU_DB_PATH ?? path.join(dir, "komsudan.db");
   const database = new Database(file);
-  database.pragma("journal_mode = WAL");
-  database.pragma("busy_timeout = 5000");
-  database.pragma("foreign_keys = ON");
+  applyPragmas(database);
   g.__komsuDb = database;
-  prepare(database);
+  bootstrapOnce(database);
   return database;
 }
 
 export function db() {
   if (!g.__komsuDb) return open();
-  if (!g.__komsuSeeding) prepare(g.__komsuDb);
   return g.__komsuDb;
 }

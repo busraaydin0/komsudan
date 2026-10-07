@@ -12,7 +12,7 @@ import {
 import type { PackageId } from "@/lib/types";
 import { db } from "./client";
 import { listPackages } from "./providers";
-import { PACKAGES } from "@/lib/data";
+import { LAUNDRY_PACKAGES } from "@/lib/laundry/packages";
 
 export type ProviderPriceRow = {
   provider_id: string;
@@ -86,18 +86,34 @@ export function listAddonPrices(providerId: string): ProviderAddonPriceRow[] {
     .all(providerId) as ProviderAddonPriceRow[];
 }
 
+export function listSizePricesForProviders(providerIds: string[]): ProviderPriceRow[] {
+  if (providerIds.length === 0) return [];
+  const ph = providerIds.map(() => "?").join(",");
+  return db()
+    .prepare(`SELECT * FROM provider_prices WHERE provider_id IN (${ph})`)
+    .all(...providerIds) as ProviderPriceRow[];
+}
+
+export function listAddonPricesForProviders(providerIds: string[]): ProviderAddonPriceRow[] {
+  if (providerIds.length === 0) return [];
+  const ph = providerIds.map(() => "?").join(",");
+  return db()
+    .prepare(`SELECT * FROM provider_addon_prices WHERE provider_id IN (${ph})`)
+    .all(...providerIds) as ProviderAddonPriceRow[];
+}
+
 /** Aktif paketler için eksik boy fiyatlarını doldur. */
 export function ensureProviderPriceGrid(providerId: string) {
   const packs = listPackages(providerId);
   for (const row of packs) {
     const suffix = row.id.includes(":") ? row.id.slice(row.id.lastIndexOf(":") + 1) : row.id;
     const packId = suffix as PackageId;
-    if (!PACKAGES.some((p) => p.id === packId)) continue;
+    if (!LAUNDRY_PACKAGES.some((p) => p.id === packId)) continue;
     const existing = listSizePrices(providerId, packId);
     if (existing.length >= 3) continue;
     const legacy =
       row.price_per_kg ||
-      PACKAGES.find((p) => p.id === packId)?.pricePerPiece ||
+      LAUNDRY_PACKAGES.find((p) => p.id === packId)?.pricePerPiece ||
       12;
     const defaults = defaultSizePricesFromLegacy(packId, legacy);
     for (const size of ["kucuk", "orta", "buyuk"] as LaundrySize[]) {

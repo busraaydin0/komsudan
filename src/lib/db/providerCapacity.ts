@@ -24,6 +24,37 @@ export function getCapacitySettings(providerId: string): CapacitySettingsRow | u
     .get(providerId) as CapacitySettingsRow | undefined;
 }
 
+export function listCapacitySettings(providerIds: string[]): CapacitySettingsRow[] {
+  if (providerIds.length === 0) return [];
+  const ph = providerIds.map(() => "?").join(",");
+  return db()
+    .prepare(`SELECT * FROM provider_capacity_settings WHERE provider_id IN (${ph})`)
+    .all(...providerIds) as CapacitySettingsRow[];
+}
+
+export function listCapacityDaysForProviders(
+  providerIds: string[],
+  fromDate: string,
+  toDate: string,
+): { providerId: string; date: string; maxUnits: number; usedUnits: number }[] {
+  if (providerIds.length === 0) return [];
+  const ph = providerIds.map(() => "?").join(",");
+  const rows = db()
+    .prepare(
+      `SELECT provider_id AS providerId, date, max_units AS maxUnits, used_units AS usedUnits
+       FROM provider_capacity_days
+       WHERE provider_id IN (${ph}) AND date >= ? AND date <= ?
+       ORDER BY provider_id, date`,
+    )
+    .all(...providerIds, fromDate, toDate) as {
+    providerId: string;
+    date: string;
+    maxUnits: number;
+    usedUnits: number;
+  }[];
+  return rows;
+}
+
 export function upsertCapacitySettings(input: {
   providerId: string;
   halfUnitsPerDay: number;
