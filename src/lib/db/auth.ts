@@ -18,6 +18,7 @@ export type UserRow = {
   home_lat: number | null;
   home_lng: number | null;
   home_neighborhood: string | null;
+  super_admin?: number;
   created_at: string;
   updated_at: string;
 };
@@ -41,7 +42,7 @@ export type RefreshRow = {
 };
 
 const USER_COLS =
-  "id, phone, name, full_name, role, identity_verified, passkey_id, avatar_url, preferred_category_ids, preferred_intent, onboarding_completed_at, home_lat, home_lng, home_neighborhood, created_at, updated_at";
+  "id, phone, name, full_name, role, identity_verified, passkey_id, avatar_url, preferred_category_ids, preferred_intent, onboarding_completed_at, home_lat, home_lng, home_neighborhood, super_admin, created_at, updated_at";
 const USER_SELECT = USER_COLS;
 const USER_SELECT_U = USER_COLS.split(", ")
   .map((c) => `u.${c}`)
@@ -97,12 +98,17 @@ export function setPasskey(id: string, credentialId: string) {
   return getUserById(id)!;
 }
 
+export function setUserSuperAdmin(id: string, on: boolean) {
+  db().prepare(`UPDATE users SET super_admin = ?, updated_at = ? WHERE id = ?`).run(
+    on ? 1 : 0,
+    new Date().toISOString(),
+    id,
+  );
+}
+
 export function setUserRole(id: string, role: UserRole) {
-  if (role === "admin") return getUserById(id)!;
   const now = new Date().toISOString();
-  db()
-    .prepare("UPDATE users SET role = ?, updated_at = ? WHERE id = ? AND role != 'admin'")
-    .run(role, now, id);
+  db().prepare("UPDATE users SET role = ?, updated_at = ? WHERE id = ?").run(role, now, id);
   return getUserById(id)!;
 }
 

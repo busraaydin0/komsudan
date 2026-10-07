@@ -41,6 +41,18 @@ export const priceChangeSchema = z.object({
   action: z.enum(["approve", "reject"]),
 });
 
+export const deliveryOverrideSchema = z.object({
+  photoId: z.string().min(1),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  note: z.string().min(3).max(500),
+});
+
+export const deliveryOverrideResolveSchema = z.object({
+  approve: z.boolean(),
+  reason: z.string().min(3).max(500),
+});
+
 export const patchStatusSchema = z.object({
   status: z.enum([
     "pending",

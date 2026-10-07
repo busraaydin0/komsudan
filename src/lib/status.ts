@@ -12,6 +12,7 @@ export const LIFECYCLES: ApiLifecycle[] = [
   "rejected",
   "cancelled",
   "disputed",
+  "admin_pending",
 ];
 
 export const LIFECYCLE_FROM_PILOT: Record<OrderStatus, ApiLifecycle> = {
@@ -30,7 +31,8 @@ export const ALLOWED_TRANSITIONS: Record<ApiLifecycle, ApiLifecycle[]> = {
   dropped_off: ["washing", "cancelled"],
   washing: ["ironing", "ready"],
   ironing: ["ready"],
-  ready: ["completed"],
+  ready: ["completed", "admin_pending"],
+  admin_pending: ["completed", "disputed"],
   completed: [],
   rejected: [],
   cancelled: [],
@@ -55,8 +57,9 @@ export function pilotFromLifecycle(next: ApiLifecycle): OrderStatus {
   if (next === "accepted" || next === "dropped_off") return "teslim_alindi";
   if (next === "washing") return "yikaniyor";
   if (next === "ironing") return "utuleniyor";
-  if (next === "ready") return "hazir";
+  if (next === "ready" || next === "admin_pending") return "hazir";
   if (next === "completed") return "teslim_edildi";
+  if (next === "rejected" || next === "cancelled" || next === "disputed") return "iptal";
   return "iptal";
 }
 

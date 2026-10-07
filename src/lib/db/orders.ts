@@ -49,6 +49,10 @@ export type OrderRow = {
   delay_count: number;
   respond_by: string | null;
   respond_reminder_sent: number;
+  public_code: string | null;
+  pickup_summary_approved_at: string | null;
+  admin_hold: number;
+  dispute_window_end: string | null;
 };
 
 export type InsertOrderInput = {
@@ -73,6 +77,7 @@ export type InsertOrderInput = {
   machine_units: number;
   estimated_delivery_date?: string | null;
   respond_by?: string | null;
+  public_code?: string | null;
   product_id?: string | null;
   product_name?: string | null;
   guest_count?: number | null;
@@ -129,7 +134,7 @@ export function insertOrderRow(input: InsertOrderInput) {
         delivery_mode, scheduled_window_start, scheduled_window_end, lifecycle,
         product_id, product_name, guest_count, allergy_note,
         fulfillment_type, visit_district, visit_neighborhood, visit_address, address_share_consent,
-        size, machine_units, price_change, estimated_delivery_date, respond_by
+        size, machine_units, price_change, estimated_delivery_date, respond_by, public_code
       ) VALUES (
         @id, @provider_id, @package_id, @express, @drop_method, @drop_point_id,
         @slot, @note, @total, @commission, @status, @created_at, @updated_at,
@@ -137,7 +142,7 @@ export function insertOrderRow(input: InsertOrderInput) {
         @delivery_mode, @scheduled_window_start, NULL, @lifecycle,
         @product_id, @product_name, @guest_count, @allergy_note,
         @fulfillment_type, @visit_district, @visit_neighborhood, @visit_address, @address_share_consent,
-        @size, @machine_units, 'none', @estimated_delivery_date, @respond_by
+        @size, @machine_units, 'none', @estimated_delivery_date, @respond_by, @public_code
       )`,
     )
     .run({
@@ -152,8 +157,21 @@ export function insertOrderRow(input: InsertOrderInput) {
       address_share_consent: 0,
       estimated_delivery_date: input.estimated_delivery_date ?? null,
       respond_by: input.respond_by ?? null,
+      public_code: input.public_code ?? null,
       ...input,
     });
+}
+
+export function updateOrderPickupSummaryApproved(id: string, at: string) {
+  db().prepare(`UPDATE orders SET pickup_summary_approved_at = ?, updated_at = ? WHERE id = ?`).run(at, at, id);
+}
+
+export function setOrderAdminHold(id: string, hold: boolean, disputeWindowEnd: string | null, updatedAt: string) {
+  db()
+    .prepare(
+      `UPDATE orders SET admin_hold = ?, dispute_window_end = ?, lifecycle = ?, updated_at = ? WHERE id = ?`,
+    )
+    .run(hold ? 1 : 0, disputeWindowEnd, hold ? "admin_pending" : "ready", updatedAt, id);
 }
 
 export type HistoryRow = {

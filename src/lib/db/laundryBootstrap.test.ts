@@ -29,6 +29,7 @@ describe("çamaşır DB ayağa kalkışı", () => {
       "0017_order_size_model.sql",
       "0018_capacity_calendar.sql",
       "0019_appointments_p11.sql",
+      "0020_handoff_codes.sql",
     ]);
 
     const providers = d.prepare("SELECT id, category_id FROM providers ORDER BY id").all() as {

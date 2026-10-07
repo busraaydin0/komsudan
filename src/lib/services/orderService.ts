@@ -1,4 +1,10 @@
-import { randomInt, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { generatePublicCode } from "@/lib/handoff/codegen";
+import {
+  issueReturnHandoffCode,
+  verifyHandoffPin,
+  customerHandoffSecrets,
+} from "@/lib/services/handoffService";
 import {
   assertCanServeOrder,
   planOrder,
@@ -7,8 +13,6 @@ import {
   scheduleLine,
 } from "@/lib/services/capacityService";
 import { parseAllocations } from "@/lib/db/providerCapacity";
-import { deliveredCount } from "@/lib/db/auth";
-import { loyaltyRate } from "@/lib/loyalty";
 import { addonKey, type LaundrySize, type OrderAddonLine } from "@/lib/laundryModel";
 import { assertReadyForDroppedOff } from "@/lib/pickupRules";
 import {
@@ -30,8 +34,6 @@ import {
   canAddPhotos,
   canCancel,
   lifecycleOf,
-  PICKUP_CODE_LEN,
-  PICKUP_CODE_TRIES,
   pilotFromLifecycle,
 } from "@/lib/status";
 import type {
@@ -49,7 +51,6 @@ import type {
 import type { AuthUser } from "@/lib/auth/types";
 import { getProfile } from "@/lib/db/providers";
 import {
-  bumpCodeAttempts,
   getOrderRow,
   insertOrderRow,
   listHistoryRows,
@@ -57,9 +58,7 @@ import {
   listOrderRowsForCustomer,
   listOrderRowsForProvider,
   recordTransition,
-  rotatePickupCode,
   runOrderTx,
-  setPickupCode,
   updateOrderCapacityCommit,
   updateOrderStatus,
   type OrderRow,
@@ -71,7 +70,6 @@ import { logger } from "@/lib/logger";
 import { ApiError } from "@/server/rules";
 import {
   notifyNewOrder,
-  notifyPickupCodeRotated,
   notifyStatusChange,
 } from "@/lib/services/notificationService";
 import { authorizePayment, capturePayment, paymentForOrder, voidPayment } from "@/lib/services/paymentService";
@@ -88,30 +86,24 @@ function nextLifecycleStep(current: ApiLifecycle, packageId: PackageId): ApiLife
   return null;
 }
 
-function genCode() {
-  return randomInt(0, 10 ** PICKUP_CODE_LEN)
-    .toString()
-    .padStart(PICKUP_CODE_LEN, "0");
-}
-
-function digits(raw: string) {
-  return raw.replace(/\D/g, "");
-}
-
 function deliveryMode(): "door" {
   return "door";
 }
 
-function ensurePickupCode(row: OrderRow) {
-  if (row.status !== "hazir") return;
-  if (row.pickup_code) return;
-  const code = genCode();
-  setPickupCode(row.id, code);
-  row.pickup_code = code;
+function isCustomerViewer(viewer: AuthUser | undefined, row: OrderRow) {
+  if (!viewer) return false;
+  if (viewer.role === "admin") return false;
+  return row.user_id === viewer.id;
 }
 
-function toOrder(row: OrderRow, _viewer?: AuthUser, lean = false): Order {
-  ensurePickupCode(row);
+function assertDeliveryPhoto(orderId: string) {
+  const photos = photosForOrder(orderId);
+  if (!photos.some((p) => p.kind === "delivery")) {
+    throw new ApiError(400, "Teslim için en az bir teslim fotoğrafı gerekli.", "VALIDATION_ERROR");
+  }
+}
+
+function toOrder(row: OrderRow, viewer?: AuthUser, lean = false): Order {
   const drop = row.drop_method as DropMethod;
   const status = row.status as OrderStatus;
   const pay = paymentForOrder(row.id);
@@ -148,7 +140,12 @@ function toOrder(row: OrderRow, _viewer?: AuthUser, lean = false): Order {
     createdAt: row.created_at,
     photos: lean ? [] : photosForOrder(row.id),
     review: lean ? null : reviewForOrder(row.id),
-    pickupCode: status === "hazir" ? row.pickup_code : null,
+    publicCode: row.public_code ?? null,
+    pickupHandoffCode: isCustomerViewer(viewer, row) ? customerHandoffSecrets(row).pickupHandoffCode : null,
+    returnHandoffCode: isCustomerViewer(viewer, row) ? customerHandoffSecrets(row).returnHandoffCode : null,
+    pickupSummaryApprovedAt: row.pickup_summary_approved_at ?? null,
+    adminHold: Boolean(row.admin_hold),
+    disputeWindowEnd: row.dispute_window_end ?? null,
     paymentStatus: payStatus,
     paidAt: payStatus === "captured" ? (pay?.updatedAt ?? row.paid_at) : row.paid_at,
     payment: pay,
@@ -191,9 +188,9 @@ function canMutateOrder(user: AuthUser, row: OrderRow) {
   return user.role === "provider" && row.provider_id === user.id;
 }
 
-export function getOrder(id: string): Order | undefined {
+export function getOrder(id: string, viewer?: AuthUser): Order | undefined {
   const row = getOrderRow(id);
-  return row ? toOrder(row) : undefined;
+  return row ? toOrder(row, viewer) : undefined;
 }
 
 export function getOrderFor(user: AuthUser, id: string): Order {
@@ -303,6 +300,7 @@ function insertPendingOrder(args: {
       machine_units: args.quote.machineUnits,
       estimated_delivery_date: args.estimatedDeliveryDate,
       respond_by: args.respondBy,
+      public_code: generatePublicCode(),
       product_id: null,
       product_name: null,
       guest_count: null,
@@ -392,7 +390,6 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     input.size,
     addons,
     express,
-    loyaltyRate(deliveredCount(userId)),
   );
   line.machineUnits = quotePreview.machineUnits;
   const plan = planOrder(provider.id, line);
@@ -475,24 +472,8 @@ function assertStatusRole(user: AuthUser, row: OrderRow, next: ApiLifecycle) {
   throw new ApiError(403, "Bu siparişi yalnızca hizmet veren ilerletebilir.", "FORBIDDEN");
 }
 
-function verifyPickupCode(row: OrderRow, code: string | undefined, now: string) {
-  const entered = digits(code ?? "");
-  const expected = row.pickup_code ?? "";
-  if (entered.length !== PICKUP_CODE_LEN || entered !== expected) {
-    const attempts = (row.code_attempts ?? 0) + 1;
-    if (attempts >= PICKUP_CODE_TRIES) {
-      const fresh = genCode();
-      rotatePickupCode(row.id, fresh, now);
-      notifyPickupCodeRotated(row, fresh);
-      throw new ApiError(
-        409,
-        "Beş hatalı deneme. Yeni kod müşteriye gitti (SMS simülasyonu).",
-        "INVALID_CODE",
-      );
-    }
-    bumpCodeAttempts(row.id, attempts, now);
-    throw new ApiError(409, `Kod uyuşmadı. Kalan deneme: ${PICKUP_CODE_TRIES - attempts}.`, "INVALID_CODE");
-  }
+export function completeOrderOverride(user: AuthUser, orderId: string, reason: string) {
+  return applyStatus(orderId, user, "completed", undefined, `override:${reason}`, { skipHandoff: true });
 }
 
 export function applyStatus(
@@ -501,6 +482,7 @@ export function applyStatus(
   next: ApiLifecycle,
   code?: string,
   note?: string,
+  opts?: { skipHandoff?: boolean },
 ): Order {
   const row = getOrderRow(id);
   if (!row || !canSeeOrder(user, row)) {
@@ -513,29 +495,28 @@ export function applyStatus(
   if (next === "dropped_off") assertReadyForDroppedOff(row);
 
   const now = new Date().toISOString();
-  if (next === "completed") verifyPickupCode(row, code, now);
+  if (next === "dropped_off") {
+    verifyHandoffPin(row, "pickup", code, user.id, now);
+  }
+  if (next === "completed" && !opts?.skipHandoff) {
+    assertDeliveryPhoto(id);
+    verifyHandoffPin(row, "return", code, user.id, now);
+  }
 
   const nextPilot = pilotFromLifecycle(next);
-  const issuedCode = next === "ready" ? genCode() : null;
   const capture = next === "completed";
   const voidPay = next === "rejected" || next === "cancelled";
 
   runOrderTx(() => {
-    if (issuedCode) {
-      updateOrderStatus({
-        id,
-        status: nextPilot,
-        lifecycle: next,
-        updatedAt: now,
-        pickupCode: issuedCode,
-      });
+    if (next === "ready") {
+      issueReturnHandoffCode(id);
+      updateOrderStatus({ id, status: nextPilot, lifecycle: next, updatedAt: now });
     } else if (capture) {
       updateOrderStatus({
         id,
         status: nextPilot,
         lifecycle: next,
         updatedAt: now,
-        pickupCode: null,
         resetAttempts: true,
         paymentStatus: "captured",
         paidAt: now,
@@ -569,15 +550,13 @@ export function applyStatus(
     if (voidPay) voidPayment(id, now);
   });
 
-  const order = getOrder(id)!;
   notifyStatusChange({
     row,
     from,
     next,
     actorId: user.id,
-    pickupCode: order.pickupCode,
   });
-  return order;
+  return toOrder(getOrderRow(id)!, user);
 }
 
 export function applyOrderAction(id: string, action: OrderAction, user: AuthUser, code?: string): Order {
@@ -619,13 +598,16 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
     }
     next = currentLifecycle(row) === "pending" ? "rejected" : "cancelled";
   } else if (action === "deliver") {
-    if (order.status !== "hazir") {
+    if (order.status !== "hazir" || order.adminHold) {
       throw new ApiError(409, "Kod ancak hazır siparişte geçer.", "INVALID_TRANSITION");
     }
     next = "completed";
   } else if (action === "advance") {
     const step = nextLifecycleStep(currentLifecycle(row), order.packageId);
     if (!step) throw new ApiError(409, "Daha ileri durum yok.", "INVALID_TRANSITION");
+    if (step === "dropped_off" && !code) {
+      throw new ApiError(400, "Alım kodu gerekli.", "VALIDATION_ERROR");
+    }
     next = step;
   } else {
     throw new ApiError(400, "Bu sipariş için bu aksiyon yok.", "VALIDATION_ERROR");
@@ -634,7 +616,7 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
   return applyStatus(id, user, next, code);
 }
 
-const PHOTO_KINDS: OrderPhotoKind[] = ["dropoff", "pickup", "damage"];
+const PHOTO_KINDS: OrderPhotoKind[] = ["dropoff", "pickup", "damage", "delivery"];
 
 function parsePhotoKind(raw?: string): OrderPhotoKind {
   if (!raw) return "dropoff";

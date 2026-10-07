@@ -42,4 +42,11 @@ export function assertReadyForDroppedOff(row: OrderRow) {
   if (row.price_change === "rejected") {
     throw new ApiError(409, "Müşteri fiyat değişikliğini reddetti.", "PRICE_REJECTED");
   }
+  if (!row.pickup_summary_approved_at) {
+    throw new ApiError(
+      409,
+      "Müşteri alım özetini onaylamadan çamaşır alınamaz.",
+      "PICKUP_SUMMARY_REQUIRED",
+    );
+  }
 }

@@ -73,7 +73,6 @@ export function confirmPickupAtDoor(
     input.confirmedSize,
     confirmedAddons,
     Boolean(row.express),
-    0,
   );
 
   const priceChange = needsApproval ? "pending" : "none";

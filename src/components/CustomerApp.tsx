@@ -21,6 +21,7 @@ import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
 import { providerLoadDisplay, sortKeyFreeSpace } from "@/lib/capacity/display";
 import {
   postOrder,
+  postPickupSummaryApprove,
   postPriceChange,
   postReview,
   patchOrder,
@@ -110,7 +111,6 @@ type Sheet = "list" | "provider" | "checkout" | "track";
 type Props = {
   pane?: "map" | "orders";
   mapActive?: boolean;
-  loyaltyLabel?: string;
   meAvatar?: string | null;
   categoryIds?: string[];
   homeLat?: number | null;
@@ -125,7 +125,6 @@ type Props = {
 export function CustomerApp({
   pane = "map",
   mapActive = true,
-  loyaltyLabel = "Komşu",
   meAvatar,
   categoryIds,
   homeLat,
@@ -502,7 +501,6 @@ export function CustomerApp({
                 note={note}
                 onNote={setNote}
                 quote={quote}
-                loyaltyLabel={loyaltyLabel}
                 walletBalance={walletBalance}
                 payGate={payGate}
                 err={err}
@@ -829,7 +827,6 @@ function Checkout({
   note,
   onNote,
   quote,
-  loyaltyLabel,
   walletBalance,
   payGate,
   err,
@@ -855,12 +852,10 @@ function Checkout({
   quote: {
     total: number;
     before: number;
-    loyaltyRate: number;
     commission: number;
     providerNet: number;
     machineUnits?: number;
   };
-  loyaltyLabel?: string;
   walletBalance: number | null;
   payGate: 0 | 1 | null;
   err: string;
@@ -990,8 +985,6 @@ function Checkout({
         <p className="text-xs text-[var(--muted)]">
           {!canPlace
             ? "Bu hizmette sipariş yok; fiyat cihazı görünce netleşir. "
-            : quote.loyaltyRate > 0 && loyaltyLabel
-            ? `${loyaltyLabel} · %${Math.round(quote.loyaltyRate * 100)} indirim, önce ${tl(quote.before)}. `
             : `${quote.machineUnits ?? ""} makine birimi. `}
           {canPlace && walletBalance != null
             ? `Bakiye ${tl(walletBalance)}. Ödeme ${payGate === 1 ? "1 · alınır" : "0 · alınmaz"}. `
@@ -1045,9 +1038,14 @@ function Track({
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
         ← {backLabel}
       </button>
-      <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Sipariş {order.id}</h2>
+      <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">
+        {order.publicCode ?? `Sipariş ${order.id}`}
+      </h2>
       <p className="text-sm text-[var(--muted)]">
         {provider?.name} · {SIZE_LABELS[order.size]?.title ?? order.size} · {tl(order.total)}
+      </p>
+      <p className="mt-1 text-xs text-[var(--muted)]">
+        Evde yokken kapıya veya komşuya bırakma yok; teslim yalnız yüz yüze ve kodla.
       </p>
       {order.priceChange === "pending" && order.status !== "iptal" && (
         <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-[var(--clay)]">
@@ -1105,17 +1103,63 @@ function Track({
           {order.cancelReason === "size_rejected" ? " (Boy/ek uyuşmadı.)" : ""}
         </p>
       )}
-      {order.status === "hazir" && order.pickupCode && (
-        <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] px-4 py-3 ring-1 ring-[var(--teal)]">
-          <p className="text-[11px] font-medium tracking-[0.14em] text-[var(--teal)] uppercase">
-            Teslim kodu
-          </p>
+      {order.pickupConfirmedAt &&
+        !order.pickupSummaryApprovedAt &&
+        order.priceChange !== "pending" &&
+        order.status !== "iptal" && (
+          <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-[var(--teal)]">
+            <p className="text-sm font-medium">Kapıdaki özet doğru mu?</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Boy, ekler ve foto onayından sonra alım kodu açılır; hizmet veren kodu girerek çamaşırı alır.
+            </p>
+            <button
+              type="button"
+              disabled={busy}
+              className="k-press k-cta mt-3 w-full rounded-full bg-[var(--teal)] py-2 text-sm text-white"
+              onClick={() => {
+                void (async () => {
+                  setBusy(true);
+                  try {
+                    await postPickupSummaryApprove(order.id);
+                    await onReload();
+                  } catch (e) {
+                    setErr(e instanceof Error ? e.message : "Onay alınamadı.");
+                  } finally {
+                    setBusy(false);
+                  }
+                })();
+              }}
+            >
+              Özeti onayla
+            </button>
+          </div>
+        )}
+      {order.pickupHandoffCode && (
+        <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] px-4 py-3 ring-1 ring-[var(--line)]">
+          <p className="text-[11px] font-medium tracking-[0.14em] text-[var(--muted)] uppercase">Alım kodu</p>
           <p className="mt-1 font-[family-name:var(--font-display)] text-4xl tabular-nums tracking-[0.28em]">
-            {order.pickupCode}
+            {order.pickupHandoffCode}
+          </p>
+          <p className="mt-2 text-xs text-[var(--muted)]">Yalnız hizmet verene söyle; uygulamada kalır.</p>
+        </div>
+      )}
+      {order.status === "hazir" && order.returnHandoffCode && !order.adminHold && (
+        <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] px-4 py-3 ring-1 ring-[var(--teal)]">
+          <p className="text-[11px] font-medium tracking-[0.14em] text-[var(--teal)] uppercase">Teslim kodu</p>
+          <p className="mt-1 font-[family-name:var(--font-display)] text-4xl tabular-nums tracking-[0.28em]">
+            {order.returnHandoffCode}
           </p>
           <p className="mt-2 text-xs text-[var(--muted)]">
-            Uygulamada ve SMS simülasyonunda. Teslim alırken komşuna söyle; kod girilince{" "}
-            {tl(order.total)} tahsil edilir.
+            Teslimde kodu söyle; komşuya veya kapıya bırakma yok. Kod girilince {tl(order.total)} tahsil edilir.
+          </p>
+        </div>
+      )}
+      {order.adminHold && order.disputeWindowEnd && (
+        <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-[var(--clay)]">
+          <p className="text-sm font-medium">Kodsuz teslim bildirimi</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Hizmet veren kod olmadan teslim bildirdi.{" "}
+            {new Date(order.disputeWindowEnd).toLocaleString("tr-TR")} tarihine kadar itiraz edebilirsin.
           </p>
         </div>
       )}

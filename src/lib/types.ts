@@ -35,7 +35,7 @@ export type LaundryPriceGrid = {
 
 export type FulfillmentType = "dropoff";
 
-export type OrderPhotoKind = "dropoff" | "pickup" | "damage";
+export type OrderPhotoKind = "dropoff" | "pickup" | "damage" | "delivery";
 
 export type WorkPhoto = {
   id: string;
@@ -137,7 +137,8 @@ export type ApiLifecycle =
   | "completed"
   | "rejected"
   | "cancelled"
-  | "disputed";
+  | "disputed"
+  | "admin_pending";
 
 export type Order = {
   id: string;
@@ -162,8 +163,14 @@ export type Order = {
   createdAt: string;
   photos: WorkPhoto[];
   review: Review | null;
-  /** Only while status is `hazir`. Customer shows this; desk must not display it. */
-  pickupCode: string | null;
+  /** KL-XXXX — iki tarafta görünür. */
+  publicCode: string | null;
+  /** Yalnız müşteri API'sinde, aktifken. */
+  pickupHandoffCode: string | null;
+  returnHandoffCode: string | null;
+  pickupSummaryApprovedAt: string | null;
+  adminHold: boolean;
+  disputeWindowEnd: string | null;
   paymentStatus: PaymentStatus;
   paidAt: string | null;
   payment?: AppPayment;

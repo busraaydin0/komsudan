@@ -6,6 +6,8 @@ import { loadUser, requestOtp, verifyOtp } from "./authService";
 import { confirmPickupAtDoor, respondPriceChange } from "./pickupConfirmService";
 import { addPhoto } from "@/server/photos";
 import { applyOrderAction } from "./orderService";
+import { approvePickupSummary } from "./handoffService";
+import { getHandoffCode } from "@/lib/db/handoffCodes";
 import { ApiError } from "@/server/rules";
 
 const MINI_PNG = Buffer.from(
@@ -67,6 +69,11 @@ describe("fiyat onayı akışı", () => {
     await expect(async () => applyOrderAction("ord-pc-1", "advance", provider)).rejects.toBeInstanceOf(
       ApiError,
     );
+    respondPriceChange(user, "ord-pc-1", "approve");
+    approvePickupSummary(user, "ord-pc-1");
+    const pin = getHandoffCode("ord-pc-1", "pickup")!.code;
+    applyOrderAction("ord-pc-1", "advance", provider, pin);
+    expect(getOrderRow("ord-pc-1")!.lifecycle).toBe("dropped_off");
   });
 
   it("müşteri red → iptal size_rejected", async () => {

@@ -145,6 +145,26 @@ export function notifyStatusChange(input: {
   }
 }
 
+export function notifyHandoffCodeRotated(row: OrderRow, kind: "pickup" | "return", _code: string) {
+  void _code;
+  const label = kind === "pickup" ? "Alım" : "Teslim";
+  pushTo(row.user_id, {
+    orderId: row.id,
+    type: "handoff_code",
+    title: `${label} kodu yenilendi`,
+    body: `${label} kodun güncellendi. Yeni kodu hizmet verene söyle.`,
+  });
+}
+
+export function notifyDeliveryOverrideOpened(row: OrderRow, disputeWindowEnd: string) {
+  pushTo(row.user_id, {
+    orderId: row.id,
+    type: "delivery_override",
+    title: "Kodsuz teslim bildirimi",
+    body: `Hizmet veren kod olmadan teslim bildirdi. ${new Date(disputeWindowEnd).toLocaleString("tr-TR")} tarihine kadar itiraz edebilirsin.`,
+  });
+}
+
 export function notifyRespondReminder(row: OrderRow) {
   pushTo(row.provider_id, {
     orderId: row.id,

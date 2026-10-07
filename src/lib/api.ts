@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CategoryId } from "./categories/registry";
 import type { Account, AppNotification, CreateOrderInput, MessageInboxThread, Order, OrderConversation, OrderMessage, Provider, Review, WalletActivity, WalletSnapshot, WorkPhoto } from "./types";
-import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
   providers: Provider[];
@@ -256,6 +255,31 @@ export async function postPickupConfirm(
   return data.order!;
 }
 
+export async function postDeliveryOverride(
+  orderId: string,
+  input: { photoId: string; note: string; lat?: number; lng?: number },
+) {
+  const data = unwrap(
+    await readJson<{ data?: { order: Order }; order?: Order }>(
+      await fetch(`/api/orders/${orderId}/delivery-override`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+    ),
+  );
+  return data.order!;
+}
+
+export async function postPickupSummaryApprove(orderId: string) {
+  const data = unwrap(
+    await readJson<{ data?: { order: Order }; order?: Order }>(
+      await fetch(`/api/orders/${orderId}/pickup-summary/approve`, { method: "POST" }),
+    ),
+  );
+  return data.order!;
+}
+
 export async function postPriceChange(orderId: string, action: "approve" | "reject") {
   const data = unwrap(
     await readJson<{ data?: { order: Order }; order?: Order }>(
@@ -342,19 +366,16 @@ export async function deleteOrderMessage(orderId: string, messageId: string) {
 
 export function useSession() {
   const [account, setAccount] = useState<Account | null>(null);
-  const [loyalty, setLoyalty] = useState<Loyalty | null>(null);
   const [ready, setReady] = useState(false);
 
   const reload = useCallback(async () => {
     try {
-      const data = await readJson<{ account: Account | null; loyalty: Loyalty | null }>(
+      const data = await readJson<{ account: Account | null }>(
         await fetch("/api/auth/session", { signal: AbortSignal.timeout(8000) }),
       );
       setAccount(data.account);
-      setLoyalty(data.loyalty);
     } catch {
       setAccount(null);
-      setLoyalty(null);
     } finally {
       setReady(true);
     }
@@ -364,7 +385,7 @@ export function useSession() {
     void reload();
   }, [reload]);
 
-  return { account, loyalty, ready, reload };
+  return { account, ready, reload };
 }
 
 export async function requestOtp(phone: string) {
@@ -391,7 +412,7 @@ export async function verifyOtp(phone: string, code: string) {
 }
 
 export async function patchAccount(body: { name: string; identity?: boolean }) {
-  return readJson<{ account: Account; loyalty: Loyalty }>(
+  return readJson<{ account: Account }>(
     await fetch("/api/account", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -401,7 +422,7 @@ export async function patchAccount(body: { name: string; identity?: boolean }) {
 }
 
 export async function postPasskey(credentialId: string, assert = false) {
-  return readJson<{ account: Account; loyalty: Loyalty }>(
+  return readJson<{ account: Account }>(
     await fetch("/api/auth/passkey", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -448,9 +469,10 @@ export async function uploadMyAvatar(file: File) {
   return data.data.avatarUrl;
 }
 
-export async function uploadOrderPhoto(orderId: string, file: File) {
+export async function uploadOrderPhoto(orderId: string, file: File, kind?: string) {
   const body = new FormData();
   body.append("file", file);
+  if (kind) body.append("kind", kind);
   const data = unwrap(
     await readJson<{ data?: { photo: WorkPhoto }; photo?: WorkPhoto }>(
       await fetch(`/api/orders/${orderId}/photos`, { method: "POST", body }),

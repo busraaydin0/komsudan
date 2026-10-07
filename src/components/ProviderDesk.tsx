@@ -5,6 +5,7 @@ import { PACKAGES } from "@/lib/data";
 import {
   fetchOrderMessages,
   patchOrder,
+  postDeliveryOverride,
   postPickupConfirm,
   uploadOrderPhoto,
   useCatalog,
@@ -222,6 +223,8 @@ function OrderCard({
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState("");
+  const [overrideNote, setOverrideNote] = useState("");
+  const [deliveryPhotoId, setDeliveryPhotoId] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
   const p = providers.find((x) => x.id === order.providerId);
   const pack =
@@ -232,8 +235,22 @@ function OrderCard({
   const [pickupAddons, setPickupAddons] = useState<OrderAddonLine[]>(order.addons);
   const [colorGroups, setColorGroups] = useState(1);
   const needsPickup = lc === "accepted" && !order.pickupConfirmedAt;
+  const needsPickupCode = Boolean(
+    lc === "accepted" &&
+      order.pickupConfirmedAt &&
+      order.pickupSummaryApprovedAt &&
+      order.priceChange !== "pending",
+  );
+  const waitingSummary = Boolean(
+    lc === "accepted" &&
+      order.pickupConfirmedAt &&
+      !order.pickupSummaryApprovedAt &&
+      order.priceChange !== "pending",
+  );
   const advanceLabel =
-    lc === "accepted" && order.pickupConfirmedAt && order.priceChange !== "pending"
+    needsPickupCode
+      ? "Alım kodu ile teslim al"
+      : lc === "accepted" && order.pickupConfirmedAt && order.priceChange !== "pending"
       ? "Kapıda bırakıldı"
       : lc === "dropped_off"
         ? "Yıkamaya geç"
@@ -270,7 +287,9 @@ function OrderCard({
     setBusy(true);
     setErr("");
     try {
-      await patchOrder(order.id, action, action === "deliver" ? code : undefined);
+      const pin =
+        action === "deliver" || (action === "advance" && needsPickupCode) ? code : undefined;
+      await patchOrder(order.id, action, pin);
       setCode("");
       await onChanged();
     } catch (e) {
@@ -289,6 +308,7 @@ function OrderCard({
         {LABEL[order.status] ?? order.status}
       </p>
       <p className="mt-2 font-medium">
+        {order.publicCode ? `${order.publicCode} · ` : ""}
         {p?.name} · {order.size} · {order.machineUnits} birim · {pack?.title}
       </p>
       <p className="mt-1 text-sm text-[var(--muted)]">
@@ -325,12 +345,27 @@ function OrderCard({
             </button>
           </>
         )}
+        {waitingSummary && (
+          <p className="w-full text-xs text-[var(--muted)]">Müşteri kapı özetini onaylayınca alım kodu açılır.</p>
+        )}
+        {needsPickupCode && (
+          <div className="w-full">
+            <label className="text-xs text-[var(--muted)]">Müşterinin 4 haneli alım kodu</label>
+            <input
+              inputMode="numeric"
+              maxLength={4}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              className="mt-1 w-24 rounded-full bg-[var(--paper)] px-3 py-1.5 text-center font-[family-name:var(--font-display)] text-lg tabular-nums tracking-[0.2em] ring-1 ring-[var(--line)]"
+            />
+          </div>
+        )}
         {advanceLabel && order.status !== "onay_bekliyor" && order.status !== "hazir" && (
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || (needsPickupCode && code.length !== 4)}
             onClick={() => void act("advance")}
-            className="k-press k-cta rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs text-[var(--paper)]"
+            className="k-press k-cta rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs text-[var(--paper)] disabled:opacity-50"
           >
             {busy ? "…" : advanceLabel}
           </button>
@@ -422,7 +457,7 @@ function OrderCard({
           />
         )}
       </div>
-      {order.status === "hazir" && (
+      {order.status === "hazir" && !order.adminHold && (
         <form
           className="mt-3"
           onSubmit={(e) => {
@@ -431,28 +466,85 @@ function OrderCard({
           }}
         >
           <p className="text-xs text-[var(--muted)]">
-            Müşterinin 6 haneli teslim kodunu gir. Doğruysa ödeme cüzdana geçer.
+            Önce teslim fotoğrafı yükle. Müşterinin 4 haneli teslim kodunu gir; kapıya/komşuya bırakma yok.
           </p>
+          <PhotoAdd
+            label="Teslim fotoğrafı"
+            busy={busy}
+            onPick={(file) => {
+              void (async () => {
+                setBusy(true);
+                setErr("");
+                try {
+                  const photo = await uploadOrderPhoto(order.id, file, "delivery");
+                  setDeliveryPhotoId(photo.id);
+                  await onChanged();
+                } catch (e) {
+                  setErr(e instanceof Error ? e.message : "Fotoğraf yüklenemedi.");
+                } finally {
+                  setBusy(false);
+                }
+              })();
+            }}
+          />
           <div className="mt-2 flex gap-2">
             <input
               inputMode="numeric"
               autoComplete="one-time-code"
-              maxLength={6}
+              maxLength={4}
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="••••••"
-              className="w-28 rounded-full bg-[var(--paper)] px-3 py-1.5 text-center font-[family-name:var(--font-display)] text-lg tabular-nums tracking-[0.2em] ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              placeholder="••••"
+              className="w-24 rounded-full bg-[var(--paper)] px-3 py-1.5 text-center font-[family-name:var(--font-display)] text-lg tabular-nums tracking-[0.2em] ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
               aria-label="Teslim kodu"
             />
             <button
               type="submit"
-              disabled={busy || code.length !== 6}
+              disabled={busy || code.length !== 4}
               className="k-press k-cta rounded-full bg-[var(--teal)] px-3 py-1.5 text-xs text-white disabled:opacity-50"
             >
               {busy ? "…" : "Doğrula · tahsil et"}
             </button>
           </div>
+          <div className="mt-3 border-t border-[var(--line)] pt-3">
+            <p className="text-xs text-[var(--muted)]">Müşteri kodu veremiyorsa (evde yok); kapıya bırakma yasak.</p>
+            <textarea
+              value={overrideNote}
+              onChange={(e) => setOverrideNote(e.target.value)}
+              placeholder="Kısa gerekçe"
+              rows={2}
+              className="mt-1 w-full rounded-xl bg-[var(--paper)] px-3 py-2 text-xs ring-1 ring-[var(--line)]"
+            />
+            <button
+              type="button"
+              disabled={busy || !deliveryPhotoId || overrideNote.trim().length < 3}
+              className="k-press mt-2 w-full rounded-full py-2 text-xs ring-1 ring-[var(--clay)] disabled:opacity-50"
+              onClick={() => {
+                void (async () => {
+                  setBusy(true);
+                  setErr("");
+                  try {
+                    await postDeliveryOverride(order.id, {
+                      photoId: deliveryPhotoId!,
+                      note: overrideNote.trim(),
+                    });
+                    setOverrideNote("");
+                    await onChanged();
+                  } catch (e) {
+                    setErr(e instanceof Error ? e.message : "Talep açılamadı.");
+                  } finally {
+                    setBusy(false);
+                  }
+                })();
+              }}
+            >
+              Kodsuz teslim bildir (admin onayı)
+            </button>
+          </div>
         </form>
+      )}
+      {order.status === "hazir" && order.adminHold && (
+        <p className="mt-3 text-xs text-[var(--clay)]">Kodsuz teslim inceleniyor; müşteri itiraz süresi açık.</p>
       )}
     </li>
   );

@@ -14,18 +14,20 @@ Client'a güvenme. Geçiş yalnızca `ALLOWED_TRANSITIONS` + rol.
 pending → accepted → dropped_off → washing → ironing → ready → completed
    ↓           ↓
 rejected   cancelled (bazı aşamalardan)
+ready → admin_pending → completed | disputed
 completed → disputed (süre içinde)
 ```
 
 ```ts
-const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending: ["accepted", "rejected"],
-  accepted: ["dropped_off", "cancelled"],
+const ALLOWED_TRANSITIONS: Record<ApiLifecycle, ApiLifecycle[]> = {
+  pending: ["accepted", "rejected", "dropped_off"],
+  accepted: ["dropped_off", "washing", "cancelled"],
   dropped_off: ["washing", "cancelled"],
-  washing: ["ironing"],
+  washing: ["ironing", "ready"],
   ironing: ["ready"],
-  ready: ["completed"],
-  completed: ["disputed"],
+  ready: ["completed", "admin_pending"],
+  admin_pending: ["completed", "disputed"],
+  completed: [],
   rejected: [],
   cancelled: [],
   disputed: [],
@@ -38,15 +40,31 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 
 - `accepted` / `rejected`: provider
 - `dropped_off` → `ready`: provider
-- `ready` → `completed`: müşteri onayı veya kod; kararı fazda sabitle, client status yazmasın
+- `ready` → `completed`: provider teslim kodu + teslim fotoğrafı; tutar sunucuda
+- Kodsuz teslim: provider talep → `admin_pending`, müşteriye 24 saat itiraz; süper admin onayı veya dispute
 - Review: yalnızca `completed` sonrası, sipariş başına bir
+
+## Kod sistemi (P2)
+
+- **Referans:** `orders.public_code` = `KL-XXXX` (4 karakter, karışabilen harf/rakam yok); iki tarafta görünür.
+- **Handoff:** `handoff_codes(order_id, kind pickup|return, code 4 hane, attempts, locked, expires_at, used_at, entered_by, override_reason)`.
+- Alım kodu: müşteri kapı özetini (`pickup_summary_approved_at`) onayladıktan sonra aktif; provider `accepted`→`dropped_off` girer.
+- Teslim kodu: `ready` (RETURNING) iken aktif; provider `completed` girer.
+- 5 yanlış deneme → kod yenilenir, müşteriye bildirim; tek kullanımlık.
+- **Gizlilik:** `pickupHandoffCode` / `returnHandoffCode` yalnız müşteri `toOrder` görünümünde; provider API cevabında null.
 
 ## Kapı doğrulama ve fiyat değişikliği (P1)
 
 - `accepted` → `dropped_off` öncesi: hizmet veren `confirmed_size`, ek adetleri, `color_groups` (1–3), en az bir `dropoff` fotoğrafı girer (`pickup_confirmed_at`).
-- Sipariştekinden **büyük boy** veya **fazla ek** → `price_change = pending`; müşteri onayı olmadan `dropped_off` yok.
+- Sipariştekinden **büyük boy** veya **fazla ek** → `price_change = pending`; müşteri onayı olmadan özet/alım kodu yok.
 - Müşteri reddederse → `cancelled`, `cancel_reason = size_rejected`, ödeme void, kapasite iade.
-- Onay mekanizması: `orders.price_change` alanı (`none` | `pending` | `approved` | `rejected`). Ayrı dispute tablosu değil.
+- Müşteri kapı özetini onaylar → alım kodu (`POST …/pickup-summary/approve`).
+
+## Teslim
+
+- `completed` öncesi en az bir `delivery` fotoğrafı zorunlu.
+- Evde yokken kapıya/komşuya bırakma yasak (UI metni).
+- `delivery_override_requests`: foto + gerekçe; `admin_hold`, `dispute_window_end`; pilotta otomatik kapanma yok.
 
 ## Fiyat ve ödeme
 
