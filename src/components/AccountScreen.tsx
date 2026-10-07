@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Loyalty } from "@/lib/loyalty";
 import type { Account, WorkPhoto } from "@/lib/types";
 import { formatPhone } from "@/lib/phone";
 import { deleteMyAccount, deleteMyPhoto, fetchMyPhotos, logoutSession, markAllNotificationsRead, markNotificationRead, patchAccount, uploadMyAvatar, uploadMyPhoto, useNotifications } from "@/lib/api";
@@ -16,7 +15,6 @@ import {
   requestNotifications,
   type PermState,
 } from "@/lib/permissions";
-import { tl } from "@/lib/pricing";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
 import { Avatar } from "@/components/Avatar";
 import { WalletPanel } from "@/components/WalletPanel";
@@ -62,14 +60,12 @@ function PermRow({
 
 export function AccountScreen({
   account,
-  loyalty,
   onLogout,
   onRefresh,
   onOpenMap,
   onEditDiscovery,
 }: {
   account: Account;
-  loyalty: Loyalty | null;
   onLogout: () => void;
   onRefresh: () => Promise<void> | void;
   onOpenMap?: () => void;
@@ -120,8 +116,6 @@ export function AccountScreen({
   useEffect(() => {
     void refreshPerms();
   }, [refreshPerms]);
-
-  const nextNeed = loyalty && loyalty.nextAt != null ? Math.max(0, loyalty.nextAt - loyalty.delivered) : 0;
 
   async function save() {
     setBusy(true);
@@ -254,47 +248,6 @@ export function AccountScreen({
           </button>
         )}
         <WalletPanel />
-        {loyalty && (
-          <section className="k-rise overflow-hidden rounded-3xl bg-[var(--teal)] p-5 text-[var(--paper)] shadow-[var(--shadow-card)]">
-            <p className="text-[11px] font-medium tracking-[0.18em] uppercase opacity-80">Sadakat</p>
-            <h2 className="mt-1 font-[family-name:var(--font-display)] text-3xl">{loyalty.label}</h2>
-            <p className="mt-1 text-sm opacity-90">{loyalty.perk}</p>
-            <p className="mt-4 text-xs opacity-80">
-              {loyalty.delivered} teslim
-              {loyalty.nextLabel
-                ? ` · ${loyalty.nextLabel} için ${nextNeed} teslim kaldı`
-                : " · en üst kademe"}
-            </p>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/20">
-              <div
-                className="h-full rounded-full bg-[var(--paper)]"
-                style={{
-                  width: `${
-                    loyalty.nextAt
-                      ? Math.min(100, (loyalty.delivered / loyalty.nextAt) * 100)
-                      : 100
-                  }%`,
-                }}
-              />
-            </div>
-            <p className="mt-4 text-sm">
-              Damga {loyalty.stamps}/{loyalty.stampGoal}
-              {loyalty.stamps === 0 && loyalty.delivered > 0
-                ? ` · bu tur doldu, sonraki siparişte ${tl(50)} kupon`
-                : ` · ${loyalty.stampGoal} teslimde ${tl(50)} kupon`}
-            </p>
-            <div className="mt-2 flex gap-1">
-              {Array.from({ length: loyalty.stampGoal }, (_, i) => (
-                <span
-                  key={i}
-                    className={`h-2 flex-1 rounded-full ${
-                      i < loyalty.stamps ? "bg-[var(--paper)]" : "bg-white/25"
-                    }`}
-                />
-              ))}
-            </div>
-          </section>
-        )}
 
         <section className="rounded-3xl bg-[var(--card)] p-5 ring-1 ring-[var(--line)]">
           <div className="flex items-start justify-between gap-3">

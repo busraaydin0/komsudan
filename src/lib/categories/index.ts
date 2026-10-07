@@ -14,7 +14,6 @@ export {
   isPublicCategoryId,
   normalizeCategoryIds,
   seatPhraseFor,
-  usesFoodSm,
 } from "./registry";
 export type {
   CategoryDef,

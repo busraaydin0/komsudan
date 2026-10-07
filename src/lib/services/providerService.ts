@@ -30,15 +30,6 @@ import {
   type ProfileRow,
   type SlotRow,
 } from "@/lib/db/providers";
-import {
-  countWashes,
-  deactivateWash,
-  insertWash,
-  listWashes,
-  toPublicWash,
-  updateWash,
-  type WashWrite,
-} from "@/lib/db/washes";
 import { getCategory } from "@/lib/db/categories";
 import { ratingBreakdown, ratingForProvider } from "@/lib/services/reviewService";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
@@ -109,7 +100,6 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     commissionRate: row.commission_rate,
     categoryId: row.category_id ?? "camasir",
     packages: listPackages(row.user_id).map(toPackage),
-    washes: listWashes(row.user_id).map(toPublicWash),
     dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -487,64 +477,4 @@ export function addMyDropPoint(user: AuthUser, input: { label: string; lat: numb
   return toDrop(insertDrop({ providerId: user.id, ...input }));
 }
 
-const MAX_WASHES = 12;
-
-function assertWashWrite(input: WashWrite) {
-  if (input.price < 1) {
-    throw new ApiError(400, "Fiyat 1 ₺ ve üzeri olsun.", "VALIDATION_ERROR");
-  }
-  const i = input.includes;
-  if (i && !i.dis && !i.supurme && !i.cam && !i.torpido && !i.jant && !i.kurulama) {
-    throw new ApiError(400, "En az bir dahil kalem seç.", "VALIDATION_ERROR");
-  }
-}
-
-export function listMyWashes(user: AuthUser) {
-  requireProvider(user);
-  return listWashes(user.id, false).map(toPublicWash);
-}
-
-export function addMyWash(user: AuthUser, input: WashWrite) {
-  const row = requireProvider(user);
-  if ((row.category_id ?? "camasir") !== "araba") {
-    throw new ApiError(400, "Yıkama kartı yalnızca Araba Yıkama alanında.", "VALIDATION_ERROR");
-  }
-  assertWashWrite(input);
-  if (countWashes(user.id, false) >= MAX_WASHES) {
-    throw new ApiError(400, `En fazla ${MAX_WASHES} hizmet.`, "VALIDATION_ERROR");
-  }
-  return toPublicWash(
-    insertWash(user.id, {
-      ...input,
-      name: input.name.trim(),
-      description: input.description?.trim() || null,
-      location: input.location?.trim() || null,
-      notes: input.notes?.trim() || null,
-      workHours: input.workHours?.trim() || null,
-    }),
-  );
-}
-
-export function patchMyWash(user: AuthUser, washId: string, input: WashWrite) {
-  requireProvider(user);
-  assertWashWrite(input);
-  const row = updateWash(washId, user.id, {
-    ...input,
-    name: input.name.trim(),
-    description: input.description?.trim() || null,
-    location: input.location?.trim() || null,
-    notes: input.notes?.trim() || null,
-    workHours: input.workHours?.trim() || null,
-  });
-  if (!row) throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
-  return toPublicWash(row);
-}
-
-export function removeMyWash(user: AuthUser, washId: string) {
-  requireProvider(user);
-  if (!deactivateWash(washId, user.id)) {
-    throw new ApiError(404, "Hizmet bulunamadı.", "NOT_FOUND");
-  }
-  return { ok: true as const };
-}
 

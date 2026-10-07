@@ -43,6 +43,7 @@ describe("çamaşır DB ayağa kalkışı", () => {
       "zeynep",
     ]);
     expect(providers.every((p) => p.category_id === "camasir")).toBe(true);
+    expect(providers.some((p) => p.id === "fatma" || p.id === "okan")).toBe(false);
 
     const extras = d
       .prepare(
@@ -66,7 +67,6 @@ describe("çamaşır DB ayağa kalkışı", () => {
     expect(kept.map((r) => r.name)).toEqual([
       "appointments",
       "availability_slots",
-      "provider_washes",
       "wallets",
     ]);
   });

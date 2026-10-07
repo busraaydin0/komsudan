@@ -8,7 +8,8 @@ export const DEFAULT_DURATION_MINUTES = 60;
 
 export type SlotDay = "bugun" | "yarin";
 
-export function durationMinutesFor(_kind?: string | null) {
+export function durationMinutesFor(kind?: string | null) {
+  void kind;
   return DEFAULT_DURATION_MINUTES;
 }
 

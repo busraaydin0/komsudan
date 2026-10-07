@@ -16,9 +16,12 @@ export const deliveryStrategy: FulfillmentStrategy = {
 };
 
 export function strategyFor(
-  _mode?: FulfillmentMode,
-  _categoryId?: string,
-  _fulfillmentType?: string | null,
+  mode?: FulfillmentMode,
+  categoryId?: string,
+  fulfillmentType?: string | null,
 ): FulfillmentStrategy {
+  void mode;
+  void categoryId;
+  void fulfillmentType;
   return deliveryStrategy;
 }

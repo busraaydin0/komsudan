@@ -207,6 +207,7 @@ export const PROVIDERS: Provider[] = [
   },
 ].map((p) => ({
   ...p,
+  categoryId: "camasir" as const,
   avatarUrl: SEEDED_AVATARS.has(p.id) ? `/avatars/${p.id}.jpg` : undefined,
 })) as Provider[];
 

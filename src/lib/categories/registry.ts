@@ -30,7 +30,6 @@ export type CategoryDef = {
   name: string;
   icon: string;
   orderPackageId: OrderPackageId | null;
-  usesFoodSm: boolean;
   blocksLaundryPackages: boolean;
   catalogKey: string;
   table: string | null;
@@ -49,7 +48,6 @@ const CAMASIR: CategoryDef = {
   name: "Çamaşır Yıkama",
   icon: "laundry",
   orderPackageId: null,
-  usesFoodSm: false,
   blocksLaundryPackages: false,
   catalogKey: "packages",
   table: "service_packages",
@@ -96,11 +94,6 @@ export function isLaundryPackageId(id: string | null | undefined): id is Laundry
 
 export function categoryDef(id: CategoryId): CategoryDef {
   return CATEGORIES[id];
-}
-
-/** Çamaşır yıkama/ütü SM. Kayıtta başka alan yok; her zaman false. */
-export function usesFoodSm(_packageId?: string, _food = false): boolean {
-  return false;
 }
 
 export function capacityLabelForPackage(packageId: string): string {

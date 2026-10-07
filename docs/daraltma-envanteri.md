@@ -270,3 +270,58 @@ Döngü yok: editor → domain lib → db; route → providerService → db. Ça
 **Envanterde adı geçen benzersiz dosya: 162.**
 
 `0029_tamir_home_visit.sql` **sil**; `src/lib/db/appointments.ts` **belirsiz** (aynı tablo, iki etiket). `provider_profiles` kyc kolonları dosya değil, D notu. `migrate.ts` CREATE blokları A6’da listelendi ama dosya B’de **ayıkla**.
+
+---
+
+## Sonuç
+
+Tarih: 2026-10-07. Dal: `chore/laundry-only`. Karşılaştırma: `main...HEAD` (bu adımdaki kural/README düzeltmeleri commit bekliyor).
+
+Envanter adaydı; fiili daraltma farklı saydı çünkü `WashServiceEditor` / `wash.ts` / `washes` API **bilerek bırakıldı** ve `homeVisit.ts` sonradan silindi.
+
+### Silinen dosya
+
+**98 dosya** (`git diff --diff-filter=D main...HEAD`).
+
+| Grup | Sayı | Not |
+| --- | --- | --- |
+| Editör | 13 | Envanter 14’tü; `WashServiceEditor.tsx` duruyor |
+| Domain lib + test | 17 | 13 kategori lib + `repair.test` + `tamirHomeVisit.test` + `homeVisit.ts` + `homeVisit.test.ts` |
+| `src/lib/db/*` | 13 | `washes.ts` duruyor |
+| `providers/me/<kategori>` route | 39 | 13×3; `washes` 3 route duruyor |
+| SQL | 16 | 15 kategori migration + `0027_review_dimensions.sql` (içerik `0013` olarak yeniden numaralandı) |
+
+### Ayıklanan dosyalar
+
+**42 dosya** değişti (`--diff-filter=M`). Çamaşır yolu durdu; çamaşır dışı dal kesildi. Özet:
+
+`registry.ts` / `customer.ts` / `orderService.ts` / `providerService.ts` / `CustomerApp.tsx` / `ProviderDesk.tsx` / `OnboardingFlow.tsx` / `data.ts` / `seed.ts` / `migrate.ts` / `0008_categories.sql` / `noticeCopy.ts` / `status.ts` / `fulfillment.ts` / `pricing.ts` / `types.ts` / `order.schema.ts` / `provider.schema.ts` / `legal.ts` / `timeWindow.ts` / `api.ts` / `photos.ts` / `catalog.ts`.
+
+Ayrıca rapor: `docs/daraltma-envanteri.md`, `docs/db-camasir-daraltma.md`, `docs/belirsiz-ve-kalinti.md`.
+
+### Bırakılan belirsizler
+
+| Ne | Neden |
+| --- | --- |
+| `appointments` tablosu + `src/lib/db/appointments.ts` | Çamaşırdan bağımsız; ileride takvim |
+| `visitAddress.ts` + test | Home-visit adresi; sipariş yolu kopuk |
+| `loyalty.ts` ve çağrıları | Pilotta kapatılacak; şimdi quote/session/Account bağlı |
+| `WashServiceEditor` + `provider_washes` + `/me/washes` | Önceki adımda korundu. `categoryId !== "araba"` kapısı ölü |
+| `wash.ts`, `db/washes.ts` | Aynı yığın |
+| `FulfillmentType` / `FulfillmentMode` `home_visit` | Kolon duruyor; `strategyFor` yok sayıyor |
+| `orders.product_id`, `guest_count`, `allergy_note`, `visit_*` | `ensureColumns`; insert null |
+| `provider_profiles.kyc_status`, `criminal_record_declared` | Kullanılmayan tamir KYC |
+| `CategoryDef.usesFoodSm` | Her zaman false |
+| `customer.ts` `guests` / boş katalog yardımcıları | PWA `pieces` alias |
+| `legal.ts` | Import yok; cümle duruyor |
+| `timeWindow.ts` | Musluk sabiti silindi; dosya çamaşır slot için duruyor |
+
+Ayrıntı: `docs/belirsiz-ve-kalinti.md`.
+
+### Kalan riskler
+
+- Yerel `data/komsudan.db` silinmedi; eski kategori **tabloları** dosyada kalmış olabilir (migration filename bir kez uygulanır). Sıfırlamak: backup + `rm data/komsudan.db*`.
+- Sadakat indirimi hâlâ hesaplanıyor.
+- Yıkama kartı editörü hiç açılmaz (`araba` kaydı yok) ama API duruyor.
+- `PILOT_SEE_ALL_ORDERS` hâlâ açık (Prompt 0’daki mesaj/dispute test kırığı bu yüzündendi; testler silinen `tamirHomeVisit` ile birlikte toparlandı).
+- Cursor kural dosyaları ve `CLAUDE.md` bu son kontrolde çamaşıra çekildi; `api-sozlesmesi.mdc` / `siparis-state-machine.mdc` sözleşme metni aynı.

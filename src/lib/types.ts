@@ -25,7 +25,7 @@ export type ServicePackage = {
   pricePerPiece: number;
 };
 
-export type FulfillmentType = "dropoff" | "home_visit";
+export type FulfillmentType = "dropoff";
 
 export type OrderPhotoKind = "dropoff" | "pickup" | "damage";
 
@@ -71,38 +71,6 @@ export type Review = {
 };
 
 
-export type WashJob = "dis" | "ic" | "icdis";
-export type WashVehicle = "otomobil" | "suv" | "ticari" | "diger";
-export type WashBooking = "randevu" | "musait";
-export type WashMaterials = "provider" | "customer";
-export type WashIncludes = {
-  dis: boolean;
-  supurme: boolean;
-  cam: boolean;
-  torpido: boolean;
-  jant: boolean;
-  kurulama: boolean;
-};
-
-export type ProviderWash = {
-  id: string;
-  name: string;
-  description?: string | null;
-  job?: WashJob;
-  vehicle?: WashVehicle;
-  photoUrl?: string | null;
-  price: number;
-  includes: WashIncludes;
-  durationMin?: number | null;
-  maxPerDay?: number | null;
-  booking?: WashBooking;
-  location?: string | null;
-  workHours?: string | null;
-  materials?: WashMaterials;
-  notes?: string | null;
-  isActive?: boolean;
-};
-
 export type Provider = {
   id: string;
   name: string;
@@ -126,7 +94,6 @@ export type Provider = {
   workPhotos: WorkPhoto[];
   recentReviews: Review[];
   categoryId?: string;
-  washes?: ProviderWash[];
 };
 
 export type DropPoint = {
@@ -172,19 +139,7 @@ export type Order = {
   dropPointId: string | null;
   slot: string;
   note: string;
-  productId?: string | null;
-  productName?: string | null;
-  guestCount?: number | null;
-  allergyNote?: string | null;
   fulfillmentType?: FulfillmentType;
-  visitDistrict?: string | null;
-  visitNeighborhood?: string | null;
-  visitAddress?: string | null;
-  appointment?: {
-    date: string;
-    windowStart: string;
-    windowEnd: string;
-  } | null;
   total: number;
   commission: number;
   status: OrderStatus;

@@ -7,6 +7,8 @@ alwaysApply: false
 
 Kaynak belge. Uygulama sırasında özet kurallarla çelişirse bu hedef geçerlidir; mevcut PWA'yı faz faz köprüle.
 
+**Pilot ürün:** yalnız Çamaşır Yıkama (`camasir`). `service_categories` ve keşifte başka id yok.
+
 **Stack:** Next.js 16 App Router + React 19 + TypeScript + SQLite (better-sqlite3) + Tailwind 4. Kod `src/` altında.
 
 **Tüketici:** PWA şimdi; sonra RN/Flutter → saf JSON API.

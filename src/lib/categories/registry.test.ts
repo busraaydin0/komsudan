@@ -10,7 +10,6 @@ import {
   clampPublicCategoryIds,
   isPublicCategoryId,
   normalizeCategoryIds,
-  usesFoodSm,
 } from "./registry";
 
 describe("Kategori registry smoke", () => {
@@ -19,14 +18,11 @@ describe("Kategori registry smoke", () => {
     expect(CATEGORY_LIST).toHaveLength(1);
     expect(CATEGORIES.camasir.sortOrder).toBe(1);
     expect(CATEGORIES.camasir.table).toBe("service_packages");
-    expect(CATEGORIES.camasir.usesFoodSm).toBe(false);
     expect(CATEGORIES.camasir.blocksLaundryPackages).toBe(false);
     expect(CATEGORIES.camasir.editor).toBe("LaundryProfile");
   });
 
-  it("çamaşır paket id’si food SM üretmez; kapasite parça yer", () => {
-    expect(usesFoodSm("yikama")).toBe(false);
-    expect(usesFoodSm("tam")).toBe(false);
+  it("çamaşır kapasite parça yer", () => {
     expect(capacityLabelForPackage("yikama")).toBe("parça yer");
     expect(capacityLabelForPackage("camasir")).toBe("parça yer");
   });

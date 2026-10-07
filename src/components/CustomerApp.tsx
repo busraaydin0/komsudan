@@ -103,7 +103,6 @@ type Sheet = "list" | "provider" | "checkout" | "track";
 type Props = {
   pane?: "map" | "orders";
   mapActive?: boolean;
-  loyaltyRate?: number;
   loyaltyLabel?: string;
   meAvatar?: string | null;
   categoryIds?: string[];
@@ -119,7 +118,6 @@ type Props = {
 export function CustomerApp({
   pane = "map",
   mapActive = true,
-  loyaltyRate = 0,
   loyaltyLabel = "Komşu",
   meAvatar,
   categoryIds,
@@ -170,13 +168,10 @@ export function CustomerApp({
   const active = orders.find((o) => o.id === activeId) ?? orders[0];
   const express = resolveExpress(Boolean(selected?.express), slot);
   const quote = quoteForProvider(selected, {
-    guests: pieces,
     pieces,
     pkg,
     express,
     slot,
-    loyaltyRate,
-    pick: {},
   });
   const payGate: 0 | 1 | null =
     walletBalance == null ? null : walletBalance >= quote.total ? 1 : 0;
@@ -271,20 +266,18 @@ export function CustomerApp({
     setErr("");
     setPlacing(true);
     try {
-      const blocked = placeBlockReason(selected, {}, "");
+      const blocked = placeBlockReason(selected);
       if (blocked) {
         setErr(blocked);
         setPlacing(false);
         return;
       }
       const order = await postOrder(
-        placeOrderInput(selected, {}, {
+        placeOrderInput(selected, {
           drop,
           dropPointId: dropId,
           slot,
           note,
-          guests: pieces,
-          allergy: "",
           pkg,
           pieces,
           express,
@@ -410,7 +403,7 @@ export function CustomerApp({
                 kişi şu anda müsait.
               </h1>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                {helloBlurb(categoryIds)}
+                {helloBlurb()}
               </p>
               <button
                 type="button"
@@ -705,7 +698,7 @@ function List({
                       </span>
                     </span>
                     <span className="text-xs text-[var(--muted)]">
-                      {price == null ? listEmptyPriceLabel(p) : listPricedTag(p, price)}
+                      {price == null ? listEmptyPriceLabel() : listPricedTag(price)}
                     </span>
                   </span>
                 </button>
@@ -789,7 +782,7 @@ function ProviderPane({
                 <span className="mt-0.5 block text-xs text-[var(--muted)]">{pack.blurb}</span>
               </button>
             ))}
-        {emptyCatalogCopy(p) ? <p className="text-sm text-[var(--muted)]">{emptyCatalogCopy(p)}</p> : null}
+        {emptyCatalogCopy() ? <p className="text-sm text-[var(--muted)]">{emptyCatalogCopy()}</p> : null}
       </div>
       </div>
       <div className="sticky bottom-0 z-10 border-t border-[var(--line)] bg-[var(--card)] px-4 pb-4 pt-3">
@@ -799,7 +792,7 @@ function ProviderPane({
           onClick={onNext}
           className="k-press k-cta w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(196,92,38,0.22)] disabled:opacity-40"
         >
-          {continueCta(p)}
+          {continueCta()}
         </button>
       </div>
     </div>
@@ -886,7 +879,7 @@ function Checkout({
   onBack: () => void;
   onPlace: () => void;
 }) {
-  const { drops, canPlace } = checkoutMeta(p, {});
+  const { drops, canPlace } = checkoutMeta(p);
   const cap = Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
   const [draft, setDraft] = useState(String(pieces));
 
@@ -909,7 +902,7 @@ function Checkout({
     <div className="flex min-h-full flex-col">
       <div className="flex-1 p-4 pt-2 pb-3">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
-        {checkoutBackLabel(p)}
+        {checkoutBackLabel()}
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Kaç parça?</h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
@@ -1013,7 +1006,7 @@ function Checkout({
       <textarea
         value={note}
         onChange={(e) => onNote(e.target.value)}
-        placeholder={notePlaceholder(p.categoryId)}
+        placeholder={notePlaceholder()}
         className="mt-4 w-full resize-none rounded-2xl bg-[var(--paper)] px-3 py-2 text-sm ring-1 ring-[var(--line)] outline-none transition-[box-shadow] duration-200 focus:ring-[var(--teal)]"
         rows={2}
       />

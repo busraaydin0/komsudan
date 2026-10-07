@@ -192,34 +192,24 @@ function ensureColumns(db: Database.Database) {
     UPDATE service_packages SET category_id = 'camasir' WHERE category_id IS NULL OR category_id != 'camasir';
     UPDATE providers SET category_id = 'camasir' WHERE category_id IS NULL OR category_id != 'camasir';
   `);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS provider_washes (
-      id TEXT PRIMARY KEY,
-      provider_id TEXT NOT NULL REFERENCES provider_profiles(user_id),
-      name TEXT NOT NULL,
-      description TEXT,
-      job TEXT NOT NULL DEFAULT 'dis',
-      vehicle TEXT NOT NULL DEFAULT 'otomobil',
-      photo_url TEXT,
-      price INTEGER NOT NULL DEFAULT 0,
-      include_dis INTEGER NOT NULL DEFAULT 0,
-      include_supurme INTEGER NOT NULL DEFAULT 0,
-      include_cam INTEGER NOT NULL DEFAULT 0,
-      include_torpido INTEGER NOT NULL DEFAULT 0,
-      include_jant INTEGER NOT NULL DEFAULT 0,
-      include_kurulama INTEGER NOT NULL DEFAULT 0,
-      duration_min INTEGER,
-      max_per_day INTEGER,
-      booking TEXT NOT NULL DEFAULT 'musait',
-      location TEXT,
-      work_hours TEXT,
-      materials TEXT NOT NULL DEFAULT 'provider',
-      notes TEXT,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_washes_provider ON provider_washes(provider_id);
-  `);
+  for (const name of [
+    "provider_products",
+    "provider_services",
+    "provider_repairs",
+    "provider_tech",
+    "provider_couriers",
+    "provider_gardens",
+    "provider_cargos",
+    "provider_prints",
+    "provider_preserves",
+    "provider_carpets",
+    "provider_lessons",
+    "provider_talks",
+    "provider_graves",
+  ]) {
+    db.exec(`DROP TABLE IF EXISTS ${name}`);
+  }
+  db.exec(`DROP TABLE IF EXISTS provider_washes`);
   addColumn(db, "orders", "product_id", "product_id TEXT");
   addColumn(db, "orders", "product_name", "product_name TEXT");
   addColumn(db, "orders", "guest_count", "guest_count INTEGER");

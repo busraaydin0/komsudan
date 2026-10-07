@@ -107,7 +107,6 @@ export function AppShell() {
         <CustomerApp
           pane={tab === "siparis" ? "orders" : "map"}
           mapActive={tab === "harita"}
-          loyaltyRate={loyalty?.rate ?? 0}
           loyaltyLabel={loyalty?.label ?? "Komşu"}
           meAvatar={account.avatarUrl}
           categoryIds={account.preferredCategoryIds ?? []}
@@ -146,7 +145,6 @@ export function AppShell() {
         <div className="absolute inset-0 z-10 overflow-y-auto">
           <AccountScreen
             account={account}
-            loyalty={loyalty}
             onLogout={() => void reload()}
             onRefresh={reload}
             onOpenMap={() => go("harita")}

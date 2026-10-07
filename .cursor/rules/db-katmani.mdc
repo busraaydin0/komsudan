@@ -10,7 +10,7 @@ alwaysApply: false
 
 ## Tablolar (hedef)
 
-`users` (phone unique, role customer|provider|admin), `otp_codes`, `refresh_tokens`, `provider_profiles` (lat/lng, commission_rate, rating), `service_packages`, `drop_points`, `availability_slots`, `orders`, `order_status_history`, `order_photos`, `payments`, `reviews`, `disputes`, `notifications`.
+`users` (phone unique, role customer|provider|admin), `otp_codes`, `refresh_tokens`, `provider_profiles` (lat/lng, commission_rate, rating), `service_categories` (aktif kayıt: `camasir`), `service_packages`, `drop_points`, `availability_slots`, `orders`, `order_status_history`, `order_photos`, `payments`, `reviews`, `disputes`, `notifications`.
 
 ## Snapshot ve audit
 

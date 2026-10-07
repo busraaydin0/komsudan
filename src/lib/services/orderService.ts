@@ -2,7 +2,6 @@ import { randomInt, randomUUID } from "node:crypto";
 import { capacityLabelForPackage } from "@/lib/categories/registry";
 import { estimateFor, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/pricing";
 import { isAllowedOrderSlot } from "@/lib/timeWindow";
-import { loyaltyRate } from "@/lib/loyalty";
 import { getCategoryForProvider } from "@/lib/db/categories";
 import { strategyFor } from "@/lib/fulfillment";
 import {
@@ -26,7 +25,6 @@ import type {
   PaymentStatus,
 } from "@/lib/types";
 import type { AuthUser } from "@/lib/auth/types";
-import { deliveredCount } from "@/lib/db/auth";
 import { getProfile } from "@/lib/db/providers";
 import {
   addRemaining,
@@ -99,15 +97,7 @@ function toOrder(row: OrderRow, _viewer?: AuthUser, lean = false): Order {
     dropPointId: row.drop_point_id,
     slot: row.slot,
     note: row.note,
-    productId: row.product_id,
-    productName: row.product_name,
-    guestCount: row.guest_count,
-    allergyNote: row.allergy_note,
     fulfillmentType: "dropoff",
-    visitDistrict: null,
-    visitNeighborhood: null,
-    visitAddress: null,
-    appointment: null,
     total: row.total,
     commission: row.commission,
     status,
@@ -320,7 +310,7 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     pieces,
     input.packageId,
     express,
-    loyaltyRate(deliveredCount(userId)),
+    0,
   );
   const id = insertPendingOrder({
     providerId: provider.id,

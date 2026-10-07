@@ -9,7 +9,6 @@ import { canAddPhotos, nextStatus } from "@/lib/status";
 import type { DropPoint, Order, OrderStatus, Provider } from "@/lib/types";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
 import { LaundryProfile } from "@/components/LaundryProfile";
-import { WashServiceEditor } from "@/components/WashServiceEditor";
 import { ProviderPayoutPanel } from "@/components/ProviderPayoutPanel";
 
 const LABEL: Record<OrderStatus, string> = {
@@ -181,12 +180,10 @@ export function ProviderDesk({
 
         {!providers.some((p) => p.id === account?.id) && (
           <p className="k-rise mt-6 text-sm text-[var(--muted)]">
-            Hizmet kartın burada görünmüyor. Keşifte “Hizmet vermek istiyorum”u işaretleyip alanı kaydet; kart ve gelen
-            işler bu sekmede açılır.
+            Hizmet kartın burada görünmüyor. Keşifte “Hizmet vermek istiyorum”u işaretleyip çamaşır paketini kaydet; kart
+            ve gelen işler bu sekmede açılır.
           </p>
         )}
-
-        <WashServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
 
       </main>
     </div>

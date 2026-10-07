@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { CategoryId } from "./categories/registry";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, MessageInboxThread, Order, OrderConversation, OrderMessage, Provider, ProviderWash, Review, WalletActivity, WalletSnapshot, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, DropPoint, MessageInboxThread, Order, OrderConversation, OrderMessage, Provider, Review, WalletActivity, WalletSnapshot, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
@@ -559,77 +559,4 @@ export async function postMyDropPoint(body: { label: string; lat: number; lng: n
   );
 }
 
-export async function postMyWash(body: {
-  name: string;
-  description?: string | null;
-  job?: "dis" | "ic" | "icdis";
-  vehicle?: "otomobil" | "suv" | "ticari" | "diger";
-  price: number;
-  includes?: {
-    dis: boolean;
-    supurme: boolean;
-    cam: boolean;
-    torpido: boolean;
-    jant: boolean;
-    kurulama: boolean;
-  };
-  durationMin?: number | null;
-  maxPerDay?: number | null;
-  booking?: "randevu" | "musait";
-  location?: string | null;
-  workHours?: string | null;
-  materials?: "provider" | "customer";
-  notes?: string | null;
-  isActive?: boolean;
-}) {
-  const data = unwrap(
-    await readJson<{ data?: { wash: ProviderWash }; wash?: ProviderWash }>(
-      await fetch("/api/providers/me/washes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-    ),
-  );
-  return data.wash!;
-}
-
-export async function fetchMyWashes() {
-  const data = unwrap(
-    await readJson<{ data?: { washes: ProviderWash[] }; washes?: ProviderWash[] }>(
-      await fetch("/api/providers/me/washes"),
-    ),
-  );
-  return data.washes ?? [];
-}
-
-export async function patchMyWash(id: string, body: Parameters<typeof postMyWash>[0]) {
-  const data = unwrap(
-    await readJson<{ data?: { wash: ProviderWash }; wash?: ProviderWash }>(
-      await fetch(`/api/providers/me/washes/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-    ),
-  );
-  return data.wash!;
-}
-
-export async function uploadMyWashPhoto(id: string, file: File) {
-  const body = new FormData();
-  body.append("file", file);
-  const data = unwrap(
-    await readJson<{ data?: { photoUrl: string; wash: ProviderWash }; photoUrl?: string; wash?: ProviderWash }>(
-      await fetch(`/api/providers/me/washes/${encodeURIComponent(id)}/photo`, { method: "POST", body }),
-    ),
-  );
-  return data;
-}
-
-export async function deleteMyWash(id: string) {
-  await readJson(
-    await fetch(`/api/providers/me/washes/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  );
-}
 

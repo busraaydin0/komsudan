@@ -10,7 +10,7 @@ Repo: [github.com/busraaydin0/komsudan](https://github.com/busraaydin0/komsudan)
 
 ## Klonlayan ne görür?
 
-**Aynı kodu** çalıştırırsın (harita, kategoriler, saat tekerleği, API). **Sahibinin canlı veritabanını değil.**
+**Aynı kodu** çalıştırırsın (harita, çamaşır paketleri, saat tekerleği, API). **Sahibinin canlı veritabanını değil.**
 
 Git’te yok (ve olmamalı):
 
@@ -62,7 +62,7 @@ Test: `npm test`
 
 Harita: 2D / 3D. Yuvarlak pin = hizmet veren. Kesik kare = gel al noktası.
 
-Giriş: telefon + SMS kodu. Dev’de kod JSON’da `demoCode`. Sipariş için ad, kimlik ve cihaz kilidi (passkey) gerekir. Keşifte “arıyorum / veriyorum” ve alan seçilir.
+Giriş: telefon + SMS kodu. Dev’de kod JSON’da `demoCode`. Sipariş için ad, kimlik ve cihaz kilidi (passkey) gerekir. Keşifte “arıyorum / veriyorum” (çamaşır).
 
 Seed hizmet veren telefonları (profil `id` = kullanıcı `id`): Elif `5321100001`, Ayşe `5321100002`, … kod: `src/lib/db/seed.ts`.
 
@@ -127,7 +127,7 @@ Orijinal “7 review / 8 dispute” **Faz 9+**.
 - Route’a SQL veya state machine koyma
 - `data/*.db` veya `.env` commit
 - Vercel / serverless
-- Musluk’u yeniden kategori açma
+- Çamaşır dışı kategori açma
 - Faz atlama
 
 Commit mesajı Türkçe, neden odaklı.
