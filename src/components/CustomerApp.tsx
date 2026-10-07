@@ -16,14 +16,8 @@ import {
 } from "@/lib/laundryModel";
 import { tl, resolveExpress } from "@/lib/pricing";
 import { INSUFFICIENT_BALANCE_MESSAGE } from "@/lib/walletMethods";
-import { TimeScrollPicker } from "@/components/TimeScrollPicker";
-import {
-  DEFAULT_DURATION_MINUTES,
-  defaultPilotSlot,
-  formatPilotSlot,
-  minutesToHmm,
-  parsePilotSlot,
-} from "@/lib/timeWindow";
+import { AppointmentCalendar } from "@/components/AppointmentCalendar";
+import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
 import { providerLoadDisplay, sortKeyFreeSpace } from "@/lib/capacity/display";
 import {
   postOrder,
@@ -57,6 +51,7 @@ import { Avatar } from "@/components/Avatar";
 import type {
   LngLat,
   MapMode,
+  AppointmentWindow,
   Order,
   PackageId,
   Provider,
@@ -154,7 +149,9 @@ export function CustomerApp({
   const [pkg, setPkg] = useState<PackageId>("tam");
   const [size, setSize] = useState<LaundrySize>("orta");
   const [addons, setAddons] = useState<OrderAddonLine[]>([]);
-  const [slot, setSlot] = useState("");
+  const [pickup, setPickup] = useState<AppointmentWindow | null>(null);
+  const [delivery, setDelivery] = useState<AppointmentWindow | null>(null);
+  const [scheduleStep, setScheduleStep] = useState<"pickup" | "delivery">("pickup");
   const [note, setNote] = useState("");
   const [dryerOnly, setDryerOnly] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -177,13 +174,13 @@ export function CustomerApp({
 
   const selected = selectedId ? providers.find((p) => p.id === selectedId) : undefined;
   const active = orders.find((o) => o.id === activeId) ?? orders[0];
-  const express = resolveExpress(Boolean(selected?.express), slot);
+  const pickupDate = pickup?.date ?? isoDateInIstanbul(new Date());
+  const express = resolveExpress(Boolean(selected?.express), pickupDate);
   const quote = quoteForProvider(selected, {
     size,
     addons,
     pkg,
-    express,
-    slot,
+    pickupDate,
   });
   const payGate: 0 | 1 | null =
     walletBalance == null ? null : walletBalance >= quote.total ? 1 : 0;
@@ -236,7 +233,9 @@ export function CustomerApp({
   useEffect(() => {
     if (selected) {
       setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
-      setSlot(defaultPilotSlot());
+      setPickup(null);
+      setDelivery(null);
+      setScheduleStep("pickup");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
@@ -281,14 +280,19 @@ export function CustomerApp({
         setPlacing(false);
         return;
       }
+      if (!pickup || !delivery) {
+        setErr("Alım ve teslim penceresi seç.");
+        setPlacing(false);
+        return;
+      }
       const order = await postOrder(
         placeOrderInput(selected, {
-          slot,
           note,
           pkg,
           size,
           addons,
-          express,
+          pickup,
+          delivery,
         }),
       );
       await Promise.all([reloadOrders(), reloadCatalog()]);
@@ -484,13 +488,17 @@ export function CustomerApp({
                 addons={addons}
                 onAddons={setAddons}
                 express={express}
-                onExpress={(want) => {
-                  const parsed = parsePilotSlot(slot);
-                  const start = parsed?.startMin ?? 18 * 60;
-                  setSlot(formatPilotSlot(want ? "bugun" : "yarin", start));
+                scheduleStep={scheduleStep}
+                onScheduleStep={setScheduleStep}
+                pickup={pickup}
+                onPickup={(w) => {
+                  setPickup(w);
+                  setDelivery(null);
+                  setScheduleStep("delivery");
                 }}
-                slot={slot}
-                onSlot={setSlot}
+                delivery={delivery}
+                onDelivery={setDelivery}
+                minDeliveryDate={pickup?.date}
                 note={note}
                 onNote={setNote}
                 quote={quote}
@@ -789,39 +797,6 @@ function ProviderPane({
   );
 }
 
-function SlotWheel({ slot, onSlot }: { slot: string; onSlot: (s: string) => void }) {
-  const parsed = parsePilotSlot(slot);
-  const day = parsed?.day ?? "bugun";
-  const startMin = parsed?.startMin ?? 10 * 60;
-  const endLabel = minutesToHmm(startMin + DEFAULT_DURATION_MINUTES);
-  return (
-    <>
-      <div className="mt-2 flex gap-2">
-        {(["bugun", "yarin"] as const).map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => onSlot(formatPilotSlot(d, startMin))}
-            className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
-              day === d ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]" : "ring-[var(--line)]"
-            }`}
-          >
-            {d === "bugun" ? "Bugün" : "Yarın"}
-          </button>
-        ))}
-      </div>
-      <TimeScrollPicker
-        startMin={startMin}
-        durationMinutes={DEFAULT_DURATION_MINUTES}
-        onChange={(m) => onSlot(formatPilotSlot(day, m))}
-      />
-      <p className="mt-1 text-center text-xs text-[var(--muted)]">
-        {minutesToHmm(startMin)}–{endLabel} · {DEFAULT_DURATION_MINUTES} dk
-      </p>
-    </>
-  );
-}
-
 function addonQty(addons: OrderAddonLine[], addon: OrderAddonLine["addon"], variant: OrderAddonLine["variant"]) {
   return addons.find((a) => a.addon === addon && a.variant === variant)?.qty ?? 0;
 }
@@ -844,9 +819,13 @@ function Checkout({
   addons,
   onAddons,
   express,
-  onExpress,
-  slot,
-  onSlot,
+  scheduleStep,
+  onScheduleStep,
+  pickup,
+  onPickup,
+  delivery,
+  onDelivery,
+  minDeliveryDate,
   note,
   onNote,
   quote,
@@ -864,9 +843,13 @@ function Checkout({
   addons: OrderAddonLine[];
   onAddons: (a: OrderAddonLine[]) => void;
   express: boolean;
-  onExpress: (v: boolean) => void;
-  slot: string;
-  onSlot: (s: string) => void;
+  scheduleStep: "pickup" | "delivery";
+  onScheduleStep: (s: "pickup" | "delivery") => void;
+  pickup: AppointmentWindow | null;
+  onPickup: (w: AppointmentWindow) => void;
+  delivery: AppointmentWindow | null;
+  onDelivery: (w: AppointmentWindow) => void;
+  minDeliveryDate?: string;
   note: string;
   onNote: (s: string) => void;
   quote: {
@@ -951,19 +934,43 @@ function Checkout({
       {placeBlockReason(p, quote.machineUnits) ? (
         <p className="mt-2 text-xs text-[var(--clay)]">{placeBlockReason(p, quote.machineUnits)}</p>
       ) : null}
-      {p.express && (
-        <label className="mt-4 flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={express}
-            onChange={(e) => onExpress(e.target.checked)}
-          />
-          Aynı gün (+%25)
-        </label>
+      {express ? (
+        <p className="mt-4 text-xs text-[var(--muted)]">Bugün alım: aynı gün express (+%25) uygulanır.</p>
+      ) : null}
+      <p className="mt-2 text-sm text-[var(--muted)]">Kapıda bırak · hazır olunca yine kapında al.</p>
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => onScheduleStep("pickup")}
+          className={`k-chip rounded-full px-3 py-1 text-xs ring-1 ${scheduleStep === "pickup" ? "bg-[var(--ink)] text-[var(--paper)]" : "ring-[var(--line)]"}`}
+        >
+          1 · Alım
+        </button>
+        <button
+          type="button"
+          disabled={!pickup}
+          onClick={() => onScheduleStep("delivery")}
+          className={`k-chip rounded-full px-3 py-1 text-xs ring-1 ${scheduleStep === "delivery" ? "bg-[var(--ink)] text-[var(--paper)]" : "ring-[var(--line)]"} disabled:opacity-40`}
+        >
+          2 · Teslim
+        </button>
+      </div>
+      {scheduleStep === "pickup" ? (
+        <AppointmentCalendar
+          providerId={p.id}
+          title="Alım penceresi (2 saat)"
+          value={pickup}
+          onPick={onPickup}
+        />
+      ) : (
+        <AppointmentCalendar
+          providerId={p.id}
+          title="Teslim penceresi"
+          minDate={minDeliveryDate}
+          value={delivery}
+          onPick={onDelivery}
+        />
       )}
-      <p className="mt-4 text-sm text-[var(--muted)]">Teslim: kapında bırak, hazır olunca yine kapında al.</p>
-      <h3 className="mt-5 text-sm font-medium">Saat</h3>
-      <SlotWheel slot={slot} onSlot={onSlot} />
       <textarea
         value={note}
         onChange={(e) => onNote(e.target.value)}
