@@ -77,7 +77,24 @@ Kullanılmayan **production** paket yok (knip/depcheck). Dev paket silme **yapı
 
 | Öğe | knip | grep import | Karar |
 |-----|------|-------------|--------|
-| `loyalty.ts` | unused file exports | çok | Sil |
+| `loyalty.ts` | unused file exports | çok | **Silindi** (commit b0de1d0) |
+
+## Uygulama durumu (2026-10-08)
+
+| Madde | Commit / not |
+|-------|----------------|
+| Rapor | `56d2afa` |
+| Sadakat | `b0de1d0` |
+| `legal.ts` | `eb2d7e0` |
+| `visitAddress` | Zaten yoktu |
+| `timeWindow` kalıntı | `372a451` |
+| KYC + washes migrate | `6f7575b` |
+| Gel-al / `pickup_code` API | `51bd824` |
+| Knip ölü dosyalar | `18cb4b9` |
+| UI copy parça→boy | `e2bed5f` |
+| Bağımlılık silme | Yapılmadı (depcheck false positive) |
+| `public/sw.js` | **Belirsiz** — tutuldu |
+| DB kolon drop (`drop_point_id`, visit_*, kyc) | **Belirsiz** — SQLite ALTER; yalnız yeni migrate eklemeleri kaldırıldı |
 | `legal.ts` | unused file | 0 | Sil |
 | `TimeScrollPicker` | unused | 0 | Sil |
 | `categories/index.ts` | unused | 0 | Sil |
