@@ -12,14 +12,7 @@ import {
   useOrders,
   useSession,
 } from "@/lib/api";
-import {
-  ADDON_KINDS,
-  ADDON_VARIANTS,
-  LAUNDRY_SIZES,
-  SIZE_LABELS,
-  type LaundrySize,
-  type OrderAddonLine,
-} from "@/lib/laundryModel";
+import { LAUNDRY_SIZES, SIZE_LABELS, type LaundrySize } from "@/lib/laundryModel";
 import { MessageBadge } from "@/components/OrderThread";
 import { tl } from "@/lib/pricing";
 import { canAddPhotos } from "@/lib/status";
@@ -232,7 +225,6 @@ function OrderCard({
     PACKAGES.find((x) => x.id === order.packageId);
   const lc = order.lifecycle ?? "pending";
   const [pickupSize, setPickupSize] = useState<LaundrySize>(order.size);
-  const [pickupAddons, setPickupAddons] = useState<OrderAddonLine[]>(order.addons);
   const [colorGroups, setColorGroups] = useState(1);
   const needsPickup = lc === "accepted" && !order.pickupConfirmedAt;
   const needsPickupCode = Boolean(
@@ -412,7 +404,7 @@ function OrderCard({
                   try {
                     await postPickupConfirm(order.id, {
                       confirmedSize: pickupSize,
-                      addons: pickupAddons,
+                      addons: order.addons,
                       colorGroups,
                     });
                     await onChanged();

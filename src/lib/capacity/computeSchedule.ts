@@ -74,8 +74,9 @@ export function computeSchedule(
   settings: CapacitySettings,
   daysUsage: DayUsage[],
   line: ScheduleOrderLine,
-  now: Date,
+  _now: Date,
 ): ScheduleResult | null {
+  void _now;
   if (line.machineUnits < 1) return null;
   if (line.machineUnits > settings.maxUnitsPerOrder) return null;
 
