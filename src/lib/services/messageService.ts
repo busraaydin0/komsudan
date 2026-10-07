@@ -123,7 +123,7 @@ export function listMessageInbox(user: AuthUser) {
   const threads = listInboxRows(user.id).map((row) => ({
     orderId: row.order_id,
     peerName: row.peer_name?.trim() || "Komşu",
-    title: row.product_name?.trim() || "Sipariş",
+    title: row.package_id ? `Sipariş · ${row.package_id}` : "Sipariş",
     status: row.status,
     preview: row.preview?.trim() || "Henüz mesaj yok.",
     unread: Number(row.unread) || 0,

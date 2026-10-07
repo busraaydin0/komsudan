@@ -20,6 +20,15 @@ Git’te yok (ve olmamalı):
 
 İlk `npm run dev` boş SQLite açar (`data/komsudan.db`). Migration + seed: örnek komşular, yorumlar. OTP geliştirmede yanıtta `demoCode` döner.
 
+Şema tek dosyada: `db/migrations/0001_schema.sql`. Eski yerel DB ile uyum yok; sıfırlamak için (yıkıcı — tüm siparişler silinir):
+
+```bash
+rm -f data/komsudan.db data/komsudan.db-wal data/komsudan.db-shm
+npm run dev
+```
+
+İsteğe bağlı yedek: `cp data/komsudan.db data/komsudan.db.bak` komutunu silmeden önce çalıştır.
+
 ---
 
 ## Çalıştırma

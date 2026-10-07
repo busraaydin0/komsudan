@@ -19,7 +19,6 @@ function seedOrder(id: string, userId: string, providerId = "elif") {
     package_id: "yikama",
     express: 0,
     drop_method: "kapi",
-    drop_point_id: null,
     slot: "Bugün 18:00–19:00",
     note: "",
     total: 240,

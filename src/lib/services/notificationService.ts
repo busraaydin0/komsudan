@@ -58,7 +58,7 @@ export function notifyNewOrder(row: {
   const copy = pickOrderNotice("created", {
     packageId: order?.package_id,
     machineUnits: order?.machine_units ?? row.machineUnits,
-    productName: order?.product_name,
+    productName: null,
     orderId: row.id,
   });
   pushTo(row.provider_id, {
@@ -82,7 +82,7 @@ export function notifyStatusChange(input: {
   const ctx = {
     packageId: row.package_id,
     machineUnits: row.machine_units,
-    productName: row.product_name,
+    productName: null,
     orderId: row.id,
   };
 

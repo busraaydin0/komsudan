@@ -58,7 +58,6 @@ function seedOrder(id: string, userId: string, status: string, lifecycle: string
     package_id: "yikama",
     express: 0,
     drop_method: "kapi",
-    drop_point_id: null,
     slot: "Bugün 18:00–19:00",
     note: "",
     total: 180,

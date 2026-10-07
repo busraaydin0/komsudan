@@ -282,7 +282,6 @@ function insertPendingOrder(args: {
       package_id: args.packageId,
       express: args.express ? 1 : 0,
       drop_method: args.drop,
-      drop_point_id: null,
       slot: args.slot,
       note: args.note,
       total: args.quote.total,
@@ -299,15 +298,6 @@ function insertPendingOrder(args: {
       estimated_delivery_date: args.estimatedDeliveryDate,
       respond_by: args.respondBy,
       public_code: generatePublicCode(),
-      product_id: null,
-      product_name: null,
-      guest_count: null,
-      allergy_note: null,
-      fulfillment_type: "dropoff",
-      visit_district: null,
-      visit_neighborhood: null,
-      visit_address: null,
-      address_share_consent: 0,
     });
     insertOrderItem({
       order_id: id,
@@ -336,6 +326,7 @@ function insertPendingOrder(args: {
       toLifecycle: "pending",
       actorId: args.userId,
       actorRole: "customer",
+      note: null,
       at: now,
     });
     authorizePayment({
@@ -444,7 +435,7 @@ function assertCanMove(row: OrderRow, from: ApiLifecycle, to: ApiLifecycle, pack
   const strat = strategyFor(
     getCategoryForProvider(row.provider_id).fulfillment_mode,
     getCategoryForProvider(row.provider_id).id,
-    row.fulfillment_type,
+    "dropoff",
   );
   if (!strat.ready) {
     throw new ApiError(409, "Bu hizmet tipi henüz açık değil.", "CATEGORY_NOT_READY");

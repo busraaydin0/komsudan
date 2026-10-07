@@ -80,7 +80,7 @@ export function computeSchedule(
   if (line.machineUnits < 1) return null;
   if (line.machineUnits > settings.maxUnitsPerOrder) return null;
 
-  let pickupDate = nextWorkingOnOrAfter(line.pickupDate, settings.workingDays);
+  const pickupDate = nextWorkingOnOrAfter(line.pickupDate, settings.workingDays);
 
   let unitsLeft = line.machineUnits;
   const allocationMap = new Map<string, number>();

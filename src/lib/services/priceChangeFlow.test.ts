@@ -29,7 +29,6 @@ function seedAcceptedOrder(id: string, userId: string) {
     package_id: "katlama",
     express: 0,
     drop_method: "kapi",
-    drop_point_id: null,
     slot: "Bugün 18:00–19:00",
     note: "",
     total: 150,

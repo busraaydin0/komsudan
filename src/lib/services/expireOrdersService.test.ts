@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { insertUser } from "@/lib/db/auth";
 import { insertAppointment } from "@/lib/db/appointments";
 import { insertOrderRow } from "@/lib/db/orders";
 import { getExpiredCount } from "@/lib/db/providerStats";
@@ -8,13 +9,13 @@ import { authorizePayment, paymentForOrder } from "@/lib/services/paymentService
 
 function seedPending(id: string, pickupDate: string, pickupStart: string) {
   const now = new Date("2026-10-07T08:00:00+03:00").toISOString();
+  const customer = insertUser("5550000990");
   insertOrderRow({
     id,
     provider_id: "elif",
     package_id: "katlama",
     express: 0,
     drop_method: "kapi",
-    drop_point_id: null,
     slot: `${pickupDate} ${pickupStart}–16:00`,
     note: "",
     total: 100,
@@ -22,7 +23,7 @@ function seedPending(id: string, pickupDate: string, pickupStart: string) {
     status: "onay_bekliyor",
     created_at: now,
     updated_at: now,
-    user_id: "u-test",
+    user_id: customer.id,
     delivery_mode: "door",
     scheduled_window_start: now,
     lifecycle: "pending",
