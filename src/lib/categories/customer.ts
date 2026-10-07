@@ -1,7 +1,9 @@
 /** Müşteri PWA: çamaşır kayıt defterinden bakış yardımcıları. */
 
+import type { LaundrySize, OrderAddonLine } from "@/lib/laundryModel";
 import { loyaltyRate } from "@/lib/loyalty";
-import { estimateFor, resolveExpress, tl } from "@/lib/pricing";
+import { addonKey } from "@/lib/laundryModel";
+import { quoteLaundry, resolveExpress, tl } from "@/lib/pricing";
 import type { CreateOrderInput, PackageId, Provider } from "@/lib/types";
 import { CATEGORIES } from "./registry";
 
@@ -11,7 +13,10 @@ export const ZERO_QUOTE = {
   loyaltyRate: 0,
   commission: 0,
   providerNet: 0,
-  perPiece: 0,
+  subtotal: 0,
+  machineUnits: 0,
+  sizePrice: 0,
+  addonTotal: 0,
 };
 
 export function helloBlurb(): string {
@@ -31,7 +36,7 @@ export function listEmptyPriceLabel(): string {
 }
 
 export function listPricedTag(price: number): string {
-  return `${tl(price)}/${CATEGORIES.camasir.unitQty}`;
+  return `${tl(price)} / orta`;
 }
 
 export function emptyCatalogCopy(): string | null {
@@ -39,7 +44,7 @@ export function emptyCatalogCopy(): string | null {
 }
 
 export function continueCta(): string {
-  return "Devam · parça ve teslimat";
+  return "Devam · boy ve teslimat";
 }
 
 export function checkoutBackLabel(): string {
@@ -49,15 +54,40 @@ export function checkoutBackLabel(): string {
 export function quoteForProvider(
   selected: Provider | undefined,
   args: {
-    pieces: number;
+    size: LaundrySize;
+    addons: OrderAddonLine[];
     pkg: PackageId;
     express: boolean;
     slot?: string;
   },
 ) {
   if (!selected) return ZERO_QUOTE;
+  const grid = selected.laundryPrices;
+  if (!grid) return ZERO_QUOTE;
+  const sizePrice = grid.sizes[args.pkg]?.[args.size];
+  if (sizePrice == null) return ZERO_QUOTE;
   const express = resolveExpress(selected.express, args.slot ?? "");
-  return estimateFor(selected, args.pieces, args.pkg, express && selected.express, loyaltyRate(0));
+  try {
+    const addonUnitPrices: Record<string, number> = {};
+    for (const a of args.addons) {
+      if (a.qty < 1) continue;
+      const key = addonKey(a.addon, a.variant);
+      const unit = grid.addons[key];
+      if (unit == null) return ZERO_QUOTE;
+      addonUnitPrices[key] = unit;
+    }
+    return quoteLaundry({
+      packageId: args.pkg,
+      size: args.size,
+      addons: args.addons,
+      express: express && selected.express,
+      loyaltyRate: loyaltyRate(0),
+      sizePrice,
+      addonUnitPrices,
+    });
+  } catch {
+    return ZERO_QUOTE;
+  }
 }
 
 export function placeBlockReason(p: Provider): string | null {
@@ -71,7 +101,8 @@ export function placeOrderInput(
     slot: string;
     note: string;
     pkg: PackageId;
-    pieces: number;
+    size: LaundrySize;
+    addons: OrderAddonLine[];
     express: boolean;
   },
 ): CreateOrderInput {
@@ -81,7 +112,8 @@ export function placeOrderInput(
     slot: args.slot ?? "",
     note: args.note,
     packageId: args.pkg,
-    pieces: args.pieces,
+    size: args.size,
+    addons: args.addons,
     express: resolveExpress(p.express, args.slot),
   };
 }

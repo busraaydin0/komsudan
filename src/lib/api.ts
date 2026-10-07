@@ -236,6 +236,39 @@ export async function postOrder(input: CreateOrderInput) {
   return data.order!;
 }
 
+export async function postPickupConfirm(
+  orderId: string,
+  body: {
+    confirmedSize: "kucuk" | "orta" | "buyuk";
+    addons: { addon: "yorgan" | "battaniye"; variant: "tek" | "cift"; qty: number }[];
+    colorGroups: number;
+  },
+) {
+  const data = unwrap(
+    await readJson<{ data?: { order: Order }; order?: Order }>(
+      await fetch(`/api/orders/${orderId}/pickup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.order!;
+}
+
+export async function postPriceChange(orderId: string, action: "approve" | "reject") {
+  const data = unwrap(
+    await readJson<{ data?: { order: Order }; order?: Order }>(
+      await fetch(`/api/orders/${orderId}/price-change`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      }),
+    ),
+  );
+  return data.order!;
+}
+
 export async function patchOrder(
   id: string,
   action: "accept" | "reject" | "advance" | "deliver",

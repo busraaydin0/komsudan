@@ -6,7 +6,15 @@ import { PILOT, trustLabel } from "@/lib/data";
 import { bayesianRating } from "@/lib/rating";
 import { dryingListLabel } from "@/lib/drying";
 import { formatKm, kmBetween } from "@/lib/geo";
-import { tl, clampPieces, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/pricing";
+import {
+  ADDON_KINDS,
+  ADDON_VARIANTS,
+  LAUNDRY_SIZES,
+  SIZE_LABELS,
+  type LaundrySize,
+  type OrderAddonLine,
+} from "@/lib/laundryModel";
+import { tl, resolveExpress } from "@/lib/pricing";
 import { INSUFFICIENT_BALANCE_MESSAGE } from "@/lib/walletMethods";
 import { TimeScrollPicker } from "@/components/TimeScrollPicker";
 import {
@@ -17,7 +25,15 @@ import {
   parsePilotSlot,
 } from "@/lib/timeWindow";
 import { seatLabel, seatTone } from "@/lib/seat";
-import { postOrder, postReview, patchOrder, fetchWallet, useCatalog, useOrders } from "@/lib/api";
+import {
+  postOrder,
+  postPriceChange,
+  postReview,
+  patchOrder,
+  fetchWallet,
+  useCatalog,
+  useOrders,
+} from "@/lib/api";
 import {
   catalogOfferCount,
   checkoutBackLabel,
@@ -54,8 +70,6 @@ const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), 
     </div>
   ),
 });
-
-const PIECES = [8, 12, 16, 24, 32];
 
 type NearbySort = "near" | "far" | "priceHigh" | "priceLow" | "rating" | "reviews" | "space";
 
@@ -138,7 +152,8 @@ export function CustomerApp({
   const [sheet, setSheet] = useState<Sheet>("list");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pkg, setPkg] = useState<PackageId>("tam");
-  const [pieces, setPieces] = useState(16);
+  const [size, setSize] = useState<LaundrySize>("orta");
+  const [addons, setAddons] = useState<OrderAddonLine[]>([]);
   const [slot, setSlot] = useState("");
   const [note, setNote] = useState("");
   const [dryerOnly, setDryerOnly] = useState(false);
@@ -164,7 +179,8 @@ export function CustomerApp({
   const active = orders.find((o) => o.id === activeId) ?? orders[0];
   const express = resolveExpress(Boolean(selected?.express), slot);
   const quote = quoteForProvider(selected, {
-    pieces,
+    size,
+    addons,
     pkg,
     express,
     slot,
@@ -270,7 +286,8 @@ export function CustomerApp({
           slot,
           note,
           pkg,
-          pieces,
+          size,
+          addons,
           express,
         }),
       );
@@ -456,17 +473,16 @@ export function CustomerApp({
                   setSheet("list");
                   setSelectedId(null);
                 }}
-                onNext={() => {
-                  setPieces(clampPieces(pieces, selected.remaining));
-                  setSheet("checkout");
-                }}
+                onNext={() => setSheet("checkout")}
               />
             )}
             {sheet === "checkout" && selected && (
               <Checkout
                 p={selected}
-                pieces={pieces}
-                onPieces={(n) => setPieces(clampPieces(n, selected.remaining))}
+                size={size}
+                onSize={setSize}
+                addons={addons}
+                onAddons={setAddons}
                 express={express}
                 onExpress={(want) => {
                   const parsed = parsePilotSlot(slot);
@@ -748,7 +764,7 @@ function ProviderPane({
               >
                 <span className="flex justify-between font-medium">
                   {pack.title}
-                  <span className="tabular-nums">{tl(pack.pricePerPiece)}/parça</span>
+                  <span className="tabular-nums">{tl(pack.pricePerPiece)}/orta</span>
                 </span>
                 <span className="mt-0.5 block text-xs text-[var(--muted)]">{pack.blurb}</span>
               </button>
@@ -803,10 +819,27 @@ function SlotWheel({ slot, onSlot }: { slot: string; onSlot: (s: string) => void
   );
 }
 
+function addonQty(addons: OrderAddonLine[], addon: OrderAddonLine["addon"], variant: OrderAddonLine["variant"]) {
+  return addons.find((a) => a.addon === addon && a.variant === variant)?.qty ?? 0;
+}
+
+function setAddonQty(
+  addons: OrderAddonLine[],
+  addon: OrderAddonLine["addon"],
+  variant: OrderAddonLine["variant"],
+  qty: number,
+): OrderAddonLine[] {
+  const next = addons.filter((a) => !(a.addon === addon && a.variant === variant));
+  if (qty > 0) next.push({ addon, variant, qty });
+  return next;
+}
+
 function Checkout({
   p,
-  pieces,
-  onPieces,
+  size,
+  onSize,
+  addons,
+  onAddons,
   express,
   onExpress,
   slot,
@@ -823,15 +856,24 @@ function Checkout({
   onPlace,
 }: {
   p: Provider;
-  pieces: number;
-  onPieces: (n: number) => void;
+  size: LaundrySize;
+  onSize: (s: LaundrySize) => void;
+  addons: OrderAddonLine[];
+  onAddons: (a: OrderAddonLine[]) => void;
   express: boolean;
   onExpress: (v: boolean) => void;
   slot: string;
   onSlot: (s: string) => void;
   note: string;
   onNote: (s: string) => void;
-  quote: { total: number; before: number; loyaltyRate: number; commission: number; providerNet: number };
+  quote: {
+    total: number;
+    before: number;
+    loyaltyRate: number;
+    commission: number;
+    providerNet: number;
+    machineUnits?: number;
+  };
   loyaltyLabel?: string;
   walletBalance: number | null;
   payGate: 0 | 1 | null;
@@ -841,23 +883,6 @@ function Checkout({
   onPlace: () => void;
 }) {
   const { canPlace } = checkoutMeta(p);
-  const cap = Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
-  const [draft, setDraft] = useState(String(pieces));
-
-  useEffect(() => {
-    setDraft(String(pieces));
-  }, [pieces]);
-
-  function typeCount(raw: string) {
-    const digits = raw.replace(/\D/g, "").slice(0, 2);
-    setDraft(digits);
-    if (!digits) return;
-    onPieces(clampPieces(Number(digits), p.remaining));
-  }
-
-  function commitCount() {
-    onPieces(clampPieces(Number(draft) || PIECES_MIN, p.remaining));
-  }
 
   return (
     <div className="flex min-h-full flex-col">
@@ -865,59 +890,64 @@ function Checkout({
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
         {checkoutBackLabel()}
       </button>
-      <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Kaç parça?</h2>
+      <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Boy</h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        Gömlek, pantolon, tişört birer parça. Nevresim / yorgan iki sayılır. Sen yaz, 1–{cap}.
+        Makine yükünü seç. Renk ayrımı standart; ek ücret yok.
       </p>
-      <div className="mt-3 flex items-center gap-2">
-        <button
-          type="button"
-          aria-label="Bir parça azalt"
-          disabled={pieces <= PIECES_MIN}
-          onClick={() => onPieces(pieces - 1)}
-          className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
-        >
-          −
-        </button>
-        <input
-          inputMode="numeric"
-          pattern="[0-9]*"
-          aria-label="Parça sayısı"
-          value={draft}
-          onChange={(e) => typeCount(e.target.value)}
-          onBlur={commitCount}
-          className="h-11 w-20 rounded-2xl bg-[var(--paper)] text-center font-[family-name:var(--font-display)] text-2xl tabular-nums ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
-        />
-        <button
-          type="button"
-          aria-label="Bir parça ekle"
-          disabled={pieces >= cap}
-          onClick={() => onPieces(pieces + 1)}
-          className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
-        >
-          +
-        </button>
-        <span className="text-sm text-[var(--muted)]">parça</span>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {PIECES.filter((n) => n <= cap).map((n) => (
+      <div className="mt-3 grid gap-2">
+        {LAUNDRY_SIZES.map((s) => (
           <button
-            key={n}
+            key={s}
             type="button"
-            onClick={() => onPieces(n)}
-            className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
-              pieces === n
-                ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]"
-                : "ring-[var(--line)]"
+            onClick={() => onSize(s)}
+            className={`k-chip rounded-2xl px-4 py-3 text-left ring-1 ${
+              size === s ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
             }`}
           >
-            {n}
+            <span className="font-medium">{SIZE_LABELS[s].title}</span>
+            <span className="mt-0.5 block text-xs opacity-90">{SIZE_LABELS[s].hint}</span>
           </button>
         ))}
       </div>
-      {p.remaining > 0 && p.remaining < PIECES_MAX && (
-        <p className="mt-2 text-xs text-[var(--muted)]">
-          Bugün en fazla {p.remaining} parça yer var.
+      <h3 className="mt-5 text-sm font-medium">Ekler</h3>
+      <p className="mt-1 text-xs text-[var(--muted)]">Yorgan / battaniye · her parça ≈ 1 makine</p>
+      <div className="mt-2 space-y-2">
+        {ADDON_KINDS.map((kind) => (
+          <div key={kind} className="rounded-2xl ring-1 ring-[var(--line)] p-3">
+            <p className="text-sm font-medium capitalize">{kind}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {ADDON_VARIANTS.map((variant) => {
+                const qty = addonQty(addons, kind, variant);
+                return (
+                  <div key={variant} className="flex items-center gap-2 rounded-full bg-[var(--paper)] px-2 py-1 ring-1 ring-[var(--line)]">
+                    <span className="text-xs capitalize">{variant}</span>
+                    <button
+                      type="button"
+                      aria-label="Azalt"
+                      className="k-press px-2"
+                      onClick={() => onAddons(setAddonQty(addons, kind, variant, Math.max(0, qty - 1)))}
+                    >
+                      −
+                    </button>
+                    <span className="tabular-nums text-sm w-4 text-center">{qty}</span>
+                    <button
+                      type="button"
+                      aria-label="Artır"
+                      className="k-press px-2"
+                      onClick={() => onAddons(setAddonQty(addons, kind, variant, qty + 1))}
+                    >
+                      +
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      {quote.machineUnits != null && p.remaining > 0 && quote.machineUnits > p.remaining && (
+        <p className="mt-2 text-xs text-[var(--clay)]">
+          Bugün en fazla {p.remaining} makine birimi var.
         </p>
       )}
       {p.express && (
@@ -954,7 +984,7 @@ function Checkout({
             ? "Bu hizmette sipariş yok; fiyat cihazı görünce netleşir. "
             : quote.loyaltyRate > 0 && loyaltyLabel
             ? `${loyaltyLabel} · %${Math.round(quote.loyaltyRate * 100)} indirim, önce ${tl(quote.before)}. `
-            : `Min. ${tl(100)}. `}
+            : `${quote.machineUnits ?? ""} makine birimi. `}
           {canPlace && walletBalance != null
             ? `Bakiye ${tl(walletBalance)}. Ödeme ${payGate === 1 ? "1 · alınır" : "0 · alınmaz"}. `
             : ""}
@@ -1009,11 +1039,62 @@ function Track({
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Sipariş {order.id}</h2>
       <p className="text-sm text-[var(--muted)]">
-        {provider?.name} · {order.pieces} parça · {tl(order.total)}
+        {provider?.name} · {SIZE_LABELS[order.size]?.title ?? order.size} · {tl(order.total)}
       </p>
+      {order.priceChange === "pending" && order.status !== "iptal" && (
+        <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-[var(--clay)]">
+          <p className="text-sm font-medium">Kapıda farklı boy veya ek</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Güncel tutar {tl(order.total)}. Onaylamazsan sipariş iptal olur.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              className="k-press k-cta flex-1 rounded-full bg-[var(--teal)] py-2 text-sm text-white"
+              onClick={() => {
+                void (async () => {
+                  setBusy(true);
+                  try {
+                    await postPriceChange(order.id, "approve");
+                    await onReload();
+                  } catch (e) {
+                    setErr(e instanceof Error ? e.message : "Onay alınamadı.");
+                  } finally {
+                    setBusy(false);
+                  }
+                })();
+              }}
+            >
+              Onayla
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              className="k-press flex-1 rounded-full py-2 text-sm ring-1 ring-[var(--line)]"
+              onClick={() => {
+                void (async () => {
+                  setBusy(true);
+                  try {
+                    await postPriceChange(order.id, "reject");
+                    await onReload();
+                  } catch (e) {
+                    setErr(e instanceof Error ? e.message : "Red alınamadı.");
+                  } finally {
+                    setBusy(false);
+                  }
+                })();
+              }}
+            >
+              Reddet
+            </button>
+          </div>
+        </div>
+      )}
       {order.status === "iptal" && (
         <p className="mt-3 text-sm text-[var(--clay)]">
           Sipariş iptal edildi. Bakiyedeki tutanak çözüldü, para çekilmedi.
+          {order.cancelReason === "size_rejected" ? " (Boy/ek uyuşmadı.)" : ""}
         </p>
       )}
       {order.status === "hazir" && order.pickupCode && (

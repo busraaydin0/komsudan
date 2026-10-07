@@ -2,10 +2,26 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PACKAGES } from "@/lib/data";
-import { fetchOrderMessages, patchOrder, uploadOrderPhoto, useCatalog, useOrders, useSession } from "@/lib/api";
+import {
+  fetchOrderMessages,
+  patchOrder,
+  postPickupConfirm,
+  uploadOrderPhoto,
+  useCatalog,
+  useOrders,
+  useSession,
+} from "@/lib/api";
+import {
+  ADDON_KINDS,
+  ADDON_VARIANTS,
+  LAUNDRY_SIZES,
+  SIZE_LABELS,
+  type LaundrySize,
+  type OrderAddonLine,
+} from "@/lib/laundryModel";
 import { MessageBadge } from "@/components/OrderThread";
 import { tl } from "@/lib/pricing";
-import { canAddPhotos, nextStatus } from "@/lib/status";
+import { canAddPhotos } from "@/lib/status";
 import type { Order, OrderStatus, Provider } from "@/lib/types";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
 import { LaundryProfile } from "@/components/LaundryProfile";
@@ -209,7 +225,23 @@ function OrderCard({
   const pack =
     p?.packages.find((x) => x.id === order.packageId) ??
     PACKAGES.find((x) => x.id === order.packageId);
-  const next = nextStatus(order.status, order.packageId);
+  const lc = order.lifecycle ?? "pending";
+  const [pickupSize, setPickupSize] = useState<LaundrySize>(order.size);
+  const [pickupAddons, setPickupAddons] = useState<OrderAddonLine[]>(order.addons);
+  const [colorGroups, setColorGroups] = useState(1);
+  const needsPickup = lc === "accepted" && !order.pickupConfirmedAt;
+  const advanceLabel =
+    lc === "accepted" && order.pickupConfirmedAt && order.priceChange !== "pending"
+      ? "Kapıda bırakıldı"
+      : lc === "dropped_off"
+        ? "Yıkamaya geç"
+        : lc === "washing"
+          ? order.packageId === "tam"
+            ? "Ütüye geç"
+            : "Hazır"
+          : lc === "ironing"
+            ? "Hazır"
+            : null;
 
   useEffect(() => {
     let alive = true;
@@ -255,7 +287,7 @@ function OrderCard({
         {LABEL[order.status] ?? order.status}
       </p>
       <p className="mt-2 font-medium">
-        {p?.name} · {order.pieces} parça · {pack?.title}
+        {p?.name} · {order.size} · {order.machineUnits} birim · {pack?.title}
       </p>
       <p className="mt-1 text-sm text-[var(--muted)]">
         {new Date(order.createdAt).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
@@ -291,15 +323,73 @@ function OrderCard({
             </button>
           </>
         )}
-        {next && order.status !== "onay_bekliyor" && order.status !== "hazir" && (
+        {advanceLabel && order.status !== "onay_bekliyor" && order.status !== "hazir" && (
           <button
             type="button"
             disabled={busy}
             onClick={() => void act("advance")}
             className="k-press k-cta rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs text-[var(--paper)]"
           >
-            {busy ? "…" : LABEL[next]}
+            {busy ? "…" : advanceLabel}
           </button>
+        )}
+        {needsPickup && (
+          <div className="mt-3 w-full rounded-2xl bg-[var(--paper)] p-3 ring-1 ring-[var(--line)]">
+            <p className="text-xs font-medium text-[var(--teal)]">Kapıda doğrula</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {LAUNDRY_SIZES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setPickupSize(s)}
+                  className={`k-chip rounded-full px-2.5 py-1 text-xs ring-1 ${
+                    pickupSize === s ? "bg-[var(--teal)] text-white" : "ring-[var(--line)]"
+                  }`}
+                >
+                  {SIZE_LABELS[s].title}
+                </button>
+              ))}
+            </div>
+            <label className="mt-2 block text-xs text-[var(--muted)]">
+              Renk grubu (kayıt)
+              <select
+                className="mt-1 w-full rounded-lg bg-[var(--card)] px-2 py-1 text-sm ring-1 ring-[var(--line)]"
+                value={colorGroups}
+                onChange={(e) => setColorGroups(Number(e.target.value))}
+              >
+                {[1, 2, 3].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              disabled={busy}
+              className="k-press k-cta mt-2 w-full rounded-full bg-[var(--clay)] py-2 text-xs text-white"
+              onClick={() => {
+                void (async () => {
+                  setBusy(true);
+                  setErr("");
+                  try {
+                    await postPickupConfirm(order.id, {
+                      confirmedSize: pickupSize,
+                      addons: pickupAddons,
+                      colorGroups,
+                    });
+                    await onChanged();
+                  } catch (e) {
+                    setErr(e instanceof Error ? e.message : "Doğrulama kaydedilemedi.");
+                  } finally {
+                    setBusy(false);
+                  }
+                })();
+              }}
+            >
+              Foto + boy kaydet
+            </button>
+          </div>
         )}
         <button
           type="button"
