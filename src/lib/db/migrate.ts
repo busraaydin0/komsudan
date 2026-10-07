@@ -337,6 +337,7 @@ function ensureColumns(db: Database.Database) {
   ]) {
     db.exec(`DROP TABLE IF EXISTS ${name}`);
   }
+  /* 0010_washes / araba kategorisi kaldırıldı (v0.3 çamaşır-only) */
   db.exec(`DROP TABLE IF EXISTS provider_washes`);
   db.exec(`DROP TABLE IF EXISTS provider_drop_points`);
   db.exec(`DROP TABLE IF EXISTS drop_points`);
@@ -351,8 +352,6 @@ function ensureColumns(db: Database.Database) {
   addColumn(db, "orders", "address_share_consent", "address_share_consent INTEGER NOT NULL DEFAULT 0");
   addColumn(db, "orders", "dispute_window_hours", "dispute_window_hours INTEGER");
   addColumn(db, "orders", "cancel_free_hours", "cancel_free_hours INTEGER");
-  addColumn(db, "provider_profiles", "kyc_status", "kyc_status TEXT");
-  addColumn(db, "provider_profiles", "criminal_record_declared", "criminal_record_declared INTEGER NOT NULL DEFAULT 0");
   addColumn(db, "reviews", "quality", "quality INTEGER");
   addColumn(db, "reviews", "timeliness", "timeliness INTEGER");
   addColumn(db, "reviews", "communication", "communication INTEGER");
