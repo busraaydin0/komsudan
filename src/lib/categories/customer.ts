@@ -90,8 +90,12 @@ export function quoteForProvider(
   }
 }
 
-export function placeBlockReason(p: Provider): string | null {
+export function placeBlockReason(p: Provider, machineUnits?: number): string | null {
   if (p.categoryId && p.categoryId !== "camasir") return "Bu hizmet alanı şu an kapalı.";
+  if (!p.capacity?.configured) return "Bu komşu kapasite ayarını tamamlamadı.";
+  if (machineUnits != null && machineUnits > p.capacity.maxUnitsPerOrder) {
+    return "Bu boy ve ekler tek sipariş limitini aşıyor (BR-020).";
+  }
   return null;
 }
 
