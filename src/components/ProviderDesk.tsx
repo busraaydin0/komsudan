@@ -15,32 +15,18 @@ import {
 import { LAUNDRY_SIZES, SIZE_LABELS, type LaundrySize } from "@/lib/laundryModel";
 import { MessageBadge } from "@/components/OrderThread";
 import { tl } from "@/lib/pricing";
-import { canAddPhotos } from "@/lib/status";
-import type { Order, OrderStatus, Provider } from "@/lib/types";
+import {
+  canAddPhotos,
+  providerAdvanceLabel,
+  statusBadgeClass,
+  statusLabel,
+  type OrderStatusId,
+} from "@/lib/status";
+import type { Order, Provider } from "@/lib/types";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
 import { LaundryProfile } from "@/components/LaundryProfile";
 import { ProviderPayoutPanel } from "@/components/ProviderPayoutPanel";
 import { ProviderCapacityPanel } from "@/components/ProviderCapacityPanel";
-
-const LABEL: Record<OrderStatus, string> = {
-  onay_bekliyor: "Bekliyor",
-  teslim_alindi: "Teslim alındı",
-  yikaniyor: "Yıkanıyor",
-  utuleniyor: "Ütüleniyor",
-  hazir: "Hazır",
-  teslim_edildi: "Bitti",
-  iptal: "İptal",
-};
-
-const BADGE: Record<OrderStatus, string> = {
-  onay_bekliyor: "bg-[var(--sand)] text-[var(--clay)]",
-  teslim_alindi: "bg-[color-mix(in_srgb,var(--teal)_14%,transparent)] text-[var(--teal)]",
-  yikaniyor: "bg-[color-mix(in_srgb,var(--teal)_14%,transparent)] text-[var(--teal)]",
-  utuleniyor: "bg-[color-mix(in_srgb,var(--teal)_14%,transparent)] text-[var(--teal)]",
-  hazir: "bg-[color-mix(in_srgb,var(--teal)_18%,transparent)] text-[var(--teal)]",
-  teslim_edildi: "bg-[var(--paper)] text-[var(--muted)]",
-  iptal: "bg-[var(--paper)] text-[var(--muted)]",
-};
 
 function monthKey(iso: string) {
   const d = new Date(iso);
@@ -63,12 +49,25 @@ export function ProviderDesk({
   const { account } = useSession();
   const { providers, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload, err: ordersErr } = useOrders();
-  const open = orders.filter((o) => o.status !== "teslim_edildi" && o.status !== "iptal");
+  const open = orders.filter(
+    (o) =>
+      o.status !== "completed" &&
+      o.status !== "cancelled" &&
+      o.status !== "rejected" &&
+      o.status !== "disputed",
+  );
   const [openMonth, setOpenMonth] = useState<string | null>(null);
   const months = useMemo(() => {
     const map = new Map<string, Order[]>();
     for (const o of orders) {
-      if (o.status !== "teslim_edildi" && o.status !== "iptal") continue;
+      if (
+        o.status !== "completed" &&
+        o.status !== "cancelled" &&
+        o.status !== "rejected" &&
+        o.status !== "disputed"
+      ) {
+        continue;
+      }
       const key = monthKey(o.createdAt);
       const list = map.get(key);
       if (list) list.push(o);
@@ -223,36 +222,27 @@ function OrderCard({
   const pack =
     p?.packages.find((x) => x.id === order.packageId) ??
     PACKAGES.find((x) => x.id === order.packageId);
-  const lc = order.lifecycle ?? "pending";
+  const st = order.status as OrderStatusId;
   const [pickupSize, setPickupSize] = useState<LaundrySize>(order.size);
   const [colorGroups, setColorGroups] = useState(1);
-  const needsPickup = lc === "accepted" && !order.pickupConfirmedAt;
+  const needsPickup = st === "accepted" && !order.pickupConfirmedAt;
   const needsPickupCode = Boolean(
-    lc === "accepted" &&
+    st === "accepted" &&
       order.pickupConfirmedAt &&
       order.pickupSummaryApprovedAt &&
       order.priceChange !== "pending",
   );
   const waitingSummary = Boolean(
-    lc === "accepted" &&
+    st === "accepted" &&
       order.pickupConfirmedAt &&
       !order.pickupSummaryApprovedAt &&
       order.priceChange !== "pending",
   );
-  const advanceLabel =
-    needsPickupCode
-      ? "Alım kodu ile teslim al"
-      : lc === "accepted" && order.pickupConfirmedAt && order.priceChange !== "pending"
-      ? "Kapıda bırakıldı"
-      : lc === "dropped_off"
-        ? "Yıkamaya geç"
-        : lc === "washing"
-          ? order.packageId === "tam"
-            ? "Ütüye geç"
-            : "Hazır"
-          : lc === "ironing"
-            ? "Hazır"
-            : null;
+  const advanceLabel = providerAdvanceLabel(st, order.packageId, {
+    needsPickupCode,
+    pickupConfirmed: Boolean(order.pickupConfirmedAt),
+    priceChangePending: order.priceChange === "pending",
+  });
 
   useEffect(() => {
     let alive = true;
@@ -296,8 +286,10 @@ function OrderCard({
       className="k-rise rounded-3xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)] transition-shadow duration-200 hover:shadow-[0_10px_28px_rgba(28,23,18,0.08)]"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <p className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE[order.status] ?? "bg-[var(--paper)] text-[var(--muted)]"}`}>
-        {LABEL[order.status] ?? order.status}
+      <p
+        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${statusBadgeClass(st)}`}
+      >
+        {statusLabel(st)}
       </p>
       <p className="mt-2 font-medium">
         {order.publicCode ? `${order.publicCode} · ` : ""}
@@ -317,7 +309,7 @@ function OrderCard({
       </p>
       {err && <p className="k-rise mt-2 text-sm text-[var(--clay)]">{err}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
-        {order.status === "onay_bekliyor" && (
+        {st === "pending" && (
           <>
             <button
               type="button"
@@ -352,7 +344,7 @@ function OrderCard({
             />
           </div>
         )}
-        {advanceLabel && order.status !== "onay_bekliyor" && order.status !== "hazir" && (
+        {advanceLabel && st !== "pending" && st !== "ready" && st !== "admin_pending" && (
           <button
             type="button"
             disabled={busy || (needsPickupCode && code.length !== 4)}
@@ -449,7 +441,7 @@ function OrderCard({
           />
         )}
       </div>
-      {order.status === "hazir" && !order.adminHold && (
+      {st === "ready" && !order.adminHold && (
         <form
           className="mt-3"
           onSubmit={(e) => {
@@ -535,7 +527,7 @@ function OrderCard({
           </div>
         </form>
       )}
-      {order.status === "hazir" && order.adminHold && (
+      {st === "admin_pending" && order.adminHold && (
         <p className="mt-3 text-xs text-[var(--clay)]">Kodsuz teslim inceleniyor; müşteri itiraz süresi açık.</p>
       )}
     </li>

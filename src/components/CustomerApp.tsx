@@ -46,7 +46,13 @@ import {
 } from "@/lib/categories/customer";
 import { clampPublicCategoryIds } from "@/lib/categories/registry";
 import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
-import { canCancel, trackSteps } from "@/lib/status";
+import {
+  canCancel,
+  customerStatusHint,
+  statusMeta,
+  trackHighlightStatus,
+  trackSteps,
+} from "@/lib/status";
 import { PhotoStrip, RatingBreakdownView, ReviewComposer, ReviewList } from "@/components/Photos";
 import { Avatar } from "@/components/Avatar";
 import type {
@@ -218,8 +224,14 @@ export function CustomerApp({
     if (pane !== "orders") return;
     setHello(false);
     const prefer =
-      orders.find((o) => o.status === "hazir") ??
-      orders.find((o) => o.status !== "teslim_edildi" && o.status !== "iptal") ??
+      orders.find((o) => o.status === "ready" || o.status === "admin_pending") ??
+      orders.find(
+        (o) =>
+          o.status !== "completed" &&
+          o.status !== "cancelled" &&
+          o.status !== "rejected" &&
+          o.status !== "disputed",
+      ) ??
       orders[0];
     if (prefer) {
       setActiveId(prefer.id);
@@ -455,8 +467,14 @@ export function CustomerApp({
                   orders[0]
                     ? () => {
                         const prefer =
-                          orders.find((o) => o.status === "hazir") ??
-                          orders.find((o) => o.status !== "teslim_edildi" && o.status !== "iptal") ??
+                          orders.find((o) => o.status === "ready" || o.status === "admin_pending") ??
+                          orders.find(
+                            (o) =>
+                              o.status !== "completed" &&
+                              o.status !== "cancelled" &&
+                              o.status !== "rejected" &&
+                              o.status !== "disputed",
+                          ) ??
                           orders[0];
                         setActiveId(prefer.id);
                         setSheet("track");
@@ -524,8 +542,8 @@ export function CustomerApp({
                             : "ring-[var(--line)]"
                         }`}
                       >
-                        {STEP_LABEL[o.status]}
-                        {!o.review && o.status === "teslim_edildi" ? " · yorum" : ""}
+                        {statusMeta(o.status).label}
+                        {!o.review && o.status === "completed" ? " · yorum" : ""}
                       </button>
                     ))}
                   </div>
@@ -997,16 +1015,6 @@ function Checkout({
   );
 }
 
-const STEP_LABEL: Record<Order["status"], string> = {
-  onay_bekliyor: "Onay bekliyor",
-  teslim_alindi: "Teslim alındı",
-  yikaniyor: "Yıkanıyor",
-  utuleniyor: "Ütüleniyor",
-  hazir: "Hazır, teslim al",
-  teslim_edildi: "Teslim edildi",
-  iptal: "İptal",
-};
-
 function Track({
   order,
   provider,
@@ -1023,7 +1031,9 @@ function Track({
   onOpenMessages?: (orderId: string) => void;
 }) {
   const steps = trackSteps(order.packageId);
-  const idx = steps.indexOf(order.status);
+  const highlight = trackHighlightStatus(order.status);
+  const idx = steps.indexOf(highlight);
+  const terminal = order.status === "cancelled" || order.status === "rejected" || order.status === "disputed";
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   return (
@@ -1040,7 +1050,7 @@ function Track({
       <p className="mt-1 text-xs text-[var(--muted)]">
         Evde yokken kapıya veya komşuya bırakma yok; teslim yalnız yüz yüze ve kodla.
       </p>
-      {order.priceChange === "pending" && order.status !== "iptal" && (
+      {order.priceChange === "pending" && !terminal && (
         <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-[var(--clay)]">
           <p className="text-sm font-medium">Kapıda farklı boy veya ek</p>
           <p className="mt-1 text-sm text-[var(--muted)]">
@@ -1090,7 +1100,7 @@ function Track({
           </div>
         </div>
       )}
-      {order.status === "iptal" && (
+      {(order.status === "cancelled" || order.status === "rejected") && (
         <p className="mt-3 text-sm text-[var(--clay)]">
           Sipariş iptal edildi. Bakiyedeki tutanak çözüldü, para çekilmedi.
           {order.cancelReason === "size_rejected" ? " (Boy/ek uyuşmadı.)" : ""}
@@ -1099,7 +1109,7 @@ function Track({
       {order.pickupConfirmedAt &&
         !order.pickupSummaryApprovedAt &&
         order.priceChange !== "pending" &&
-        order.status !== "iptal" && (
+        !terminal && (
           <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-[var(--teal)]">
             <p className="text-sm font-medium">Kapıdaki özet doğru mu?</p>
             <p className="mt-1 text-xs text-[var(--muted)]">
@@ -1136,7 +1146,7 @@ function Track({
           <p className="mt-2 text-xs text-[var(--muted)]">Yalnız hizmet verene söyle; uygulamada kalır.</p>
         </div>
       )}
-      {order.status === "hazir" && order.returnHandoffCode && !order.adminHold && (
+      {order.status === "ready" && order.returnHandoffCode && !order.adminHold && (
         <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] px-4 py-3 ring-1 ring-[var(--teal)]">
           <p className="text-[11px] font-medium tracking-[0.14em] text-[var(--teal)] uppercase">Teslim kodu</p>
           <p className="mt-1 font-[family-name:var(--font-display)] text-4xl tabular-nums tracking-[0.28em]">
@@ -1156,7 +1166,10 @@ function Track({
           </p>
         </div>
       )}
-      {order.paymentStatus === "authorized" && order.status !== "iptal" && order.status !== "hazir" && (
+      {order.paymentStatus === "authorized" &&
+        !terminal &&
+        order.status !== "ready" &&
+        order.status !== "admin_pending" && (
         <p className="mt-3 text-xs text-[var(--muted)]">
           Bakiyede {tl(order.total)} tutanak. Teslim kodundan sonra kesinleşir.
         </p>
@@ -1178,7 +1191,7 @@ function Track({
       <ol className="mt-5">
         {steps.map((s, i) => {
           const done = i < idx;
-          const current = i === idx && order.status !== "iptal";
+          const current = i === idx && !terminal;
           return (
             <li key={s} className="relative flex gap-3 pb-4 last:pb-0">
               {i < steps.length - 1 && (
@@ -1202,20 +1215,16 @@ function Track({
                   current || done ? "text-[var(--ink)]" : "text-[var(--muted)]"
                 } ${current ? "font-medium" : ""}`}
               >
-                {STEP_LABEL[s]}
+                {statusMeta(s).trackLabel}
               </span>
             </li>
           );
         })}
       </ol>
       <p className="mt-2 text-xs text-[var(--muted)]">
-        {order.status === "hazir"
-          ? "Hizmet veren kodu girince iş biter ve para geçer."
-          : order.status === "teslim_edildi"
-            ? "Teslim bitti. İstersen yorum ve fotoğraf bırak."
-            : order.status === "onay_bekliyor"
-              ? "Komşu kabul etmeden iptal edebilirsin. Tutanak çözülür, para çekilmez."
-              : "Durumu Hizmet sekmesinden ilerlet. Canlı sunucudan güncellenir."}
+        {order.status === "pending"
+          ? "Komşu kabul etmeden iptal edebilirsin. Tutanak çözülür, para çekilmez."
+          : customerStatusHint(order.status)}
       </p>
       {onOpenMessages && (
         <button
@@ -1252,13 +1261,13 @@ function Track({
           {busy ? "…" : "Siparişi iptal et"}
         </button>
       )}
-      {order.status === "teslim_edildi" && order.review && (
+      {order.status === "completed" && order.review && (
         <div className="mt-4">
           <h3 className="text-sm font-medium">Yorumun</h3>
           <ReviewList reviews={[order.review]} />
         </div>
       )}
-      {order.status === "teslim_edildi" && !order.review && (
+      {order.status === "completed" && !order.review && (
         <ReviewComposer
           busy={busy}
           err={err}
