@@ -638,13 +638,6 @@ function List({
             const loadMeta = providerLoadDisplay(p);
             const tone = loadMeta.tone;
             const load = loadMeta.loadLabel;
-            const fill = loadMeta.barFillPct;
-            const bar =
-              tone === "full"
-                ? "bg-[var(--load-full)]"
-                : tone === "low"
-                  ? "bg-[var(--load-low)]"
-                  : "bg-[var(--teal)]";
             const tag =
               tone === "full"
                 ? "text-[var(--load-full)]"
@@ -891,7 +884,7 @@ function Checkout({
         ))}
       </div>
       <h3 className="mt-5 text-sm font-medium">Ekler</h3>
-      <p className="mt-1 text-xs text-[var(--muted)]">Yorgan / battaniye · her parça ≈ 1 makine</p>
+      <p className="mt-1 text-xs text-[var(--muted)]">Yorgan / battaniye · her ek 2 makine birimi</p>
       <div className="mt-2 space-y-2">
         {ADDON_KINDS.map((kind) => (
           <div key={kind} className="rounded-2xl ring-1 ring-[var(--line)] p-3">

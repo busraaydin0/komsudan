@@ -144,13 +144,13 @@ export function LaundryProfile({
               <button type="button" onClick={() => togglePack(pack.id)} className="flex w-full justify-between text-left font-medium">
                 {pack.title}
                 <span className="tabular-nums text-sm font-normal text-[var(--muted)]">
-                  {on ? `${tl(prices[pack.id])}/parça` : "kapalı"}
+                  {on ? `${tl(prices[pack.id])}/orta` : "kapalı"}
                 </span>
               </button>
               <span className="mt-0.5 block text-xs text-[var(--muted)]">{pack.blurb}</span>
               {on && (
                 <label className="mt-2 flex items-center gap-2 text-xs text-[var(--muted)]">
-                  ₺/parça
+                  ₺/orta boy
                   <input
                     inputMode="numeric"
                     value={prices[pack.id]}

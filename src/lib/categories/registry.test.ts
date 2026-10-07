@@ -22,7 +22,7 @@ describe("Kategori registry smoke", () => {
     expect(CATEGORIES.camasir.editor).toBe("LaundryProfile");
   });
 
-  it("çamaşır kapasite parça yer", () => {
+  it("çamaşır kapasite birim etiketi", () => {
     expect(capacityLabelForPackage("yikama")).toBe("makine birimi");
     expect(capacityLabelForPackage("camasir")).toBe("makine birimi");
   });

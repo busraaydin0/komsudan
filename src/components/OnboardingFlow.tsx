@@ -199,7 +199,7 @@ export function OnboardingFlow({
                 <RoleCard
                   on={offer}
                   title="Hizmet vermek istiyorum"
-                  hint={`${LAUNDRY.name} — parça fiyatı ve kurutmayı sonra yazarsın`}
+                  hint={`${LAUNDRY.name} — boy fiyatlarını ve kurutmayı sonra yazarsın`}
                   onClick={() => {
                     setOffer((v) => !v);
                     setLaundryAdded(false);
@@ -344,7 +344,7 @@ function LaundryOfferQa({
     <div className="mt-4 rounded-2xl bg-[var(--paper)] p-3 ring-1 ring-[var(--line)]">
       <p className="text-sm font-medium">Hizmet ekle</p>
       <p className="mt-0.5 text-xs text-[var(--muted)]">
-        {LAUNDRY.name} — müşteri haritada parça fiyatını ve kurutmayı görür.
+        {LAUNDRY.name} — müşteri haritada boy fiyatlarını ve kurutmayı görür.
       </p>
 
       <p className="mt-4 text-sm font-medium">Kurutma tipi nedir?</p>
@@ -382,13 +382,13 @@ function LaundryOfferQa({
               <button type="button" onClick={() => onTogglePack(pack.id)} className="flex w-full justify-between text-left font-medium">
                 {pack.title}
                 <span className="tabular-nums text-sm font-normal text-[var(--muted)]">
-                  {on ? `${tl(prices[pack.id])}/parça` : "kapalı"}
+                  {on ? `${tl(prices[pack.id])}/orta` : "kapalı"}
                 </span>
               </button>
               <span className="mt-0.5 block text-xs text-[var(--muted)]">{pack.blurb}</span>
               {on && (
                 <label className="mt-2 flex items-center gap-2 text-xs text-[var(--muted)]">
-                  ₺/parça
+                  ₺/orta boy
                   <input
                     inputMode="numeric"
                     value={prices[pack.id]}

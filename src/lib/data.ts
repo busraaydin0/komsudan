@@ -204,7 +204,7 @@ export const SEED_REVIEWS: Review[] = [
     providerId: "elif",
     orderId: null,
     rating: 5,
-    body: "Aynı gün yetiştirdi. Nevresim iki parça sayıldı, şeffaf oldu.",
+    body: "Aynı gün yetiştirdi. Boy ve ekler kapıda netleşti, şeffaf oldu.",
     author: "M.Y.",
     createdAt: "2026-06-28T18:20:00.000Z",
   },
