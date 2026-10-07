@@ -1,5 +1,4 @@
 export {
-  CATALOG_CATEGORY_IDS,
   CATEGORIES,
   CATEGORY_IDS,
   CATEGORY_ID_ENUM,
@@ -10,7 +9,6 @@ export {
   capacityLabelForPackage,
   categoryDef,
   clampPublicCategoryIds,
-  isCatalogCategoryId,
   isCategoryId,
   isLaundryPackageId,
   isPublicCategoryId,
@@ -19,8 +17,6 @@ export {
   usesFoodSm,
 } from "./registry";
 export type {
-  CatalogCategoryId,
-  CatalogItemKey,
   CategoryDef,
   CategoryId,
   LaundryPackageId,
