@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import type { AppPayment, PaymentStatus } from "@/lib/types";
 import {
   getPaymentByOrderId,
   getPaymentByReference,
   insertPayment,
+  listPaymentsByOrderIds,
   updatePaymentStatus,
   type PaymentRow,
 } from "@/lib/db/payments";
@@ -34,6 +35,15 @@ function simReference() {
 export function paymentForOrder(orderId: string): AppPayment | undefined {
   const row = getPaymentByOrderId(orderId);
   return row ? toPublic(row) : undefined;
+}
+
+export function paymentsForOrders(orderIds: string[]): Map<string, AppPayment> {
+  const rows = listPaymentsByOrderIds(orderIds);
+  const map = new Map<string, AppPayment>();
+  for (const row of rows) {
+    map.set(row.order_id, toPublic(row));
+  }
+  return map;
 }
 
 export function authorizePayment(input: {

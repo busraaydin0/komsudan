@@ -2,7 +2,7 @@ import { getAppointment } from "@/lib/db/appointments";
 import { bumpExpiredCount } from "@/lib/db/providerStats";
 import {
   getOrderRow,
-  listOrderRowsAll,
+  listAllOrderRows,
   recordTransition,
   runOrderTx,
   updateOrderCancelReason,
@@ -105,7 +105,7 @@ export function expireStaleRequests(now = new Date()): number {
   const nowIso = now.toISOString();
   const nowMs = now.getTime();
   let n = 0;
-  for (const row of listOrderRowsAll()) {
+  for (const row of listAllOrderRows()) {
     if (row.status !== "pending") continue;
     maybeRemind(row, nowMs);
     if (shouldExpire(row, nowMs) && expireOne(row.id, nowIso)) n += 1;

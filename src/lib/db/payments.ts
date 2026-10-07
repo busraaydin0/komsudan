@@ -46,6 +46,14 @@ export function getPaymentByOrderId(orderId: string): PaymentRow | undefined {
   return db().prepare("SELECT * FROM payments WHERE order_id = ?").get(orderId) as PaymentRow | undefined;
 }
 
+export function listPaymentsByOrderIds(orderIds: string[]): PaymentRow[] {
+  if (orderIds.length === 0) return [];
+  const ph = orderIds.map(() => "?").join(",");
+  return db()
+    .prepare(`SELECT * FROM payments WHERE order_id IN (${ph})`)
+    .all(...orderIds) as PaymentRow[];
+}
+
 export function getPaymentById(id: string): PaymentRow | undefined {
   return db().prepare("SELECT * FROM payments WHERE id = ?").get(id) as PaymentRow | undefined;
 }

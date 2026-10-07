@@ -28,8 +28,7 @@ import { listSlots } from "@/lib/db/providers";
 import { computeRespondBy } from "@/lib/scheduling/respondBy";
 import { windowLabel } from "@/lib/scheduling/windows";
 import { assertCalendarWindow } from "@/lib/services/calendarService";
-import { getCategoryForProvider } from "@/lib/db/categories";
-import { strategyFor } from "@/lib/fulfillment";
+import { laundryDeliveryStrategy } from "@/lib/fulfillment";
 import {
   canAddPhotos,
   canCancel,
@@ -63,16 +62,22 @@ import {
   updateOrderStatus,
   type OrderRow,
 } from "@/lib/db/orders";
-import { getProvider } from "@/server/catalog";
-import { addPhoto, photosForOrder } from "@/server/photos";
+import { getProvider } from "@/lib/services/catalogService";
+import { addPhoto, photosForOrder } from "@/lib/services/photoService";
 import { reviewForOrder } from "@/lib/services/reviewService";
 import { logger } from "@/lib/logger";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import {
   notifyNewOrder,
   notifyStatusChange,
 } from "@/lib/services/notificationService";
-import { authorizePayment, capturePayment, paymentForOrder, voidPayment } from "@/lib/services/paymentService";
+import {
+  authorizePayment,
+  capturePayment,
+  paymentForOrder,
+  paymentsForOrders,
+  voidPayment,
+} from "@/lib/services/paymentService";
 import { holdForOrder } from "@/lib/services/walletService";
 
 export type OrderAction = "accept" | "reject" | "advance" | "deliver";
@@ -94,10 +99,15 @@ function assertDeliveryPhoto(orderId: string) {
   }
 }
 
-function toOrder(row: OrderRow, viewer?: AuthUser, lean = false): Order {
+function toOrder(
+  row: OrderRow,
+  viewer?: AuthUser,
+  lean = false,
+  payCache?: Map<string, ReturnType<typeof paymentForOrder>>,
+): Order {
   const drop = row.drop_method as DropMethod;
   const status = row.status as OrderStatusId;
-  const pay = paymentForOrder(row.id);
+  const pay = payCache?.get(row.id) ?? paymentForOrder(row.id);
   const payStatus = (pay?.status ?? row.payment_status) as PaymentStatus;
   const items = lean ? [] : listOrderItems(row.id);
   const addons = addonsFromItems(items);
@@ -190,17 +200,18 @@ export function getOrderFor(user: AuthUser, id: string): Order {
   return toOrder(row, user);
 }
 
-export function listOrdersFor(user: AuthUser): Order[] {
+export function listOrdersFor(user: AuthUser, limit = 100, offset = 0): Order[] {
   const asProvider = user.role === "provider" || Boolean(getProfile(user.id));
   const rows =
     user.role === "admin" || PILOT_SEE_ALL_ORDERS
-      ? listOrderRowsAll()
+      ? listOrderRowsAll(limit, offset)
       : asProvider
-        ? listOrderRowsForProvider(user.id)
-        : listOrderRowsForCustomer(user.id);
+        ? listOrderRowsForProvider(user.id, limit, offset)
+        : listOrderRowsForCustomer(user.id, limit, offset);
+  const payCache = paymentsForOrders(rows.map((r) => r.id));
   return rows.flatMap((row) => {
     try {
-      return [toOrder(row, user, true)];
+      return [toOrder(row, user, true, payCache)];
     } catch (e) {
       logger.error({ err: e, orderId: row.id }, "Sipariş satırı okunamadı.");
       return [];
@@ -211,12 +222,7 @@ export function listOrdersFor(user: AuthUser): Order[] {
 export function createOrder(input: CreateOrderInput, userId: string): Order {
   const provider = getProvider(input.providerId);
   if (!provider) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
-  const cat = getCategoryForProvider(provider.id);
-  assertFulfillmentReady(provider.id);
-
-  if (cat.id !== "camasir") {
-    throw new ApiError(400, "Bu hizmet alanı şu an kapalı.", "CATEGORY_INACTIVE");
-  }
+  assertFulfillmentReady();
   return createLaundryOrder(input, userId, provider);
 }
 
@@ -412,17 +418,15 @@ function orderStatus(row: OrderRow): OrderStatusId {
   return row.status;
 }
 
-function assertFulfillmentReady(providerId: string) {
-  const cat = getCategoryForProvider(providerId);
-  const strat = strategyFor(cat.fulfillment_mode, cat.id);
-  if (!strat.ready) {
+function assertFulfillmentReady() {
+  if (!laundryDeliveryStrategy.ready) {
     throw new ApiError(409, "Bu hizmet tipi henüz açık değil.", "CATEGORY_NOT_READY");
   }
-  return strat;
+  return laundryDeliveryStrategy;
 }
 
 function assertCanMove(row: OrderRow, from: OrderStatusId, to: OrderStatusId, user: AuthUser, packageId: PackageId) {
-  assertFulfillmentReady(row.provider_id);
+  assertFulfillmentReady();
   const isOrderParty = row.user_id === user.id || row.provider_id === user.id;
   const roleForCheck =
     user.role === "admin"

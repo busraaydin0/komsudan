@@ -68,14 +68,27 @@ export function getOrderRow(id: string): OrderRow | undefined {
   return db().prepare("SELECT * FROM orders WHERE id = ?").get(id) as OrderRow | undefined;
 }
 
-export function listOrderRowsAll(): OrderRow[] {
+export const ORDER_LIST_DEFAULT_LIMIT = 100;
+
+/** Dahili işler (expire vb.) — API listesinden ayrı. */
+export function listAllOrderRows(): OrderRow[] {
   return db().prepare("SELECT * FROM orders ORDER BY created_at DESC").all() as OrderRow[];
 }
 
-export function listOrderRowsForCustomer(userId: string): OrderRow[] {
+export function listOrderRowsAll(limit = ORDER_LIST_DEFAULT_LIMIT, offset = 0): OrderRow[] {
   return db()
-    .prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC")
-    .all(userId) as OrderRow[];
+    .prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT ? OFFSET ?")
+    .all(limit, offset) as OrderRow[];
+}
+
+export function listOrderRowsForCustomer(
+  userId: string,
+  limit = ORDER_LIST_DEFAULT_LIMIT,
+  offset = 0,
+): OrderRow[] {
+  return db()
+    .prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?")
+    .all(userId, limit, offset) as OrderRow[];
 }
 
 export function customerHasOpenOrder(userId: string) {
@@ -89,14 +102,19 @@ export function customerHasOpenOrder(userId: string) {
   return Boolean(row);
 }
 
-export function listOrderRowsForProvider(userId: string): OrderRow[] {
+export function listOrderRowsForProvider(
+  userId: string,
+  limit = ORDER_LIST_DEFAULT_LIMIT,
+  offset = 0,
+): OrderRow[] {
   return db()
     .prepare(
       `SELECT * FROM orders
        WHERE user_id = ? OR provider_id = ?
-       ORDER BY created_at DESC`,
+       ORDER BY created_at DESC
+       LIMIT ? OFFSET ?`,
     )
-    .all(userId, userId) as OrderRow[];
+    .all(userId, userId, limit, offset) as OrderRow[];
 }
 
 export function insertOrderRow(input: InsertOrderInput) {
