@@ -1,49 +1,49 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { CategoryId } from "./categories/registry";
+
+function useVisiblePolling(reload: () => void | Promise<void>, intervalMs: number) {
+  useEffect(() => {
+    void reload();
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const tick = () => {
+      if (!document.hidden) void reload();
+    };
+    const start = () => {
+      if (timer) return;
+      timer = setInterval(tick, intervalMs);
+    };
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+    };
+    const onVis = () => (document.hidden ? stop() : start());
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [reload, intervalMs]);
+}
+import { errorMessageFromBody, readJson, unwrapEnvelope } from "@/lib/http/client";
 import type { Account, AppNotification, CreateOrderInput, MessageInboxThread, Order, OrderConversation, OrderMessage, Provider, Review, WalletActivity, WalletSnapshot, WorkPhoto } from "./types";
 
 export type Catalog = {
   providers: Provider[];
 };
 
-function errorMessage(data: { error?: unknown }) {
-  if (typeof data.error === "string") return data.error;
-  if (data.error && typeof data.error === "object" && "message" in data.error) {
-    const message = (data.error as { message: unknown }).message;
-    if (typeof message === "string") return message;
-  }
-  return "İstek başarısız.";
-}
-
-async function readJson<T>(res: Response): Promise<T> {
-  const data = (await res.json()) as T & { error?: unknown };
-  if (!res.ok) throw new Error(errorMessage(data));
-  return data;
-}
-
-function unwrap<T>(data: { data?: T } & Partial<T>): T {
-  return (data.data ?? data) as T;
-}
-
-export function useCatalog(categoryIds?: string[]) {
+export function useCatalog() {
   const [catalog, setCatalog] = useState<Catalog>({ providers: [] });
   const [ready, setReady] = useState(false);
-  const filterKey = (categoryIds ?? []).join(",");
 
   const reload = useCallback(async () => {
-    const qs = filterKey ? `?category_id=${encodeURIComponent(filterKey)}` : "";
-    const data = await readJson<Catalog>(await fetch(`/api/catalog${qs}`));
+    const data = await readJson<Catalog>(await fetch("/api/catalog"));
     setCatalog({ providers: data.providers });
     setReady(true);
-  }, [filterKey]);
+  }, []);
 
-  useEffect(() => {
-    void reload();
-    const t = setInterval(() => void reload(), 12000);
-    return () => clearInterval(t);
-  }, [reload]);
+  useVisiblePolling(reload, 15000);
 
   return { ...catalog, ready, reload };
 }
@@ -56,7 +56,7 @@ export function useOrders() {
   const reload = useCallback(async () => {
     try {
       const res = await fetch("/api/orders", { credentials: "same-origin" });
-      const data = unwrap(await readJson<{ data?: { orders: Order[] }; orders?: Order[] }>(res));
+      const data = unwrapEnvelope(await readJson<{ data?: { orders: Order[] }; orders?: Order[] }>(res));
       const list = Array.isArray(data.orders) ? data.orders : [];
       setOrders(list);
       setErr("");
@@ -68,11 +68,7 @@ export function useOrders() {
     }
   }, []);
 
-  useEffect(() => {
-    void reload();
-    const t = setInterval(() => void reload(), 8000);
-    return () => clearInterval(t);
-  }, [reload]);
+  useVisiblePolling(reload, 12000);
 
   return { orders, ready, reload, err };
 }
@@ -84,7 +80,7 @@ export function useNotifications() {
 
   const reload = useCallback(async () => {
     try {
-      const data = unwrap(
+      const data = unwrapEnvelope(
         await readJson<{
           data?: { notifications: AppNotification[]; unread: number };
           notifications?: AppNotification[];
@@ -101,11 +97,7 @@ export function useNotifications() {
     }
   }, []);
 
-  useEffect(() => {
-    void reload();
-    const t = setInterval(() => void reload(), 2500);
-    return () => clearInterval(t);
-  }, [reload]);
+  useVisiblePolling(reload, 6000);
 
   return { notifications, unread, ready, reload };
 }
@@ -117,7 +109,7 @@ export function useInbox() {
 
   const reload = useCallback(async () => {
     try {
-      const data = unwrap(
+      const data = unwrapEnvelope(
         await readJson<{
           data?: { threads: MessageInboxThread[]; unreadTotal: number };
           threads?: MessageInboxThread[];
@@ -134,17 +126,13 @@ export function useInbox() {
     }
   }, []);
 
-  useEffect(() => {
-    void reload();
-    const t = setInterval(() => void reload(), 8000);
-    return () => clearInterval(t);
-  }, [reload]);
+  useVisiblePolling(reload, 12000);
 
   return { threads, unreadTotal, ready, reload };
 }
 
 export async function markNotificationRead(id: string) {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{
       data?: { notifications: AppNotification[]; unread: number };
       notifications?: AppNotification[];
@@ -161,7 +149,7 @@ export async function markNotificationRead(id: string) {
 }
 
 export async function markAllNotificationsRead() {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{
       data?: { notifications: AppNotification[]; unread: number };
       notifications?: AppNotification[];
@@ -173,7 +161,7 @@ export async function markAllNotificationsRead() {
 
 export async function fetchWallet(amount?: number) {
   const qs = amount != null && amount > 0 ? `?amount=${encodeURIComponent(String(amount))}` : "";
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{
       data?: { wallet: WalletSnapshot; activity: WalletActivity[]; presets: number[] };
       wallet?: WalletSnapshot;
@@ -189,7 +177,7 @@ export async function fetchWallet(amount?: number) {
 }
 
 export async function postWalletTopup(method: string, amount: number) {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{
       data?: { wallet: WalletSnapshot; activity: WalletActivity[] };
       wallet?: WalletSnapshot;
@@ -206,7 +194,7 @@ export async function postWalletTopup(method: string, amount: number) {
 }
 
 export async function postWalletPayout(method: string, amount: number) {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{
       data?: { wallet: WalletSnapshot; activity: WalletActivity[] };
       wallet?: WalletSnapshot;
@@ -223,7 +211,7 @@ export async function postWalletPayout(method: string, amount: number) {
 }
 
 export async function postOrder(input: CreateOrderInput) {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{ data?: { order: Order }; order?: Order }>(
       await fetch("/api/orders", {
         method: "POST",
@@ -243,7 +231,7 @@ export async function postPickupConfirm(
     colorGroups: number;
   },
 ) {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{ data?: { order: Order }; order?: Order }>(
       await fetch(`/api/orders/${orderId}/pickup`, {
         method: "POST",
@@ -259,7 +247,7 @@ export async function postDeliveryOverride(
   orderId: string,
   input: { photoId: string; note: string; lat?: number; lng?: number },
 ) {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{ data?: { order: Order }; order?: Order }>(
       await fetch(`/api/orders/${orderId}/delivery-override`, {
         method: "POST",
@@ -272,7 +260,7 @@ export async function postDeliveryOverride(
 }
 
 export async function postPickupSummaryApprove(orderId: string) {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{ data?: { order: Order }; order?: Order }>(
       await fetch(`/api/orders/${orderId}/pickup-summary/approve`, { method: "POST" }),
     ),
@@ -281,7 +269,7 @@ export async function postPickupSummaryApprove(orderId: string) {
 }
 
 export async function postPriceChange(orderId: string, action: "approve" | "reject") {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{ data?: { order: Order }; order?: Order }>(
       await fetch(`/api/orders/${orderId}/price-change`, {
         method: "POST",
@@ -298,7 +286,7 @@ export async function patchOrder(
   action: "accept" | "reject" | "advance" | "deliver",
   code?: string,
 ) {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{ data?: { order: Order }; order?: Order }>(
       await fetch(`/api/orders/${id}`, {
         method: "PATCH",
@@ -317,7 +305,7 @@ export type OrderThread = {
 };
 
 export async function fetchOrderMessages(orderId: string) {
-  return unwrap(
+  return unwrapEnvelope(
     await readJson<{ data?: OrderThread } & Partial<OrderThread>>(
       await fetch(`/api/orders/${orderId}/messages`),
     ),
@@ -325,7 +313,7 @@ export async function fetchOrderMessages(orderId: string) {
 }
 
 export async function postOrderMessage(orderId: string, body: string, clientMessageId: string) {
-  return unwrap(
+  return unwrapEnvelope(
     await readJson<{ data?: { message: OrderMessage; warning: boolean }; message?: OrderMessage; warning?: boolean }>(
       await fetch(`/api/orders/${orderId}/messages`, {
         method: "POST",
@@ -337,7 +325,7 @@ export async function postOrderMessage(orderId: string, body: string, clientMess
 }
 
 export async function patchOrderMessagesRead(orderId: string) {
-  return unwrap(
+  return unwrapEnvelope(
     await readJson<{ data?: OrderThread } & Partial<OrderThread>>(
       await fetch(`/api/orders/${orderId}/messages/read`, { method: "PATCH" }),
     ),
@@ -345,7 +333,7 @@ export async function patchOrderMessagesRead(orderId: string) {
 }
 
 export async function reportOrderMessage(orderId: string, messageId: string, reason: string) {
-  return unwrap(
+  return unwrapEnvelope(
     await readJson<{ data?: { ok: true } }>(
       await fetch(`/api/orders/${orderId}/messages/${messageId}/report`, {
         method: "POST",
@@ -357,7 +345,7 @@ export async function reportOrderMessage(orderId: string, messageId: string, rea
 }
 
 export async function deleteOrderMessage(orderId: string, messageId: string) {
-  return unwrap(
+  return unwrapEnvelope(
     await readJson<{ data?: { message: OrderMessage }; message?: OrderMessage }>(
       await fetch(`/api/orders/${orderId}/messages/${messageId}`, { method: "DELETE" }),
     ),
@@ -473,7 +461,7 @@ export async function uploadOrderPhoto(orderId: string, file: File, kind?: strin
   const body = new FormData();
   body.append("file", file);
   if (kind) body.append("kind", kind);
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{ data?: { photo: WorkPhoto }; photo?: WorkPhoto }>(
       await fetch(`/api/orders/${orderId}/photos`, { method: "POST", body }),
     ),
@@ -535,7 +523,7 @@ export async function patchPreferences(body: {
 }
 
 export async function fetchMyProvider() {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{ data?: { provider: Record<string, unknown> }; provider?: Record<string, unknown> }>(
       await fetch("/api/providers/me/profile"),
     ),
@@ -556,7 +544,7 @@ export async function patchMyProviderProfile(body: {
   drops?: "kapi"[];
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
 }) {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{ data?: { provider: Record<string, unknown> }; provider?: Record<string, unknown> }>(
       await fetch("/api/providers/me/profile", {
         method: "PATCH",
@@ -569,14 +557,14 @@ export async function patchMyProviderProfile(body: {
 }
 
 export async function postMyOffer(body: {
-  categoryId: CategoryId;
+  categoryId?: "camasir";
   dryingType?: "makine" | "ip" | "ikisi";
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
   lat: number;
   lng: number;
   neighborhood: string;
 }) {
-  const data = unwrap(
+  const data = unwrapEnvelope(
     await readJson<{ data?: { provider: Record<string, unknown> }; provider?: Record<string, unknown> }>(
       await fetch("/api/providers/me/offer", {
         method: "POST",

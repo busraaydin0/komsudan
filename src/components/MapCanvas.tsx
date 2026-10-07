@@ -1,14 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Map, Marker, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
-import { PILOT } from "@/lib/data";
+import type { Map as MaplibreMap, Marker as MaplibreMarker, StyleSpecification } from "maplibre-gl";
+import { PILOT_AREA } from "@/lib/laundry/pilot";
 import { initials } from "@/lib/avatar";
 import { providerLoadDisplay } from "@/lib/capacity/display";
 import type { LngLat, MapMode, Provider } from "@/lib/types";
-
-/** Next/Turbopack does not emit the worker next to maplibre-gl-shared.mjs. */
-setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 /** OSM sokak haritası (Carto Voyager). 3D binalar yüklenince eklenir. */
 const STYLE: StyleSpecification = {
@@ -41,8 +38,8 @@ type Props = {
 
 function tightBounds(): [[number, number], [number, number]] {
   return [
-    [PILOT.bounds.west, PILOT.bounds.south],
-    [PILOT.bounds.east, PILOT.bounds.north],
+    [PILOT_AREA.bounds.west, PILOT_AREA.bounds.south],
+    [PILOT_AREA.bounds.east, PILOT_AREA.bounds.north],
   ];
 }
 
@@ -62,9 +59,10 @@ export function MapCanvas({
   visible = true,
 }: Props) {
   const root = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<Map | null>(null);
-  const markers = useRef<Marker[]>([]);
-  const userMarker = useRef<Marker | null>(null);
+  const mapRef = useRef<MaplibreMap | null>(null);
+  const MarkerRef = useRef<typeof MaplibreMarker | null>(null);
+  const markers = useRef<MaplibreMarker[]>([]);
+  const userMarker = useRef<MaplibreMarker | null>(null);
   const onSelectRef = useRef(onSelect);
   const modeRef = useRef(mode);
   const providersRef = useRef(providers);
@@ -78,45 +76,55 @@ export function MapCanvas({
 
   useEffect(() => {
     if (!root.current || mapRef.current) return;
+    let cancelled = false;
 
-    const map = new Map({
-      container: root.current,
-      style: STYLE,
-      center: [PILOT.center.lng, PILOT.center.lat],
-      zoom: PILOT.zoom,
-      minZoom: 13.2,
-      maxZoom: 18,
-      pitch: mode === "3d" ? 58 : 0,
-      bearing: mode === "3d" ? -18 : 0,
-      maxPitch: 75,
-      pitchWithRotate: true,
-      canvasContextAttributes: { antialias: true },
-      ...(mode === "3d" ? {} : { maxBounds: tightBounds() }),
-      attributionControl: { compact: true },
-    });
-    mapRef.current = map;
-    setMapReady(true);
+    void import("maplibre-gl").then((ml) => {
+      if (cancelled || !root.current || mapRef.current) return;
+      ml.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+      MarkerRef.current = ml.Marker;
 
-    const onReady = () => {
-      map.resize();
-      ensureBuildings(map, modeRef.current);
-      syncMode(map, modeRef.current);
-    };
-    map.on("load", onReady);
-    map.once("idle", () => syncMode(map, modeRef.current));
-    map.on("sourcedata", (e) => {
-      if (e.sourceId === "openfreemap" && e.isSourceLoaded) {
+      const map = new ml.Map({
+        container: root.current,
+        style: STYLE,
+        center: [PILOT_AREA.center.lng, PILOT_AREA.center.lat],
+        zoom: PILOT_AREA.zoom,
+        minZoom: 13.2,
+        maxZoom: 18,
+        pitch: mode === "3d" ? 58 : 0,
+        bearing: mode === "3d" ? -18 : 0,
+        maxPitch: 75,
+        pitchWithRotate: true,
+        canvasContextAttributes: { antialias: true },
+        ...(mode === "3d" ? {} : { maxBounds: tightBounds() }),
+        attributionControl: { compact: true },
+      });
+      mapRef.current = map;
+      setMapReady(true);
+
+      const onReady = () => {
+        map.resize();
         ensureBuildings(map, modeRef.current);
-      }
+        syncMode(map, modeRef.current);
+      };
+      map.on("load", onReady);
+      map.once("idle", () => syncMode(map, modeRef.current));
+      map.on("sourcedata", (e) => {
+        if (e.sourceId === "openfreemap" && e.isSourceLoaded) {
+          ensureBuildings(map, modeRef.current);
+        }
+      });
     });
 
     return () => {
+      cancelled = true;
       setMapReady(false);
       markers.current.forEach((m) => m.remove());
       markers.current = [];
       userMarker.current?.remove();
-      map.remove();
+      userMarker.current = null;
+      mapRef.current?.remove();
       mapRef.current = null;
+      MarkerRef.current = null;
     };
   }, []);
 
@@ -124,8 +132,10 @@ export function MapCanvas({
     const map = mapRef.current;
     if (!mapReady || !map) return;
 
+    const Marker = MarkerRef.current;
+    if (!Marker) return;
     markers.current.forEach((m) => m.remove());
-    const next: Marker[] = [];
+    const next: MaplibreMarker[] = [];
     providers.forEach((p, i) => {
       const el = document.createElement("button");
       el.type = "button";
@@ -140,6 +150,8 @@ export function MapCanvas({
         const img = document.createElement("img");
         img.src = p.avatarUrl;
         img.alt = "";
+        img.loading = "lazy";
+        img.decoding = "async";
         face.appendChild(img);
       } else {
         face.textContent = initials(p.name);
@@ -223,11 +235,13 @@ export function MapCanvas({
     const map = mapRef.current;
     if (!map || !user) return;
     const inPilot =
-      user.lng >= PILOT.bounds.west &&
-      user.lng <= PILOT.bounds.east &&
-      user.lat >= PILOT.bounds.south &&
-      user.lat <= PILOT.bounds.north;
+      user.lng >= PILOT_AREA.bounds.west &&
+      user.lng <= PILOT_AREA.bounds.east &&
+      user.lat >= PILOT_AREA.bounds.south &&
+      user.lat <= PILOT_AREA.bounds.north;
     if (!inPilot) return;
+    const Marker = MarkerRef.current;
+    if (!Marker) return;
     if (!userMarker.current) {
       const el = document.createElement("div");
       el.className = meAvatar ? "katla-me has-face" : "katla-me";
@@ -235,6 +249,7 @@ export function MapCanvas({
         const img = document.createElement("img");
         img.src = meAvatar;
         img.alt = "";
+        img.loading = "lazy";
         el.appendChild(img);
       } else {
         el.innerHTML = `<span></span>`;
@@ -269,7 +284,7 @@ export function MapCanvas({
   );
 }
 
-function syncMode(map: Map, mode: MapMode) {
+function syncMode(map: MaplibreMap, mode: MapMode) {
   const three = mode === "3d";
   const gen = ++cameraGen;
   map.getContainer().dataset.view = mode;
@@ -313,7 +328,7 @@ function syncMode(map: Map, mode: MapMode) {
   ensureBuildings(map, mode);
 }
 
-function ensureBuildings(map: Map, mode: MapMode) {
+function ensureBuildings(map: MaplibreMap, mode: MapMode) {
   if (!map.isStyleLoaded()) return;
   if (!map.getSource("openfreemap")) {
     try {
