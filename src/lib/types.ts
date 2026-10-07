@@ -70,6 +70,39 @@ export type Review = {
   wouldRepeat?: boolean | null;
 };
 
+
+export type WashJob = "dis" | "ic" | "icdis";
+export type WashVehicle = "otomobil" | "suv" | "ticari" | "diger";
+export type WashBooking = "randevu" | "musait";
+export type WashMaterials = "provider" | "customer";
+export type WashIncludes = {
+  dis: boolean;
+  supurme: boolean;
+  cam: boolean;
+  torpido: boolean;
+  jant: boolean;
+  kurulama: boolean;
+};
+
+export type ProviderWash = {
+  id: string;
+  name: string;
+  description?: string | null;
+  job?: WashJob;
+  vehicle?: WashVehicle;
+  photoUrl?: string | null;
+  price: number;
+  includes: WashIncludes;
+  durationMin?: number | null;
+  maxPerDay?: number | null;
+  booking?: WashBooking;
+  location?: string | null;
+  workHours?: string | null;
+  materials?: WashMaterials;
+  notes?: string | null;
+  isActive?: boolean;
+};
+
 export type Provider = {
   id: string;
   name: string;
@@ -93,6 +126,7 @@ export type Provider = {
   workPhotos: WorkPhoto[];
   recentReviews: Review[];
   categoryId?: string;
+  washes?: ProviderWash[];
 };
 
 export type DropPoint = {

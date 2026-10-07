@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { canonicalCategoryId, isCatalogCategoryId } from "@/lib/categories/registry";
+import { canonicalCategoryId } from "@/lib/categories/registry";
 import { INDEPENDENT_TRADESPERSON_CLAUSE } from "@/lib/legal";
 import { NEIGHBORHOODS, PACKAGES, PILOT } from "@/lib/data";
 import { DRYING_OPTIONS } from "@/lib/drying";
@@ -132,13 +132,6 @@ export function OnboardingFlow({
       });
       return;
     }
-    if (!isCatalogCategoryId(categoryId)) return;
-    await postMyOffer({
-      categoryId,
-      lat,
-      lng,
-      neighborhood: neighborhoodName,
-    });
   }
 
   async function persist(extra: { completed?: boolean; skipped?: boolean; categoryIds?: string[] }) {

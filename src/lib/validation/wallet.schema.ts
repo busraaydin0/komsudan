@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { PAYOUT_METHODS, TOPUP_METHODS } from "@/lib/walletMethods";
+import { PAYOUT_METHODS, TOPUP_METHODS, type PayoutMethodId, type TopupMethodId } from "@/lib/walletMethods";
 
-const methodIds = TOPUP_METHODS.map((m) => m.id) as [string, ...string[]];
-const payoutMethodIds = PAYOUT_METHODS.map((m) => m.id) as [string, ...string[]];
+const methodIds = TOPUP_METHODS.map((m) => m.id) as [TopupMethodId, ...TopupMethodId[]];
+const payoutMethodIds = PAYOUT_METHODS.map((m) => m.id) as [PayoutMethodId, ...PayoutMethodId[]];
 
 export const walletTopupSchema = z.object({
   method: z.enum(methodIds, { error: "Yükleme yöntemi seç." }),

@@ -12,7 +12,7 @@ import {
   type DisputeOpenerRole,
   type DisputeRow,
 } from "@/lib/db/disputes";
-import { canSeeOrder } from "@/lib/services/orderService";
+import { isOrderParty } from "@/lib/services/orderService";
 import { ApiError } from "@/server/rules";
 
 export type PublicDispute = {
@@ -41,7 +41,7 @@ function toPublic(row: DisputeRow): PublicDispute {
 
 function requireOrderParty(user: AuthUser, orderId: string) {
   const row = getOrderRow(orderId);
-  if (!row || !canSeeOrder(user, row)) {
+  if (!row || !isOrderParty(user, row)) {
     throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
   }
   return row;

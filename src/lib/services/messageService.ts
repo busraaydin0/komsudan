@@ -24,7 +24,7 @@ import {
 } from "@/lib/db/messages";
 import { moderateMessage } from "@/lib/moderation/messageModeration";
 import { collapseSpaces } from "@/lib/moderation/normalize";
-import { canSeeOrder } from "@/lib/services/orderService";
+import { isOrderParty } from "@/lib/services/orderService";
 import { notifyOrderMessage } from "@/lib/services/notificationService";
 import { ApiError } from "@/server/rules";
 
@@ -37,7 +37,7 @@ const REMOVED = "Bu mesaj kaldırıldı";
 
 function requireOrderParty(user: AuthUser, orderId: string) {
   const row = getOrderRow(orderId);
-  if (!row || !canSeeOrder(user, row)) {
+  if (!row || !isOrderParty(user, row)) {
     throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
   }
   return row;
@@ -271,7 +271,7 @@ export function deleteOrderMessage(user: AuthUser, orderId: string, messageId: s
 
 export function unreadCountForOrder(user: AuthUser, orderId: string) {
   const row = getOrderRow(orderId);
-  if (!row || !canSeeOrder(user, row)) return 0;
+  if (!row || !isOrderParty(user, row)) return 0;
   const convo = getConversationByOrderId(orderId);
   if (!convo) return 0;
   return countUnreadForViewer(convo.id, user.id);

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { isCatalogCategoryId } from "@/lib/categories/registry";
 import { PACKAGES, trustLabel } from "@/lib/data";
 import { DRYING_OPTIONS, dryingFromProvider } from "@/lib/drying";
 import { patchMyProviderProfile } from "@/lib/api";
@@ -33,7 +32,7 @@ export function LaundryProfile({
   const [ok, setOk] = useState("");
 
   useEffect(() => {
-    if (!me || isCatalogCategoryId(me.categoryId)) return;
+    if (!me || (me.categoryId && me.categoryId !== "camasir")) return;
     setBio(me.bio);
     setDryingType(dryingFromProvider(me));
     setExpress(me.express);
@@ -47,7 +46,7 @@ export function LaundryProfile({
     });
   }, [me]);
 
-  if (!me || isCatalogCategoryId(me.categoryId)) return null;
+  if (!me || (me.categoryId && me.categoryId !== "camasir")) return null;
 
   const tone = seatTone(me.remaining, me.capacity);
 

@@ -1,4 +1,3 @@
-import { isCatalogCategoryId } from "@/lib/categories/registry";
 import type { ApiLifecycle, FulfillmentType, PackageId } from "@/lib/types";
 import { canTransition as deliveryCanTransition } from "@/lib/status";
 import type { FulfillmentMode } from "@/lib/db/categories";
@@ -63,9 +62,7 @@ export function strategyFor(
   fulfillmentType?: FulfillmentType | string | null,
 ): FulfillmentStrategy {
   if (fulfillmentType === "home_visit" || mode === "home_visit") return homeVisitStrategy;
-  if (isCatalogCategoryId(categoryId)) {
-    return foodStrategy;
-  }
+  void categoryId;
   return deliveryStrategy;
 }
 

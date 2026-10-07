@@ -49,7 +49,7 @@ describe("yorum ortalaması", () => {
   });
 });
 
-function seedOrder(id: string, userId: string, status: string, lifecycle: string, providerId = "jale") {
+function seedOrder(id: string, userId: string, status: string, lifecycle: string, providerId = "elif") {
   const now = new Date().toISOString();
   insertOrderRow({
     id,
@@ -97,13 +97,13 @@ describe("yorum kırılımı", () => {
     insertReview({
       id: "rev-test-one",
       order_id: null,
-      provider_id: "jale",
+      provider_id: "leyla",
       rating: 5,
       body: "Tek yorum, alt puan yok.",
       author: "A.A.",
       created_at: "2026-08-29T12:00:00.000Z",
     });
-    expect(ratingBreakdown("jale")).toEqual({
+    expect(ratingBreakdown("leyla")).toEqual({
       overall: 5,
       count: 1,
       quality: null,
@@ -117,7 +117,7 @@ describe("yorum kırılımı", () => {
     insertReview({
       id: "rev-test-dim",
       order_id: null,
-      provider_id: "nuran",
+      provider_id: "serkan",
       rating: 4,
       body: "Yalnızca kalite ve tekrar var.",
       author: "B.B.",
@@ -125,7 +125,7 @@ describe("yorum kırılımı", () => {
       quality: 5,
       would_repeat: 1,
     });
-    const live = ratingBreakdown("nuran");
+    const live = ratingBreakdown("serkan");
     expect(live.quality).toBe(5);
     expect(live.timeliness).toBeNull();
     expect(live.communication).toBeNull();
@@ -133,7 +133,7 @@ describe("yorum kırılımı", () => {
   });
 
   it("trust sinyali ham ortalama yanında rankScore üretir", () => {
-    const signals = reviewSignalsForProvider("jale");
+    const signals = reviewSignalsForProvider("leyla");
     expect(signals.overall).toBe(5);
     expect(signals.count).toBe(1);
     expect(signals.rankScore).toBeLessThan(5);

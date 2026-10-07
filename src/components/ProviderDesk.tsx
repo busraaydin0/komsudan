@@ -10,20 +10,7 @@ import { canAddPhotos, nextStatus } from "@/lib/status";
 import type { DropPoint, Order, OrderStatus, Provider } from "@/lib/types";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
 import { LaundryProfile } from "@/components/LaundryProfile";
-import { FoodMenuEditor } from "@/components/FoodMenuEditor";
-import { SewingServiceEditor } from "@/components/SewingServiceEditor";
-import { RepairServiceEditor } from "@/components/RepairServiceEditor";
-import { TechServiceEditor } from "@/components/TechServiceEditor";
 import { WashServiceEditor } from "@/components/WashServiceEditor";
-import { CourierServiceEditor } from "@/components/CourierServiceEditor";
-import { GardenServiceEditor } from "@/components/GardenServiceEditor";
-import { CargoServiceEditor } from "@/components/CargoServiceEditor";
-import { PrintServiceEditor } from "@/components/PrintServiceEditor";
-import { PreserveServiceEditor } from "@/components/PreserveServiceEditor";
-import { CarpetServiceEditor } from "@/components/CarpetServiceEditor";
-import { LessonServiceEditor } from "@/components/LessonServiceEditor";
-import { TalkServiceEditor } from "@/components/TalkServiceEditor";
-import { GraveServiceEditor } from "@/components/GraveServiceEditor";
 import { ProviderPayoutPanel } from "@/components/ProviderPayoutPanel";
 
 const LABEL: Record<OrderStatus, string> = {
@@ -200,33 +187,8 @@ export function ProviderDesk({
           </p>
         )}
 
-        <FoodMenuEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <SewingServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <RepairServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <TechServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
         <WashServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
 
-        <CourierServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <GardenServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <CargoServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <PrintServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <PreserveServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <CarpetServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <LessonServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <TalkServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <GraveServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
       </main>
     </div>
   );
@@ -256,7 +218,7 @@ function OrderCard({
     p?.packages.find((x) => x.id === order.packageId) ??
     PACKAGES.find((x) => x.id === order.packageId);
   const drop = dropPoints.find((d) => d.id === order.dropPointId);
-  const food = order.packageId === "davet";
+  const food = Boolean(order.productName || order.allergyNote);
   const catalog = usesFoodSm(order.packageId);
   const next = nextStatus(order.status, order.packageId, catalog);
 

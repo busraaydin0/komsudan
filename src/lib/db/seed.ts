@@ -9,20 +9,7 @@ import {
   upsertProfile,
   upsertProviderUser,
 } from "./providers";
-import { upsertProduct } from "./products";
-import { upsertService } from "./services";
-import { upsertRepair } from "./repairs";
-import { upsertTech } from "./tech";
 import { upsertWash } from "./washes";
-import { upsertCourier } from "./couriers";
-import { upsertGarden } from "./gardens";
-import { upsertCargo } from "./cargos";
-import { upsertPrint } from "./prints";
-import { upsertPreserve } from "./preserves";
-import { upsertCarpet } from "./carpets";
-import { upsertLesson } from "./lessons";
-import { upsertTalk } from "./talks";
-import { upsertGrave } from "./graves";
 import { writeProfileRatingsFromReviews } from "./reviews";
 
 const SEED_PHONES: Record<string, string> = {
@@ -119,81 +106,6 @@ function seedProviderDirectory() {
         });
       }
     }
-    for (const product of p.products ?? []) {
-      upsertProduct({
-        id: product.id,
-        provider_id: p.id,
-        name: product.name,
-        price_per_person: product.pricePerPerson,
-      });
-    }
-    for (const service of p.services ?? []) {
-      upsertService({
-        id: service.id,
-        provider_id: p.id,
-        name: service.name,
-        description: service.description,
-        subcategory: service.subcategory,
-        price: service.price,
-        priceUnit: service.priceUnit,
-        minOrder: service.minOrder,
-        leadDays: service.leadDays,
-        maxPerWeek: service.maxPerWeek,
-        delivery: service.delivery,
-        workRadiusKm: service.workRadiusKm,
-        notes: service.notes,
-        material: service.material,
-      });
-    }
-    for (const repair of p.repairs ?? []) {
-      upsertRepair({
-        id: repair.id,
-        provider_id: p.id,
-        name: repair.name,
-        description: repair.description,
-        kind: repair.kind,
-        item: repair.item,
-        job: repair.job,
-        price: repair.price,
-        priceType: repair.priceType,
-        priceUnit: repair.priceUnit,
-        parts: repair.parts,
-        leadDays: repair.leadDays,
-        maxPerWeek: repair.maxPerWeek,
-        delivery: repair.delivery,
-        workRadiusKm: repair.workRadiusKm,
-        inspectRequired: repair.inspectRequired,
-        quoteFrom: repair.quoteFrom,
-        warrantyDays: repair.warrantyDays,
-        notes: repair.notes,
-        workHours: repair.workHours,
-      });
-    }
-    for (const tech of p.techs ?? []) {
-      upsertTech({
-        id: tech.id,
-        provider_id: p.id,
-        name: tech.name,
-        description: tech.description,
-        kind: tech.kind,
-        item: tech.item,
-        job: tech.job,
-        price: tech.price,
-        priceType: tech.priceType,
-        priceUnit: tech.priceUnit,
-        materials: tech.materials,
-        leadHours: tech.leadHours,
-        leadDays: tech.leadDays,
-        maxPerWeek: tech.maxPerWeek,
-        delivery: tech.delivery,
-        inspectRequired: tech.inspectRequired,
-        quoteFromPhoto: tech.quoteFromPhoto,
-        platform: tech.platform,
-        warrantyDays: tech.warrantyDays,
-        notes: tech.notes,
-        workHours: tech.workHours,
-      });
-    }
     for (const wash of p.washes ?? []) {
       upsertWash({
         id: wash.id,
@@ -211,187 +123,6 @@ function seedProviderDirectory() {
         workHours: wash.workHours,
         materials: wash.materials,
         notes: wash.notes,
-      });
-    }
-    for (const courier of p.couriers ?? []) {
-      upsertCourier({
-        id: courier.id,
-        provider_id: p.id,
-        name: courier.name,
-        description: courier.description,
-        transport: courier.transport,
-        sizes: courier.sizes,
-        maxKm: courier.maxKm,
-        price: courier.price,
-        priceType: courier.priceType,
-        durationMin: courier.durationMin,
-        routes: courier.routes,
-        avail: courier.avail,
-        workHours: courier.workHours,
-        region: courier.region,
-        carry: courier.carry,
-        carryOther: courier.carryOther,
-        refuse: courier.refuse,
-        confirm: courier.confirm,
-        notes: courier.notes,
-      });
-    }
-    for (const garden of p.gardens ?? []) {
-      upsertGarden({
-        id: garden.id,
-        provider_id: p.id,
-        name: garden.name,
-        description: garden.description,
-        jobs: garden.jobs,
-        areas: garden.areas,
-        price: garden.price,
-        priceType: garden.priceType,
-        durationMin: garden.durationMin,
-        equipment: garden.equipment,
-        location: garden.location,
-        maxKm: garden.maxKm,
-        avail: garden.avail,
-        workHours: garden.workHours,
-        canDo: garden.canDo,
-        cannotDo: garden.cannotDo,
-        notes: garden.notes,
-      });
-    }
-    for (const cargo of p.cargos ?? []) {
-      upsertCargo({
-        id: cargo.id,
-        provider_id: p.id,
-        name: cargo.name,
-        jobs: cargo.jobs,
-        sizes: cargo.sizes,
-        maxKm: cargo.maxKm,
-        branches: cargo.branches,
-        points: cargo.points,
-        price: cargo.price,
-        priceType: cargo.priceType,
-        durationMin: cargo.durationMin,
-        avail: cargo.avail,
-        workHours: cargo.workHours,
-        pickup: cargo.pickup,
-        dropoff: cargo.dropoff,
-        confirm: cargo.confirm,
-        refuse: cargo.refuse,
-        notes: cargo.notes,
-      });
-    }
-    for (const print of p.prints ?? []) {
-      upsertPrint({
-        id: print.id,
-        provider_id: p.id,
-        name: print.name,
-        colors: print.colors,
-        paper: print.paper,
-        sides: print.sides,
-        files: print.files,
-        price: print.price,
-        minPages: print.minPages,
-        durationMin: print.durationMin,
-        send: print.send,
-        pickup: print.pickup,
-        avail: print.avail,
-        workHours: print.workHours,
-        notes: print.notes,
-      });
-    }
-    for (const preserve of p.preserves ?? []) {
-      upsertPreserve({
-        id: preserve.id,
-        provider_id: p.id,
-        name: preserve.name,
-        description: preserve.description,
-        kinds: preserve.kinds,
-        portion: preserve.portion,
-        ingredients: preserve.ingredients,
-        material: preserve.material,
-        price: preserve.price,
-        priceUnit: preserve.priceUnit,
-        minOrder: preserve.minOrder,
-        leadDays: preserve.leadDays,
-        noticeDays: preserve.noticeDays,
-        storage: preserve.storage,
-        pickup: preserve.pickup,
-        season: preserve.season,
-        allergens: preserve.allergens,
-        notes: preserve.notes,
-      });
-    }
-    for (const carpet of p.carpets ?? []) {
-      upsertCarpet({
-        id: carpet.id,
-        provider_id: p.id,
-        name: carpet.name,
-        description: carpet.description,
-        kinds: carpet.kinds,
-        sizes: carpet.sizes,
-        minOrder: carpet.minOrder,
-        cleans: carpet.cleans,
-        price: carpet.price,
-        leadDays: carpet.leadDays,
-        pickup: carpet.pickup,
-        readyAt: carpet.readyAt,
-        products: carpet.products,
-        noticeDays: carpet.noticeDays,
-        notes: carpet.notes,
-      });
-    }
-    for (const lesson of p.lessons ?? []) {
-      upsertLesson({
-        id: lesson.id,
-        provider_id: p.id,
-        name: lesson.name,
-        description: lesson.description,
-        kinds: lesson.kinds,
-        levels: lesson.levels,
-        subjects: lesson.subjects,
-        subjectOther: lesson.subjectOther,
-        durations: lesson.durations,
-        price: lesson.price,
-        place: lesson.place,
-        weekly: lesson.weekly,
-        materials: lesson.materials,
-        notes: lesson.notes,
-      });
-    }
-    for (const talk of p.talks ?? []) {
-      upsertTalk({
-        id: talk.id,
-        provider_id: p.id,
-        name: talk.name,
-        description: talk.description,
-        langs: talk.langs,
-        langOther: talk.langOther,
-        kinds: talk.kinds,
-        levels: talk.levels,
-        durations: talk.durations,
-        price: talk.price,
-        place: talk.place,
-        materials: talk.materials,
-        notes: talk.notes,
-      });
-    }
-    for (const grave of p.graves ?? []) {
-      upsertGrave({
-        id: grave.id,
-        provider_id: p.id,
-        name: grave.name,
-        description: grave.description,
-        kinds: grave.kinds,
-        cemetery: grave.cemetery,
-        radiusKm: grave.radiusKm,
-        price: grave.price,
-        pricing: grave.pricing,
-        flowers: grave.flowers,
-        fees: grave.fees,
-        durationMin: grave.durationMin,
-        photos: grave.photos,
-        avails: grave.avails,
-        workHours: grave.workHours,
-        notes: grave.notes,
       });
     }
     if (p.drops.includes("nokta")) {
@@ -459,7 +190,9 @@ export function seedCatalog(database: Database.Database) {
     for (const d of DROP_POINTS) {
       upDrop.run({ id: d.id, payload: JSON.stringify(d) });
     }
+    const knownProviders = new Set(PROVIDERS.map((p) => p.id));
     for (const r of SEED_REVIEWS) {
+      if (!knownProviders.has(r.providerId)) continue;
       upReview.run({
         id: r.id,
         order_id: r.orderId,
