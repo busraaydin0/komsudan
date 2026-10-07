@@ -24,7 +24,7 @@ import {
   minutesToHmm,
   parsePilotSlot,
 } from "@/lib/timeWindow";
-import { seatLabel, seatTone } from "@/lib/seat";
+import { providerLoadDisplay, sortKeyFreeSpace } from "@/lib/capacity/display";
 import {
   postOrder,
   postPriceChange,
@@ -49,7 +49,7 @@ import {
   placeOrderInput,
   quoteForProvider,
 } from "@/lib/categories/customer";
-import { clampPublicCategoryIds, seatPhraseFor } from "@/lib/categories/registry";
+import { clampPublicCategoryIds } from "@/lib/categories/registry";
 import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
 import { canCancel, trackSteps } from "@/lib/status";
 import { PhotoStrip, RatingBreakdownView, ReviewComposer, ReviewList } from "@/components/Photos";
@@ -104,7 +104,7 @@ function sortNearby(rows: { p: Provider; km: number }[], sort: NearbySort) {
       );
     }
     if (sort === "reviews") return b.p.reviews - a.p.reviews || b.p.rating - a.p.rating || a.km - b.km;
-    if (sort === "space") return b.p.remaining - a.p.remaining || a.km - b.km;
+    if (sort === "space") return sortKeyFreeSpace(b.p) - sortKeyFreeSpace(a.p) || a.km - b.km;
     return a.km - b.km || b.p.rating - a.p.rating;
   });
   return copy;
@@ -173,7 +173,7 @@ export function CustomerApp({
       .map((p) => ({ p, km: kmBetween(origin, p.loc) }))
       .sort((a, b) => a.km - b.km);
   }, [origin, dryerOnly, providers]);
-  const available = ranked.filter(({ p }) => p.remaining > 0).length;
+  const available = ranked.filter(({ p }) => p.capacity?.configured && p.capacity.weekTone !== "full").length;
 
   const selected = selectedId ? providers.find((p) => p.id === selectedId) : undefined;
   const active = orders.find((o) => o.id === activeId) ?? orders[0];
@@ -275,7 +275,7 @@ export function CustomerApp({
     setErr("");
     setPlacing(true);
     try {
-      const blocked = placeBlockReason(selected);
+      const blocked = placeBlockReason(selected, quote.machineUnits);
       if (blocked) {
         setErr(blocked);
         setPlacing(false);
@@ -629,14 +629,10 @@ function List({
       ) : (
         <ul className="space-y-2">
           {sorted.map(({ p, km }, i) => {
-            const tone = seatTone(p.remaining, p.capacity);
-            const load = seatLabel(tone);
-            const fill =
-              tone === "full"
-                ? 100
-                : p.capacity > 0
-                  ? Math.max(8, Math.round((p.remaining / p.capacity) * 100))
-                  : 0;
+            const loadMeta = providerLoadDisplay(p);
+            const tone = loadMeta.tone;
+            const load = loadMeta.loadLabel;
+            const fill = loadMeta.barFillPct;
             const bar =
               tone === "full"
                 ? "bg-[var(--load-full)]"
@@ -670,11 +666,17 @@ function List({
                         </span>
                       ) : null}
                     </span>
-                    <span className="mt-2 block h-1 w-28 overflow-hidden rounded-full bg-[var(--line)]">
-                      <span
-                        className={`block h-full rounded-full transition-[width,background-color] duration-500 ${bar}`}
-                        style={{ width: `${fill}%` }}
-                      />
+                    {loadMeta.deliveryLine ? (
+                      <span className="mt-1 block text-[11px] text-[var(--muted)]">{loadMeta.deliveryLine}</span>
+                    ) : null}
+                    <span className="mt-2 flex h-1 w-28 gap-px overflow-hidden rounded-full bg-[var(--line)]">
+                      {loadMeta.weekBars.map((pct, j) => (
+                        <span
+                          key={j}
+                          className={`h-full flex-1 ${pct >= 100 ? "bg-[var(--load-full)]" : pct >= 67 ? "bg-[var(--load-low)]" : "bg-[var(--teal)]"}`}
+                          style={{ opacity: pct >= 100 ? 1 : 0.35 + (pct / 100) * 0.65 }}
+                        />
+                      ))}
                     </span>
                   </span>
                   <span className="shrink-0 text-right text-sm">
@@ -713,7 +715,8 @@ function ProviderPane({
   onBack: () => void;
   onNext: () => void;
 }) {
-  const tone = seatTone(p.remaining, p.capacity);
+  const loadMeta = providerLoadDisplay(p);
+  const tone = loadMeta.tone;
   const canNext = catalogOfferCount(p) > 0;
   return (
     <div className="flex min-h-full flex-col">
@@ -736,7 +739,7 @@ function ProviderPane({
                     : ""
               }
             >
-              {p.remaining <= 0 ? "bugün dolu" : `bugün ${p.remaining} ${seatPhraseFor(p.categoryId)}`}
+              {loadMeta.deliveryLine ?? (loadMeta.loadLabel ?? "Müsait")}
             </span>
           </p>
         </div>
@@ -945,11 +948,9 @@ function Checkout({
           </div>
         ))}
       </div>
-      {quote.machineUnits != null && p.remaining > 0 && quote.machineUnits > p.remaining && (
-        <p className="mt-2 text-xs text-[var(--clay)]">
-          Bugün en fazla {p.remaining} makine birimi var.
-        </p>
-      )}
+      {placeBlockReason(p, quote.machineUnits) ? (
+        <p className="mt-2 text-xs text-[var(--clay)]">{placeBlockReason(p, quote.machineUnits)}</p>
+      ) : null}
       {p.express && (
         <label className="mt-4 flex items-center gap-2 text-sm">
           <input

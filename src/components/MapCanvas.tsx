@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Map, Marker, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import { PILOT } from "@/lib/data";
 import { initials } from "@/lib/avatar";
-import { seatTone } from "@/lib/seat";
+import { providerLoadDisplay } from "@/lib/capacity/display";
 import type { LngLat, MapMode, Provider } from "@/lib/types";
 
 /** Next/Turbopack does not emit the worker next to maplibre-gl-shared.mjs. */
@@ -131,7 +131,7 @@ export function MapCanvas({
       el.type = "button";
       el.className = "katla-pin";
       el.dataset.id = p.id;
-      el.dataset.load = seatTone(p.remaining, p.capacity);
+      el.dataset.load = providerLoadDisplay(p).tone;
       el.style.setProperty("--pin-delay", `${i * 40}ms`);
       el.setAttribute("aria-label", p.name);
       const face = document.createElement("span");
@@ -215,7 +215,7 @@ export function MapCanvas({
       const id = el.dataset.id;
       if (!id) continue;
       const p = providers.find((x) => x.id === id);
-      if (p) el.dataset.load = seatTone(p.remaining, p.capacity);
+      if (p) el.dataset.load = providerLoadDisplay(p).tone;
     }
   }, [providers]);
 

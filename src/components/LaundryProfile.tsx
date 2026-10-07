@@ -5,7 +5,7 @@ import { PACKAGES, trustLabel } from "@/lib/data";
 import { DRYING_OPTIONS, dryingFromProvider } from "@/lib/drying";
 import { patchMyProviderProfile } from "@/lib/api";
 import { tl } from "@/lib/pricing";
-import { seatTone } from "@/lib/seat";
+import { providerLoadDisplay } from "@/lib/capacity/display";
 import { Avatar } from "@/components/Avatar";
 import { PhotoStrip, ReviewList } from "@/components/Photos";
 import type { DryingType, PackageId, Provider } from "@/lib/types";
@@ -46,7 +46,8 @@ export function LaundryProfile({
 
   if (!me || (me.categoryId && me.categoryId !== "camasir")) return null;
 
-  const tone = seatTone(me.remaining, me.capacity);
+  const loadMeta = providerLoadDisplay(me);
+  const tone = loadMeta.tone;
 
   function togglePack(id: PackageId) {
     setOffered((prev) => {
@@ -102,7 +103,7 @@ export function LaundryProfile({
                     : ""
               }
             >
-              {me.remaining <= 0 ? "bugün dolu" : `bugün ${me.remaining} parça yer`}
+              {loadMeta.deliveryLine ?? loadMeta.loadLabel ?? "Kapasite"}
             </span>
           </p>
         </div>
