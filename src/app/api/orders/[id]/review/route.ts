@@ -1,8 +1,8 @@
-import { fail } from "@/server/http";
-import { requireAccount } from "@/server/auth";
-import { addReviewPhoto } from "@/server/photos";
+import { fail } from "@/lib/http/response";
+import { requireAccount } from "@/lib/auth/routeAccount";
+import { addReviewPhoto } from "@/lib/services/photoService";
 import { createReview, reviewForOrder } from "@/lib/services/reviewService";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 

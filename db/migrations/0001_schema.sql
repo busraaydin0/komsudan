@@ -57,23 +57,10 @@ CREATE TABLE sessions (
 
 CREATE INDEX idx_sessions_user ON sessions(user_id);
 
--- Kategori (yalnız çamaşır)
-CREATE TABLE service_categories (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  icon TEXT,
-  fulfillment_mode TEXT NOT NULL CHECK (fulfillment_mode IN ('delivery', 'home_visit')),
-  pricing_model TEXT NOT NULL CHECK (pricing_model IN ('per_piece', 'per_kg', 'fixed', 'hourly')),
-  is_active INTEGER NOT NULL DEFAULT 1,
-  blurb TEXT,
-  sort_order INTEGER NOT NULL DEFAULT 0
-);
-
 -- Keşif kartı (JSON payload)
 CREATE TABLE providers (
   id TEXT PRIMARY KEY,
-  payload TEXT NOT NULL,
-  category_id TEXT NOT NULL DEFAULT 'camasir' REFERENCES service_categories(id)
+  payload TEXT NOT NULL
 );
 
 CREATE TABLE provider_profiles (
@@ -92,7 +79,6 @@ CREATE TABLE provider_profiles (
   rating_avg REAL NOT NULL DEFAULT 0,
   rating_count INTEGER NOT NULL DEFAULT 0,
   completed_orders INTEGER NOT NULL DEFAULT 0,
-  category_id TEXT REFERENCES service_categories(id),
   updated_at TEXT NOT NULL
 );
 
@@ -107,8 +93,7 @@ CREATE TABLE service_packages (
   min_order_amount REAL NOT NULL DEFAULT 0,
   express_available INTEGER NOT NULL DEFAULT 0,
   express_surcharge_pct REAL NOT NULL DEFAULT 0,
-  is_active INTEGER NOT NULL DEFAULT 1,
-  category_id TEXT REFERENCES service_categories(id)
+  is_active INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX idx_packages_provider ON service_packages(provider_id);

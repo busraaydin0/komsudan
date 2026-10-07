@@ -26,7 +26,7 @@ import { moderateMessage } from "@/lib/moderation/messageModeration";
 import { collapseSpaces } from "@/lib/moderation/normalize";
 import { isOrderParty } from "@/lib/services/orderService";
 import { notifyOrderMessage } from "@/lib/services/notificationService";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 
 export const MSG_PER_MINUTE = 8;
 export const MSG_PER_HOUR = 40;
@@ -269,10 +269,3 @@ export function deleteOrderMessage(user: AuthUser, orderId: string, messageId: s
   return { message: toPublicMessage({ ...next, deleted_at: next.deleted_at ?? at }) };
 }
 
-export function unreadCountForOrder(user: AuthUser, orderId: string) {
-  const row = getOrderRow(orderId);
-  if (!row || !isOrderParty(user, row)) return 0;
-  const convo = getConversationByOrderId(orderId);
-  if (!convo) return 0;
-  return countUnreadForViewer(convo.id, user.id);
-}

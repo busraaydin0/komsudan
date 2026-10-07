@@ -1,33 +1,7 @@
-import type { LngLat, Provider, Review, ServicePackage } from "./types";
+import type { Provider, Review } from "@/lib/types";
+import { LAUNDRY_PACKAGES } from "@/lib/laundry/packages";
 
-export const PILOT = {
-  id: "cankaya-cukurambar",
-  city: "Ankara",
-  label: "Çankaya · Çukurambar",
-  /** OSM: Çukurambar Mahallesi centroid */
-  center: { lng: 32.80286, lat: 39.90313 } satisfies LngLat,
-  zoom: 15.7,
-  radiusKm: 3,
-  bounds: {
-    west: 32.786,
-    south: 39.894,
-    east: 32.815,
-    north: 39.913,
-  },
-};
-
-/** Manuel konum seçimi (geo yoksa). Pilot mahalleler. */
-export const NEIGHBORHOODS: { name: string; loc: LngLat }[] = [
-  { name: "Çukurambar", loc: { lng: 32.80286, lat: 39.90313 } },
-  { name: "Söğütözü", loc: { lng: 32.7902, lat: 39.9076 } },
-  { name: "Kızılırmak", loc: { lng: 32.8091, lat: 39.9055 } },
-];
-
-export const PACKAGES: ServicePackage[] = [
-  { id: "yikama", title: "Sadece yıkama", blurb: "Yıka, kurut, poşetle", pricePerPiece: 9 },
-  { id: "katlama", title: "Yıkama + katlama", blurb: "Düzenli katlanmış teslim", pricePerPiece: 13 },
-  { id: "tam", title: "Yıkama + ütü + katlama", blurb: "Tam paket", pricePerPiece: 18 },
-];
+const SEEDED_AVATARS = new Set(["elif", "ayse", "merve", "zeynep", "gulsen"]);
 
 const slots = [
   "Bugün 18:00–19:00",
@@ -37,8 +11,6 @@ const slots = [
   "Yarın 18:00–19:00",
 ];
 
-const SEEDED_AVATARS = new Set(["elif", "ayse", "merve", "zeynep", "gulsen"]);
-
 export const PROVIDERS: Provider[] = [
 {
     id: "elif",
@@ -47,7 +19,7 @@ export const PROVIDERS: Provider[] = [
     loc: { lng: 32.79902, lat: 39.90163 },
     rating: 4.9,
     reviews: 86,
-    packages: PACKAGES,
+    packages: LAUNDRY_PACKAGES,
     hasDryer: true,
     express: true,
     trust: "kurucu",
@@ -64,8 +36,8 @@ export const PROVIDERS: Provider[] = [
     loc: { lng: 32.7902, lat: 39.9076 },
     rating: 4.7,
     reviews: 41,
-    packages: PACKAGES.filter((p) => p.id !== "tam").concat([
-      { ...PACKAGES[2], pricePerPiece: 17 },
+    packages: LAUNDRY_PACKAGES.filter((p) => p.id !== "tam").concat([
+      { ...LAUNDRY_PACKAGES[2], pricePerPiece: 17 },
     ]),
     hasDryer: false,
     express: false,
@@ -83,7 +55,7 @@ export const PROVIDERS: Provider[] = [
     loc: { lng: 32.8091, lat: 39.9055 },
     rating: 4.8,
     reviews: 63,
-    packages: PACKAGES.map((p) =>
+    packages: LAUNDRY_PACKAGES.map((p) =>
       p.id === "tam" ? { ...p, pricePerPiece: 20 } : p,
     ),
     hasDryer: true,
@@ -102,7 +74,7 @@ export const PROVIDERS: Provider[] = [
     loc: { lng: 32.7964, lat: 39.8998 },
     rating: 4.5,
     reviews: 12,
-    packages: PACKAGES.filter((p) => p.id !== "tam"),
+    packages: LAUNDRY_PACKAGES.filter((p) => p.id !== "tam"),
     hasDryer: false,
     express: false,
     trust: "yeni",
@@ -119,7 +91,7 @@ export const PROVIDERS: Provider[] = [
     loc: { lng: 32.8043, lat: 39.9049 },
     rating: 4.9,
     reviews: 101,
-    packages: PACKAGES.map((p) => ({ ...p, pricePerPiece: p.pricePerPiece - 2 })),
+    packages: LAUNDRY_PACKAGES.map((p) => ({ ...p, pricePerPiece: p.pricePerPiece - 2 })),
     hasDryer: true,
     express: true,
     trust: "kurucu",
@@ -136,7 +108,7 @@ export const PROVIDERS: Provider[] = [
     loc: { lng: 32.8051, lat: 39.9019 },
     rating: 4.3,
     reviews: 9,
-    packages: PACKAGES.filter((p) => p.id !== "tam"),
+    packages: LAUNDRY_PACKAGES.filter((p) => p.id !== "tam"),
     hasDryer: false,
     dryingType: "ip",
     express: false,
@@ -154,7 +126,7 @@ export const PROVIDERS: Provider[] = [
     loc: { lng: 32.8585, lat: 39.9255 },
     rating: 4.6,
     reviews: 33,
-    packages: PACKAGES.map((p) => (p.id === "tam" ? { ...p, pricePerPiece: 19 } : p)),
+    packages: LAUNDRY_PACKAGES.map((p) => (p.id === "tam" ? { ...p, pricePerPiece: 19 } : p)),
     hasDryer: true,
     dryingType: "makine",
     express: true,
@@ -172,7 +144,7 @@ export const PROVIDERS: Provider[] = [
     loc: { lng: 32.703, lat: 39.8895 },
     rating: 4.4,
     reviews: 21,
-    packages: PACKAGES.filter((p) => p.id !== "tam").concat([{ ...PACKAGES[2], pricePerPiece: 16 }]),
+    packages: LAUNDRY_PACKAGES.filter((p) => p.id !== "tam").concat([{ ...LAUNDRY_PACKAGES[2], pricePerPiece: 16 }]),
     hasDryer: false,
     dryingType: "ip",
     express: false,
@@ -264,12 +236,3 @@ export const SEED_REVIEWS: Review[] = [
   },
 ];
 
-export function providerById(id: string) {
-  return PROVIDERS.find((p) => p.id === id);
-}
-
-export function trustLabel(tier: Provider["trust"]) {
-  if (tier === "kurucu") return "Kurucu";
-  if (tier === "guvenilir") return "Kapı açık";
-  return "Yeni komşu";
-}

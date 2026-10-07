@@ -1,14 +1,13 @@
 import { logger } from "@/lib/logger";
 import type { AppNotification } from "@/lib/types";
 import type { OrderStatusId } from "@/lib/status";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import type { AuthUser } from "@/lib/auth/types";
 import { formatDeliveryDayTr } from "@/lib/capacity/istanbul";
 import { customerHasOpenOrder, getOrderRow, type OrderRow } from "@/lib/db/orders";
 import { pickNudgeCopy, pickOrderNotice } from "@/lib/noticeCopy";
 import {
   countUnread,
-  deleteNotificationsForUser,
   getNotification,
   insertNotification,
   latestNotificationOfType,
@@ -17,9 +16,6 @@ import {
   markNotificationRead,
   type NotificationRow,
 } from "@/lib/db/notifications";
-
-export { deleteNotificationsForUser };
-export type { AppNotification };
 
 function toPublic(row: NotificationRow): AppNotification {
   return {
@@ -212,7 +208,7 @@ export function maybeEngagementNudge(user: AuthUser) {
   if (customerHasOpenOrder(user.id)) return;
   const last = latestNotificationOfType(user.id, "nudge");
   if (last && Date.now() - Date.parse(last.created_at) < NUDGE_GAP_MS) return;
-  const copy = pickNudgeCopy(last?.title, user.preferredCategoryIds);
+  const copy = pickNudgeCopy(last?.title);
   pushTo(user.id, {
     type: "nudge",
     title: copy.title,

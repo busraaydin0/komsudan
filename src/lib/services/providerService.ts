@@ -1,11 +1,6 @@
-import { ApiError } from "@/server/rules";
-import {
-  canonicalCategoryId,
-  clampPublicCategoryIds,
-  isPublicCategoryId,
-  type CategoryId,
-} from "@/lib/categories/registry";
-import { PACKAGES, PILOT } from "@/lib/data";
+import { ApiError } from "@/lib/errors";
+import { LAUNDRY_PACKAGES } from "@/lib/laundry/packages";
+import { PILOT_AREA } from "@/lib/laundry/pilot";
 import { dryingBlurb, hasDryerFrom } from "@/lib/drying";
 import { haversineKm } from "@/lib/geo/distance";
 import { setUserRole } from "@/lib/db/auth";
@@ -27,7 +22,6 @@ import {
   type ProfileRow,
   type SlotRow,
 } from "@/lib/db/providers";
-import { getCategory } from "@/lib/db/categories";
 import { ratingBreakdown, ratingForProvider } from "@/lib/services/reviewService";
 import { EXPRESS_BUMP } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
@@ -37,7 +31,6 @@ export type NearbyQuery = {
   lat?: number;
   lng?: number;
   radius?: number;
-  categoryIds?: string[];
 };
 
 function toPackage(row: PackageRow) {
@@ -85,7 +78,6 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     rating: ratingBreakdown(row.user_id, live),
     completedOrders: row.completed_orders,
     commissionRate: row.commission_rate,
-    categoryId: row.category_id ?? "camasir",
     packages: listPackages(row.user_id).map(toPackage),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
@@ -107,11 +99,11 @@ function bbox(lat: number, lng: number, radiusKm: number) {
 }
 
 export function listNearby(query: NearbyQuery) {
-  const lat = query.lat ?? PILOT.center.lat;
-  const lng = query.lng ?? PILOT.center.lng;
-  const radius = query.radius ?? PILOT.radiusKm;
+  const lat = query.lat ?? PILOT_AREA.center.lat;
+  const lng = query.lng ?? PILOT_AREA.center.lng;
+  const radius = query.radius ?? PILOT_AREA.radiusKm;
   const origin = { lat, lng };
-  const rows = listProfilesInBox(bbox(lat, lng, radius), clampPublicCategoryIds(query.categoryIds));
+  const rows = listProfilesInBox(bbox(lat, lng, radius));
   return rows
     .map((row) => toPublic(row, origin))
     .filter((p) => (p.distanceKm ?? Infinity) <= radius)
@@ -156,15 +148,7 @@ export function patchMyProfile(
     packages?: { id: PackageId; pricePerPiece: number }[];
   },
 ) {
-  const requestedCategoryId = patch.categoryId ? canonicalCategoryId(patch.categoryId) : undefined;
-  if (requestedCategoryId && !getCategory(requestedCategoryId)) {
-    throw new ApiError(400, "Kategori bulunamadı.", "VALIDATION_ERROR");
-  }
-  const profile = requireProvider(user);
-  const categoryId = requestedCategoryId ?? profile.category_id ?? "camasir";
-  if (patch.packages && categoryId !== "camasir") {
-    throw new ApiError(400, "Bu alanda çamaşır paketi yok.", "VALIDATION_ERROR");
-  }
+  requireProvider(user);
   if (patch.packages) {
     assertUniquePackages(patch.packages);
   }
@@ -173,14 +157,13 @@ export function patchMyProfile(
   const row = updateProfileFields(user.id, {
     ...patch,
     hasDryer,
-    ...(requestedCategoryId ? { categoryId: requestedCategoryId } : {}),
   });
   if (!row) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
 
   if (patch.packages) {
     const express = patch.express ?? false;
     for (const pack of patch.packages) {
-      const meta = PACKAGES.find((p) => p.id === pack.id)!;
+      const meta = LAUNDRY_PACKAGES.find((p) => p.id === pack.id)!;
       upsertPackage({
         id: `${user.id}:${pack.id}`,
         provider_id: user.id,
@@ -200,7 +183,7 @@ export function patchMyProfile(
 
   const catalogPacks: ServicePackage[] | undefined = patch.packages
     ? patch.packages.map((p) => {
-        const meta = PACKAGES.find((x) => x.id === p.id)!;
+        const meta = LAUNDRY_PACKAGES.find((x) => x.id === p.id)!;
         return { id: p.id, title: meta.title, blurb: meta.blurb, pricePerPiece: p.pricePerPiece };
       })
     : undefined;
@@ -238,12 +221,11 @@ function ensureDirectoryEntry(
     neighborhood: string;
     bio: string;
     hasDryer: boolean;
-    categoryId: string;
     packages: ServicePackage[];
     dryingType?: DryingType;
   },
 ) {
-  const neighborhood = input.neighborhood.trim() || PILOT.label;
+  const neighborhood = input.neighborhood.trim() || PILOT_AREA.label;
   if (user.role !== "admin") {
     setUserRole(user.id, "provider");
   }
@@ -261,7 +243,6 @@ function ensureDirectoryEntry(
       ratingAvg: 0,
       ratingCount: 0,
       avatarUrl: user.avatarUrl,
-      categoryId: input.categoryId,
     });
   } else {
     updateProfileFields(user.id, {
@@ -270,7 +251,6 @@ function ensureDirectoryEntry(
       lng: input.lng,
       neighborhood,
       hasDryer: input.hasDryer,
-      categoryId: input.categoryId,
     });
   }
 
@@ -293,14 +273,12 @@ function ensureDirectoryEntry(
     avatarUrl: user.avatarUrl,
     workPhotos: [],
     recentReviews: [],
-    categoryId: input.categoryId,
   };
 
   if (!catalogProviderExists(user.id)) {
     insertCatalogProvider({
       id: user.id,
       payload: { ...payload },
-      categoryId: input.categoryId,
     });
   } else {
     patchCatalogPayload(user.id, {
@@ -312,7 +290,6 @@ function ensureDirectoryEntry(
       bio,
       name: payload.name,
       drops,
-      categoryId: input.categoryId,
     });
   }
 
@@ -351,7 +328,7 @@ export function ensureLaundryOffer(
 ) {
   assertUniquePackages(input.packages);
   const catalogPacks: ServicePackage[] = input.packages.map((pack) => {
-    const meta = PACKAGES.find((p) => p.id === pack.id);
+    const meta = LAUNDRY_PACKAGES.find((p) => p.id === pack.id);
     if (!meta) throw new ApiError(400, "Paket bulunamadı.", "VALIDATION_ERROR");
     return { id: pack.id, title: meta.title, blurb: meta.blurb, pricePerPiece: pack.pricePerPiece };
   });
@@ -361,12 +338,11 @@ export function ensureLaundryOffer(
     neighborhood: input.neighborhood,
     bio: dryingBlurb(input.dryingType),
     hasDryer: hasDryerFrom(input.dryingType),
-    categoryId: "camasir",
     packages: catalogPacks,
     dryingType: input.dryingType,
   });
   for (const pack of input.packages) {
-    const meta = PACKAGES.find((p) => p.id === pack.id)!;
+    const meta = LAUNDRY_PACKAGES.find((p) => p.id === pack.id)!;
     upsertPackage({
       id: `${user.id}:${pack.id}`,
       provider_id: user.id,
@@ -388,7 +364,7 @@ export function ensureLaundryOffer(
 export function ensureServiceOffer(
   user: AuthUser,
   input: {
-    categoryId?: CategoryId;
+    categoryId?: string;
     dryingType?: DryingType;
     packages?: { id: PackageId; pricePerPiece: number }[];
     lat: number;
@@ -396,10 +372,7 @@ export function ensureServiceOffer(
     neighborhood: string;
   },
 ) {
-  const categoryId = input.categoryId ?? "camasir";
-  if (!isPublicCategoryId(categoryId) || categoryId !== "camasir") {
-    throw new ApiError(400, "Bu hizmet alanı şu an kapalı.", "CATEGORY_INACTIVE");
-  }
+  void input.categoryId;
   if (!input.dryingType || !input.packages?.length) {
     throw new ApiError(400, "Çamaşır için kurutma tipi ve paket yaz.", "VALIDATION_ERROR");
   }

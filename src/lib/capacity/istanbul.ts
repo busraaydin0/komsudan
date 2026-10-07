@@ -22,13 +22,6 @@ export function addCalendarDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function pickupIsoFromSlot(slot: string, now: Date): string {
-  const today = isoDateInIstanbul(now);
-  const lower = slot.trim().toLocaleLowerCase("tr-TR");
-  if (lower.startsWith("yarın")) return addCalendarDaysIso(today, 1);
-  return today;
-}
-
 export function formatDeliveryDayTr(iso: string): string {
   const d = dateAtNoonIstanbul(iso);
   return d.toLocaleDateString("tr-TR", {

@@ -11,7 +11,7 @@ import { loadUser, requestOtp, verifyOtp } from "./authService";
 import { applyOrderAction, getOrderFor } from "./orderService";
 import { confirmPickupAtDoor, respondPriceChange } from "./pickupConfirmService";
 import { approvePickupSummary } from "./handoffService";
-import { addPhoto } from "@/server/photos";
+import { addPhoto } from "@/lib/services/photoService";
 import { authorizePayment, paymentForOrder } from "./paymentService";
 import { expireStaleRequests } from "./expireOrdersService";
 import { openDispute } from "./disputeService";

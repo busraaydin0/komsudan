@@ -3,8 +3,8 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { OrderPhotoKind, WorkPhoto } from "@/lib/types";
 import { canAddPhotos, isOrderStatus } from "@/lib/status";
-import { db, uploadsDir } from "./db";
-import { ApiError } from "./rules";
+import { db, uploadsDir } from "@/lib/db/client";
+import { ApiError } from "@/lib/errors";
 import { setUserAvatar } from "@/lib/db/auth";
 import { countOrderPhotos, insertOrderPhoto, listOrderPhotoRows } from "@/lib/db/orderPhotos";
 
@@ -64,10 +64,6 @@ function writeFile(buf: Buffer) {
 function unlinkPhotoFile(id: string, ext: string) {
   const file = path.join(uploadsDir(), `${id}.${ext}`);
   if (fs.existsSync(file)) fs.unlinkSync(file);
-}
-
-export function storeImage(buf: Buffer) {
-  return writeFile(buf);
 }
 
 export async function parsePhotoUpload(req: Request) {

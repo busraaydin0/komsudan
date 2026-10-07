@@ -19,5 +19,3 @@ export function moderateMessage(body: string): ModerationResult {
   }
   return { decision: "allow", reason: null };
 }
-
-export { normalizeForMatch } from "./normalize";

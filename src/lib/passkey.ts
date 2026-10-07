@@ -34,19 +34,6 @@ export async function registerPasskey(userId: string, phone: string, name: strin
   return cred.id;
 }
 
-export async function unlockPasskey() {
-  if (!canUsePasskey()) throw new Error("Bu tarayıcı cihaz kilidini desteklemiyor.");
-  const cred = (await navigator.credentials.get({
-    publicKey: {
-      challenge: challenge(),
-      userVerification: "required",
-      timeout: 60_000,
-    },
-  })) as PublicKeyCredential | null;
-  if (!cred?.id) throw new Error("Yüz veya parmak izi iptal edildi.");
-  return cred.id;
-}
-
 export function pilotPasskeyId(userId: string) {
   return `pilot-device:${userId}`;
 }

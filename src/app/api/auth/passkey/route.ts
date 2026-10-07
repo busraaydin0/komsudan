@@ -1,5 +1,5 @@
-import { fail } from "@/server/http";
-import { assertPasskey, enablePasskey } from "@/server/auth";
+import { fail } from "@/lib/http/response";
+import { assertPasskey, enablePasskey } from "@/lib/auth/routeAccount";
 
 export const dynamic = "force-dynamic";
 

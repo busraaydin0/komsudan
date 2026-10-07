@@ -1,9 +1,9 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { parseBody, mePatchSchema } from "@/lib/validation/auth.schema";
 import { requireAuth } from "@/lib/auth/middleware";
 import { publicUser } from "@/lib/auth/types";
 import { updateProfile } from "@/lib/services/authService";
-import { deleteMyAccount } from "@/server/auth";
+import { deleteMyAccount } from "@/lib/auth/routeAccount";
 
 export const dynamic = "force-dynamic";
 

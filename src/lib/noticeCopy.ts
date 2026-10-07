@@ -1,7 +1,5 @@
 /** Sipariş ve hatırlatma metinleri. Çamaşır kayıt defterinden. */
 
-import { clampPublicCategoryIds } from "./categories/registry";
-
 export type NoticeKind = "created" | "accepted" | "ready" | "completed" | "rejected" | "cancelled" | "pickup";
 
 export type NoticeCtx = {
@@ -87,11 +85,8 @@ export const NUDGES: Record<string, Line[]> = {
   ],
 };
 
-export const NUDGE_COPIES: Line[] = NUDGES.camasir!;
-
-export function pickNudgeCopy(excludeTitle?: string | null, categoryIds?: string[]) {
-  const cats = clampPublicCategoryIds(categoryIds);
-  const pool = cats.flatMap((id) => NUDGES[id] ?? NUDGES.camasir!);
+export function pickNudgeCopy(excludeTitle?: string | null) {
+  const pool = NUDGES.camasir!;
   const list = excludeTitle ? pool.filter((item) => item.title !== excludeTitle) : pool;
-  return pick(list.length ? list : NUDGES.camasir!);
+  return pick(list.length ? list : pool);
 }

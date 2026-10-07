@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/knip.dev/schema.json",
+  "entry": [
+    "next.config.ts",
+    "src/app/**/route.ts",
+    "src/app/**/page.tsx",
+    "src/app/**/layout.tsx",
+    "src/app/**/manifest.ts",
+    "src/app/**/icon.tsx",
+    "src/app/**/apple-icon.tsx",
+    "vitest.config.ts",
+    "public/sw.js",
+    "src/**/*.test.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignore": ["data/**"],
+  "ignoreDependencies": ["@tailwindcss/postcss", "tailwindcss", "@types/react-dom"],
+  "ignoreExportsUsedInFile": true,
+  "rules": {
+    "exports": "error",
+    "files": "error"
+  }
+}

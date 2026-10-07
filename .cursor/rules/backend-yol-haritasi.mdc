@@ -26,7 +26,8 @@ src/app/api/orders  [id]  [id]/status|photos|review
 src/app/api/payments/webhook  notifications
 src/lib/db/client.ts migrate.ts
 src/lib/auth/jwt.ts otp.ts middleware.ts
-src/lib/services/orderService.ts providerService.ts pricingService.ts
+src/lib/services/orderService.ts providerService.ts catalogService.ts
+src/lib/pricing.ts pricingServer.ts
 src/lib/geo/distance.ts
 src/lib/validation/*.schema.ts  (zod)
 db/migrations/0001_init.sql …

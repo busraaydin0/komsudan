@@ -1,17 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORIES, PUBLIC_CATEGORY_IDS } from "@/lib/categories/registry";
-import { NEIGHBORHOODS, PACKAGES, PILOT } from "@/lib/data";
-import { DRYING_OPTIONS } from "@/lib/drying";
+import { LAUNDRY_PACKAGES } from "@/lib/laundry/packages";
+import { LAUNDRY_PRODUCT_NAME, PILOT_AREA, PILOT_NEIGHBORHOODS } from "@/lib/laundry/pilot";
 import { patchPreferences, postMyOffer } from "@/lib/api";
 import { readLocationIfGranted, requestLocation } from "@/lib/permissions";
-import { tl } from "@/lib/pricing";
 import type { Account, DryingType, PackageId, PreferredIntent } from "@/lib/types";
+import { LaundryOfferSetup } from "@/components/laundry/onboarding/LaundryOfferSetup";
+import { OnboardingRoleCard } from "@/components/laundry/onboarding/OnboardingRoleCard";
 
 type Step = "role" | "offer" | "location";
-
-const LAUNDRY = CATEGORIES.camasir;
 
 export function OnboardingFlow({
   account,
@@ -67,16 +65,16 @@ export function OnboardingFlow({
   async function persistOffer() {
     if (!offer) return;
     if (!laundryAdded || !dryingType) return;
-    const lat = home?.lat ?? PILOT.center.lat;
-    const lng = home?.lng ?? PILOT.center.lng;
-    const place = (home?.neighborhood || neighborhood || PILOT.label).trim().slice(0, 80);
+    const lat = home?.lat ?? PILOT_AREA.center.lat;
+    const lng = home?.lng ?? PILOT_AREA.center.lng;
+    const place = (home?.neighborhood || neighborhood || PILOT_AREA.label).trim().slice(0, 80);
     await postMyOffer({
-      categoryId: LAUNDRY.id,
+      categoryId: "camasir",
       dryingType,
       packages: offered.map((id) => ({ id, pricePerPiece: prices[id] })),
       lat,
       lng,
-      neighborhood: place || PILOT.label,
+      neighborhood: place || PILOT_AREA.label,
     });
   }
 
@@ -84,7 +82,7 @@ export function OnboardingFlow({
     await persistOffer();
     await patchPreferences({
       intent,
-      categoryIds: [...PUBLIC_CATEGORY_IDS],
+      categoryIds: ["camasir"],
       homeLat: home?.lat ?? null,
       homeLng: home?.lng ?? null,
       homeNeighborhood: home?.neighborhood || neighborhood || null,
@@ -134,7 +132,7 @@ export function OnboardingFlow({
         return;
       }
       const loc = await readLocationIfGranted();
-      const spot = loc ?? PILOT.center;
+      const spot = loc ?? PILOT_AREA.center;
       const name = neighborhood || "Çukurambar";
       setNeighborhood(name);
       setHome({ lat: spot.lat, lng: spot.lng, neighborhood: name });
@@ -144,7 +142,7 @@ export function OnboardingFlow({
   }
 
   function pickNeighborhood(name: string) {
-    const row = NEIGHBORHOODS.find((n) => n.name === name);
+    const row = PILOT_NEIGHBORHOODS.find((n) => n.name === name);
     setNeighborhood(name);
     if (row) setHome({ lat: row.loc.lat, lng: row.loc.lng, neighborhood: name });
   }
@@ -170,7 +168,7 @@ export function OnboardingFlow({
           Komşudan
         </p>
         <p className="mt-3 shrink-0 font-[family-name:var(--font-display)] text-xl leading-snug">
-          {LAUNDRY.name} — harita ona göre açılsın.
+          {LAUNDRY_PRODUCT_NAME} — harita ona göre açılsın.
         </p>
         <ol className="mt-6 flex shrink-0 gap-2 text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
           {labels.map((label, i) => (
@@ -187,19 +185,19 @@ export function OnboardingFlow({
               <h1 className="font-[family-name:var(--font-display)] text-2xl">Nasıl başlayalım?</h1>
               <p className="mt-2 text-sm text-[var(--muted)]">İkisini de işaretleyebilirsin. Varsayılan sekme buna göre açılır.</p>
               <div className="mt-4 grid gap-2">
-                <RoleCard
+                <OnboardingRoleCard
                   on={seek}
                   title="Hizmet arıyorum"
-                  hint={`${LAUNDRY.name} — komşudan al`}
+                  hint={`${LAUNDRY_PRODUCT_NAME} — komşudan al`}
                   onClick={() => {
                     setSeek((v) => !v);
                     setErr("");
                   }}
                 />
-                <RoleCard
+                <OnboardingRoleCard
                   on={offer}
                   title="Hizmet vermek istiyorum"
-                  hint={`${LAUNDRY.name} — boy fiyatlarını ve kurutmayı sonra yazarsın`}
+                  hint={`${LAUNDRY_PRODUCT_NAME} — boy fiyatlarını ve kurutmayı sonra yazarsın`}
                   onClick={() => {
                     setOffer((v) => !v);
                     setLaundryAdded(false);
@@ -212,11 +210,11 @@ export function OnboardingFlow({
 
           {step === "offer" && (
             <>
-              <h1 className="font-[family-name:var(--font-display)] text-2xl">{LAUNDRY.name}</h1>
+              <h1 className="font-[family-name:var(--font-display)] text-2xl">{LAUNDRY_PRODUCT_NAME}</h1>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Parça fiyatı ve kurutmayı yaz. Müşteri haritada bunları görür.
               </p>
-              <LaundryOfferQa
+              <LaundryOfferSetup
                 dryingType={dryingType}
                 offered={offered}
                 prices={prices}
@@ -229,7 +227,7 @@ export function OnboardingFlow({
                 onTogglePack={(id) => {
                   setOffered((prev) => {
                     if (prev.includes(id)) return prev.length === 1 ? prev : prev.filter((x) => x !== id);
-                    return PACKAGES.map((p) => p.id).filter((x) => x === id || prev.includes(x));
+                    return LAUNDRY_PACKAGES.map((p) => p.id).filter((x) => x === id || prev.includes(x));
                   });
                   setLaundryAdded(false);
                   setErr("");
@@ -260,7 +258,7 @@ export function OnboardingFlow({
               </button>
               <p className="mt-4 text-xs text-[var(--muted)]">veya mahalle</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                {NEIGHBORHOODS.map((n) => (
+                {PILOT_NEIGHBORHOODS.map((n) => (
                   <button
                     key={n.name}
                     type="button"
@@ -321,126 +319,3 @@ export function OnboardingFlow({
   );
 }
 
-function LaundryOfferQa({
-  dryingType,
-  offered,
-  prices,
-  added,
-  onDrying,
-  onTogglePack,
-  onPrice,
-  onAdd,
-}: {
-  dryingType: DryingType | null;
-  offered: PackageId[];
-  prices: Record<PackageId, number>;
-  added: boolean;
-  onDrying: (id: DryingType) => void;
-  onTogglePack: (id: PackageId) => void;
-  onPrice: (id: PackageId, n: number) => void;
-  onAdd: () => void;
-}) {
-  return (
-    <div className="mt-4 rounded-2xl bg-[var(--paper)] p-3 ring-1 ring-[var(--line)]">
-      <p className="text-sm font-medium">Hizmet ekle</p>
-      <p className="mt-0.5 text-xs text-[var(--muted)]">
-        {LAUNDRY.name} — müşteri haritada boy fiyatlarını ve kurutmayı görür.
-      </p>
-
-      <p className="mt-4 text-sm font-medium">Kurutma tipi nedir?</p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {DRYING_OPTIONS.map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            onClick={() => onDrying(opt.id)}
-            className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
-              dryingType === opt.id ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-      {dryingType && (
-        <p className="mt-1.5 text-xs text-[var(--muted)]">
-          {DRYING_OPTIONS.find((o) => o.id === dryingType)?.hint}
-        </p>
-      )}
-
-      <p className="mt-4 text-sm font-medium">Parça başı fiyatın ne?</p>
-      <div className="mt-2 grid gap-2">
-        {PACKAGES.map((pack) => {
-          const on = offered.includes(pack.id);
-          return (
-            <div
-              key={pack.id}
-              className={`rounded-2xl px-3 py-3 ring-1 ${
-                on ? "bg-[var(--sand)] ring-[var(--clay)]" : "bg-[var(--card)] ring-[var(--line)]"
-              }`}
-            >
-              <button type="button" onClick={() => onTogglePack(pack.id)} className="flex w-full justify-between text-left font-medium">
-                {pack.title}
-                <span className="tabular-nums text-sm font-normal text-[var(--muted)]">
-                  {on ? `${tl(prices[pack.id])}/orta` : "kapalı"}
-                </span>
-              </button>
-              <span className="mt-0.5 block text-xs text-[var(--muted)]">{pack.blurb}</span>
-              {on && (
-                <label className="mt-2 flex items-center gap-2 text-xs text-[var(--muted)]">
-                  ₺/orta boy
-                  <input
-                    inputMode="numeric"
-                    value={prices[pack.id]}
-                    onChange={(e) => {
-                      const n = Number(e.target.value.replace(/\D/g, "").slice(0, 2));
-                      onPrice(pack.id, n || 1);
-                    }}
-                    className="w-14 rounded-full bg-[var(--paper)] px-2 py-1 text-center tabular-nums ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
-                  />
-                </label>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {added ? (
-        <p className="mt-3 text-sm text-[var(--teal)]">{LAUNDRY.name} eklendi. Devam’a bas.</p>
-      ) : (
-        <button
-          type="button"
-          onClick={onAdd}
-          className="k-press mt-3 w-full rounded-full bg-[var(--teal)] py-2.5 text-sm font-medium text-white"
-        >
-          Hizmet ekle
-        </button>
-      )}
-    </div>
-  );
-}
-
-function RoleCard({
-  on,
-  title,
-  hint,
-  onClick,
-}: {
-  on: boolean;
-  title: string;
-  hint: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-2xl px-4 py-3 text-left ring-1 ${
-        on ? "bg-[var(--sand)] ring-[var(--clay)]" : "bg-[var(--paper)] ring-[var(--line)]"
-      }`}
-    >
-      <p className="text-sm font-medium">{title}</p>
-      <p className="mt-0.5 text-xs text-[var(--muted)]">{hint}</p>
-    </button>
-  );
-}

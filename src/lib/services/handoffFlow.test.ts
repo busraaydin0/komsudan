@@ -6,7 +6,7 @@ import { getHandoffCode } from "@/lib/db/handoffCodes";
 import type { AuthUser } from "@/lib/auth/types";
 import { loadUser, requestOtp, verifyOtp } from "./authService";
 import { confirmPickupAtDoor } from "./pickupConfirmService";
-import { addPhoto } from "@/server/photos";
+import { addPhoto } from "@/lib/services/photoService";
 import { applyOrderAction, getOrderFor } from "./orderService";
 import {
   approvePickupSummary,
@@ -16,7 +16,7 @@ import {
 import { adminResolveOverride, requestDeliveryOverride } from "./deliveryOverrideService";
 import { setUserRole, setUserSuperAdmin } from "@/lib/db/auth";
 import { authorizePayment } from "./paymentService";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 
 const MINI_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",

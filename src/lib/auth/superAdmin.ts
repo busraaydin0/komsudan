@@ -1,6 +1,6 @@
 import { getUserById } from "@/lib/db/auth";
 import type { AuthUser } from "@/lib/auth/types";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 
 export function assertSuperAdmin(user: AuthUser) {
   if (user.role !== "admin") {

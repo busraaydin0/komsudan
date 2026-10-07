@@ -1,4 +1,4 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { requireAuth } from "@/lib/auth/middleware";
 import { parseBody } from "@/lib/validation/parse";
 import { walletPayoutSchema } from "@/lib/validation/wallet.schema";

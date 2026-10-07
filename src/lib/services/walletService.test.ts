@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { insertOrderRow } from "@/lib/db/orders";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import { requestOtp, verifyOtp } from "./authService";
 import { canPay, creditOnCapture, getWallet, holdForOrder, topupWallet, withdrawWallet } from "./walletService";
 

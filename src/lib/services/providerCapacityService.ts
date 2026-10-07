@@ -4,7 +4,7 @@ import {
   upsertCapacitySettings,
 } from "@/lib/db/providerCapacity";
 import type { AuthUser } from "@/lib/auth/types";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 
 export function getMyCapacitySettings(user: AuthUser) {
   const row = getCapacitySettings(user.id);

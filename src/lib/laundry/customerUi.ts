@@ -1,10 +1,9 @@
-/** Müşteri PWA: çamaşır kayıt defterinden bakış yardımcıları. */
+/** Müşteri PWA metinleri ve teklif hesabı (çamaşır). */
 
 import type { LaundrySize, OrderAddonLine } from "@/lib/laundryModel";
 import { addonKey } from "@/lib/laundryModel";
 import { quoteLaundry, resolveExpress, tl } from "@/lib/pricing";
 import type { CreateOrderInput, PackageId, Provider } from "@/lib/types";
-import { CATEGORIES } from "./registry";
 
 export const ZERO_QUOTE = {
   total: 0,
@@ -18,7 +17,7 @@ export const ZERO_QUOTE = {
 };
 
 export function helloBlurb(): string {
-  return CATEGORIES.camasir.offerBio || "Eve kimse girmez. Çamaşırı kapında bırak.";
+  return "Eve kimse girmez. Çamaşırı kapında bırak.";
 }
 
 export function notePlaceholder(): string {
@@ -29,16 +28,16 @@ export function listPrice(p: Provider): number | null {
   return p.packages.find((x) => x.id === "tam")?.pricePerPiece ?? p.packages.at(-1)?.pricePerPiece ?? null;
 }
 
+export function emptyCatalogCopy(): string | null {
+  return null;
+}
+
 export function listEmptyPriceLabel(): string {
   return "paket yok";
 }
 
 export function listPricedTag(price: number): string {
   return `${tl(price)} / orta`;
-}
-
-export function emptyCatalogCopy(): string | null {
-  return null;
 }
 
 export function continueCta(): string {
@@ -87,7 +86,6 @@ export function quoteForProvider(
 }
 
 export function placeBlockReason(p: Provider, machineUnits?: number): string | null {
-  if (p.categoryId && p.categoryId !== "camasir") return "Bu hizmet alanı şu an kapalı.";
   if (!p.capacity?.configured) return "Bu komşu kapasite ayarını tamamlamadı.";
   if (machineUnits != null && machineUnits > p.capacity.maxUnitsPerOrder) {
     return "Bu boy ve ekler tek sipariş limitini aşıyor (BR-020).";
@@ -118,10 +116,8 @@ export function placeOrderInput(
   };
 }
 
-export function checkoutMeta(p: Provider): { canPlace: boolean } {
-  return {
-    canPlace: !p.categoryId || p.categoryId === "camasir",
-  };
+export function checkoutMeta(): { canPlace: boolean } {
+  return { canPlace: true };
 }
 
 export function catalogOfferCount(p: Provider): number {

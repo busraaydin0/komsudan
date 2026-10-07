@@ -1,4 +1,4 @@
-import { ApiError } from "./rules";
+import { ApiError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
 export function ok<T>(data: T, status = 200) {

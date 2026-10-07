@@ -5,7 +5,7 @@ import {
   type OrderAddonLine,
 } from "@/lib/laundryModel";
 import type { OrderRow } from "@/lib/db/orders";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 
 export function addonQtyExceeds(
   ordered: OrderAddonLine[],

@@ -9,7 +9,7 @@ import {
 } from "@/lib/db/handoffCodes";
 import { getOrderRow, updateOrderPickupSummaryApproved } from "@/lib/db/orders";
 import type { AuthUser } from "@/lib/auth/types";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import { isOrderStatus } from "@/lib/status";
 import { notifyHandoffCodeRotated } from "@/lib/services/notificationService";
 

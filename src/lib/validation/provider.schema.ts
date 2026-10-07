@@ -1,13 +1,10 @@
 import { z } from "zod";
-import { CATEGORY_ID_ENUM } from "@/lib/categories/registry";
-
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Saat HH:mm olmalı.");
 
 export const nearbyQuerySchema = z.object({
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
   radius: z.number().positive().max(50).optional(),
-  category_id: z.string().trim().max(400).optional(),
 });
 
 export const profilePatchSchema = z.object({
@@ -18,7 +15,6 @@ export const profilePatchSchema = z.object({
   hasDryer: z.boolean().optional(),
   dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
   status: z.enum(["active", "paused"]).optional(),
-  categoryId: z.string().trim().min(1).max(80).optional(),
   express: z.boolean().optional(),
   drops: z.array(z.literal("kapi")).min(1).max(1).optional(),
   packages: z
@@ -51,7 +47,7 @@ export const laundryOfferSchema = z.object({
 
 export const serviceOfferSchema = z
   .object({
-    categoryId: z.enum(CATEGORY_ID_ENUM).default("camasir"),
+    categoryId: z.literal("camasir").optional(),
     dryingType: z.enum(["makine", "ip", "ikisi"]).optional(),
     packages: laundryOfferSchema.shape.packages.optional(),
     lat: z.number().min(-90).max(90),
@@ -59,7 +55,6 @@ export const serviceOfferSchema = z
     neighborhood: z.string().trim().min(1).max(80),
   })
   .superRefine((val, ctx) => {
-    if (val.categoryId !== "camasir") return;
     if (!val.dryingType) {
       ctx.addIssue({ code: "custom", message: "Kurutma tipini seç.", path: ["dryingType"] });
     }

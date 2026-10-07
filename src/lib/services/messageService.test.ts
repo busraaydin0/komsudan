@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import { insertOrderItem } from "@/lib/db/orderItems";
 import { insertOrderRow } from "@/lib/db/orders";
 import { latestNotificationOfType } from "@/lib/db/notifications";

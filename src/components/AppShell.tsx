@@ -108,7 +108,6 @@ export function AppShell() {
           pane={tab === "siparis" ? "orders" : "map"}
           mapActive={tab === "harita"}
           meAvatar={account.avatarUrl}
-          categoryIds={account.preferredCategoryIds ?? []}
           homeLat={account.homeLat}
           homeLng={account.homeLng}
           onOpenOrders={() => go("siparis")}

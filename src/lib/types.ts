@@ -1,4 +1,4 @@
-import type { LaundryPackageId, OrderPackageId } from "./categories/registry";
+import type { LaundryPackageId, OrderPackageId } from "./laundry/packages";
 import type { OrderStatusId } from "./status";
 import type { LaundrySize, OrderAddonLine, PriceChangeStatus } from "./laundryModel";
 
@@ -10,7 +10,6 @@ export type MapMode = "2d" | "3d";
 export type TrustTier = "yeni" | "kurucu" | "guvenilir";
 
 export type { OrderStatusId } from "./status";
-export type OrderStatus = OrderStatusId;
 
 export type LngLat = { lng: number; lat: number };
 

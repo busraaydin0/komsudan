@@ -1,4 +1,4 @@
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import { verifyAccess } from "./jwt";
 import { ACCESS_COOKIE, REFRESH_COOKIE, SESSION_COOKIE, readCookie } from "./cookies";
 import { loadUser, loadUserBySession } from "@/lib/services/authService";

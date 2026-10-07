@@ -13,8 +13,8 @@ import {
   writeProfileRating,
   type ReviewRow,
 } from "@/lib/db/reviews";
-import { photosForReview } from "@/server/photos";
-import { ApiError } from "@/server/rules";
+import { photosForReview } from "@/lib/services/photoService";
+import { ApiError } from "@/lib/errors";
 
 export type ProviderRating = { rating: number; reviews: number };
 

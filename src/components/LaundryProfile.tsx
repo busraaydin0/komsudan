@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PACKAGES, trustLabel } from "@/lib/data";
+import { LAUNDRY_PACKAGES } from "@/lib/laundry/packages";
+import { trustLabel } from "@/lib/laundry/pilot";
 import { DRYING_OPTIONS, dryingFromProvider } from "@/lib/drying";
 import { patchMyProviderProfile } from "@/lib/api";
 import { tl } from "@/lib/pricing";
@@ -52,7 +53,7 @@ export function LaundryProfile({
   function togglePack(id: PackageId) {
     setOffered((prev) => {
       if (prev.includes(id)) return prev.length === 1 ? prev : prev.filter((x) => x !== id);
-      return [...PACKAGES.map((p) => p.id).filter((x) => x === id || prev.includes(x))];
+      return [...LAUNDRY_PACKAGES.map((p) => p.id).filter((x) => x === id || prev.includes(x))];
     });
     setOk("");
   }
@@ -130,7 +131,7 @@ export function LaundryProfile({
       )}
 
       <div className="mt-4 grid gap-2">
-        {PACKAGES.map((pack) => {
+        {LAUNDRY_PACKAGES.map((pack) => {
           const on = offered.includes(pack.id);
           return (
             <div

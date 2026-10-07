@@ -1,5 +1,5 @@
-import { fail } from "@/server/http";
-import { updateProfile, verifyIdentity } from "@/server/auth";
+import { fail } from "@/lib/http/response";
+import { updateProfile, verifyIdentity } from "@/lib/auth/routeAccount";
 
 export const dynamic = "force-dynamic";
 

@@ -26,7 +26,7 @@ function useVisiblePolling(reload: () => void | Promise<void>, intervalMs: numbe
     };
   }, [reload, intervalMs]);
 }
-import { errorMessageFromBody, readJson, unwrapEnvelope } from "@/lib/http/client";
+import { readJson, unwrapEnvelope } from "@/lib/http/client";
 import type { Account, AppNotification, CreateOrderInput, MessageInboxThread, Order, OrderConversation, OrderMessage, Provider, Review, WalletActivity, WalletSnapshot, WorkPhoto } from "./types";
 
 export type Catalog = {
@@ -469,15 +469,6 @@ export async function uploadOrderPhoto(orderId: string, file: File, kind?: strin
   return data.photo!;
 }
 
-export async function uploadPortfolioPhoto(providerId: string, file: File) {
-  const body = new FormData();
-  body.append("file", file);
-  const data = await readJson<{ photo: WorkPhoto; photos: WorkPhoto[] }>(
-    await fetch(`/api/providers/${providerId}/photos`, { method: "POST", body }),
-  );
-  return data;
-}
-
 export async function postReview(
   orderId: string,
   input: {
@@ -520,15 +511,6 @@ export async function patchPreferences(body: {
       body: JSON.stringify(body),
     }),
   );
-}
-
-export async function fetchMyProvider() {
-  const data = unwrapEnvelope(
-    await readJson<{ data?: { provider: Record<string, unknown> }; provider?: Record<string, unknown> }>(
-      await fetch("/api/providers/me/profile"),
-    ),
-  );
-  return data.provider!;
 }
 
 export async function patchMyProviderProfile(body: {
@@ -574,20 +556,5 @@ export async function postMyOffer(body: {
     ),
   );
   return data.provider!;
-}
-
-export async function postMyAvailability(body: {
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  deliveryMode: "door" | "point" | "both";
-}) {
-  await readJson(
-    await fetch("/api/providers/me/availability", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-  );
 }
 

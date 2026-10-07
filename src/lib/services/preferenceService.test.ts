@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "@/server/rules";
 import { requestOtp, verifyOtp } from "./authService";
 import { savePreferences } from "./preferenceService";
 
@@ -9,19 +8,20 @@ async function customer(phone: string) {
   return session.user;
 }
 
-describe("savePreferences kategori eşlemesi", () => {
+describe("savePreferences (çamaşır pilot)", () => {
   it("çamaşır dışı id tercihten düşer; camasir kalır", async () => {
     const user = await customer("5550000891");
     const next = savePreferences(user, {
       intent: "seek",
-      categoryIds: ["camasir", "davet"],
+      categoryIds: ["camasir", "legacy-id"],
       completed: true,
     });
     expect(next.preferredCategoryIds).toEqual(["camasir"]);
   });
 
-  it("bilinmeyen id tek başına gelince reddeder", async () => {
+  it("yalnızca camasir yazar; gönderilen id listesi yok sayılır", async () => {
     const user = await customer("5550000892");
-    expect(() => savePreferences(user, { categoryIds: ["foto"] })).toThrow(ApiError);
+    const next = savePreferences(user, { categoryIds: ["unknown"] });
+    expect(next.preferredCategoryIds).toEqual(["camasir"]);
   });
 });

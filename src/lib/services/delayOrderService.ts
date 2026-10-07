@@ -1,7 +1,7 @@
 import { dateAtNoonIstanbul, isoDateInIstanbul } from "@/lib/capacity/istanbul";
 import { getOrderRow, updateOrderDelay } from "@/lib/db/orders";
 import type { AuthUser } from "@/lib/auth/types";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import { isOrderStatus, type OrderStatusId } from "@/lib/status";
 import { notifyOrderDelayed } from "./notificationService";
 

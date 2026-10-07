@@ -4,11 +4,11 @@ import { ensureProviderPriceGrid } from "@/lib/db/providerPrices";
 import { getOrderRow, insertOrderRow } from "@/lib/db/orders";
 import { loadUser, requestOtp, verifyOtp } from "./authService";
 import { confirmPickupAtDoor, respondPriceChange } from "./pickupConfirmService";
-import { addPhoto } from "@/server/photos";
+import { addPhoto } from "@/lib/services/photoService";
 import { applyOrderAction } from "./orderService";
 import { approvePickupSummary } from "./handoffService";
 import { getHandoffCode } from "@/lib/db/handoffCodes";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 
 const MINI_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",

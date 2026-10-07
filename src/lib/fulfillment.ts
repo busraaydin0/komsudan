@@ -1,27 +1,14 @@
-import type { PackageId } from "@/lib/types";
-import { canTransition as deliveryCanTransition, type OrderStatusId } from "@/lib/status";
-import type { FulfillmentMode } from "@/lib/db/categories";
+import type { OrderStatusId, PackageId } from "@/lib/status";
+import { canTransition as laundryCanTransition } from "@/lib/status";
 
 export type FulfillmentStrategy = {
-  mode: FulfillmentMode;
+  mode: "delivery";
   ready: boolean;
   canTransition: (from: OrderStatusId, to: OrderStatusId, packageId: PackageId) => boolean;
 };
 
-/** Çamaşır teslim (kapı). PWA davranışı buradan değişmez. */
-export const deliveryStrategy: FulfillmentStrategy = {
+export const laundryDeliveryStrategy: FulfillmentStrategy = {
   mode: "delivery",
   ready: true,
-  canTransition: (from, to, packageId) => deliveryCanTransition(from, to, "admin", { packageId }),
+  canTransition: (from, to, packageId) => laundryCanTransition(from, to, "admin", { packageId }),
 };
-
-export function strategyFor(
-  mode?: FulfillmentMode,
-  categoryId?: string,
-  fulfillmentType?: string | null,
-): FulfillmentStrategy {
-  void mode;
-  void categoryId;
-  void fulfillmentType;
-  return deliveryStrategy;
-}

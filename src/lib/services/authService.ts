@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from "node:crypto";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import { db } from "@/lib/db/client";
 import { getProfile } from "@/lib/db/providers";
 import {

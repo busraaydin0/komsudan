@@ -1,4 +1,4 @@
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import {
   addBalance,
   ensureWalletRow,

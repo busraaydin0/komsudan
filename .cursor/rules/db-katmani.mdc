@@ -1,31 +1,29 @@
 ---
 description: SQLite erişimi, migration ve şema kararları
-globs: src/lib/db/**/*.ts,db/migrations/**/*.sql,scripts/**/*.ts
+globs: src/lib/db/**/*.ts,db/migrations/**/*.sql
 alwaysApply: false
 ---
 
 # DB katmanı
 
-`better-sqlite3` singleton: `src/lib/db/client.ts`. Migration: `src/lib/db/migrate.ts` + `db/migrations/`. Service içine ham SQL yazma.
+`better-sqlite3` singleton: `src/lib/db/client.ts`. Migration: `src/lib/db/migrate.ts` + `db/migrations/0001_schema.sql`. Service içine ham SQL yazma.
 
-## Tablolar (hedef)
+## Tablolar (çamaşır pilot)
 
-`users` (phone unique, role customer|provider|admin), `otp_codes`, `refresh_tokens`, `provider_profiles` (lat/lng, commission_rate, rating), `service_categories` (aktif kayıt: `camasir`), `service_packages`, `drop_points`, `availability_slots`, `orders`, `order_status_history`, `order_photos`, `payments`, `reviews`, `disputes`, `notifications`.
+`users`, `otp_codes`, `refresh_tokens`, `providers` (JSON payload), `provider_profiles`, `service_packages`, `provider_prices`, `provider_addon_prices`, `provider_capacity_*`, `availability_slots`, `orders`, `order_items`, `order_status_history`, `order_photos`, `appointments`, `payments`, `wallets`, `wallet_ledger`, `reviews`, `disputes`, `notifications`, `conversations`, `messages`.
+
+Kategori tablosu yok; ürün sabitleri `src/lib/laundry/`.
 
 ## Snapshot ve audit
 
-- `orders.price_per_kg_snapshot` — sipariş anı fiyatı donar; sağlayıcı fiyatı geçmişi bozmaz.
-- Durum sadece `orders.status`; kim/ne zaman `order_status_history`.
-- `payments.provider_reference` — iyzico id; split payment v2.
+- Sipariş tutarı `orders.total` / kalemler `order_items`.
+- Durum `orders.status` (İngilizce id); geçmiş `order_status_history`.
+- `payments.provider_reference` — ödeme simülasyonu / ileride iyzico.
 
 ## İndeks
 
-`orders(customer_id)`, `orders(provider_id)`, `orders(status)`, `provider_profiles(lat, lng)`.
+`orders(user_id)`, `orders(provider_id)`, `orders(status)`, `provider_profiles(lat, lng)` — ayrıntı migration dosyasında.
 
 ## Geo
 
-SQL bounding-box (`idx_provider_location`), kesin sıra Haversine (`src/lib/geo/distance.ts`). PostGIS yok.
-
-## KVKK
-
-Telefon/konum minimum. TC asla düz saklama. `.db` ve upload git'e girmez.
+Mesafe: `src/lib/geo/`. Keşif kutusu: `src/lib/laundry/pilot.ts`.

@@ -1,18 +1,10 @@
-import { ApiError } from "./rules";
-import { deliveredCount as countDelivered } from "@/lib/db/auth";
-import { REFRESH_COOKIE, SESSION_COOKIE, clearAuthCookies, readCookie, setAuthCookies } from "@/lib/auth/cookies";
+import { ApiError } from "@/lib/errors";
+import { REFRESH_COOKIE, SESSION_COOKIE, clearAuthCookies, readCookie } from "@/lib/auth/cookies";
 import { getAuth, requireAuth } from "@/lib/auth/middleware";
 import { toAccount } from "@/lib/auth/types";
 import type { Account } from "@/lib/types";
 import * as authService from "@/lib/services/authService";
-import { deletePortfolioForUser } from "@/server/photos";
-
-export { SESSION_COOKIE } from "@/lib/auth/cookies";
-export { normalizePhone } from "@/lib/phone";
-
-export function deliveredCount(userId: string) {
-  return countDelivered(userId);
-}
+import { deletePortfolioForUser } from "@/lib/services/photoService";
 
 export async function readSession(): Promise<Account | null> {
   const user = await getAuth();
@@ -29,16 +21,6 @@ export async function requireReadyAccount(request?: Request): Promise<Account> {
     throw new ApiError(403, "Kimlik ve cihaz kilidi tamamlanmadan sipariş yok.", "FORBIDDEN");
   }
   return toAccount(user);
-}
-
-export function issueOtp(phone: string) {
-  return authService.requestOtp(phone);
-}
-
-export async function verifyOtp(phone: string, code: string): Promise<Account> {
-  const tokens = await authService.verifyOtp(phone, code);
-  await setAuthCookies(tokens);
-  return toAccount(tokens.user);
 }
 
 export async function updateProfile(name: string): Promise<Account> {

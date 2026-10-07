@@ -191,11 +191,3 @@ export function capacitySummariesForProviders(
   return out;
 }
 
-export function capacitySummaryForProvider(providerId: string, now = new Date()): ProviderCapacitySummary {
-  return capacitySummariesForProviders([providerId], now).get(providerId)!;
-}
-
-export function providerMatchesOrderSize(summary: ProviderCapacitySummary, machineUnits: number) {
-  if (!summary.configured) return false;
-  return machineUnits <= summary.maxUnitsPerOrder;
-}

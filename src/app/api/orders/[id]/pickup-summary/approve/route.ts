@@ -1,4 +1,4 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { requireAuth } from "@/lib/auth/middleware";
 import { approvePickupSummary } from "@/lib/services/handoffService";
 import { getOrderFor } from "@/lib/services/orderService";

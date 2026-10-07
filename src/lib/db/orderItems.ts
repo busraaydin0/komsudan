@@ -2,8 +2,6 @@ import { randomUUID } from "node:crypto";
 import {
   addonKey,
   parseAddonKey,
-  type AddonKind,
-  type AddonVariant,
   type LaundrySize,
   type OrderAddonLine,
 } from "@/lib/laundryModel";
@@ -33,10 +31,6 @@ export function listOrderItems(orderId: string): OrderItemRow[] {
   return db()
     .prepare(`SELECT * FROM order_items WHERE order_id = ? ORDER BY kind, variant`)
     .all(orderId) as OrderItemRow[];
-}
-
-export function deleteOrderItems(orderId: string) {
-  db().prepare(`DELETE FROM order_items WHERE order_id = ?`).run(orderId);
 }
 
 export function replaceAddonItems(orderId: string, addons: OrderAddonLine[], unitPrices: Map<string, number>) {
@@ -72,9 +66,3 @@ export function addonsFromItems(items: OrderItemRow[]): OrderAddonLine[] {
   return out;
 }
 
-export function sumAddonQty(items: OrderItemRow[], addon: AddonKind, variant: AddonVariant) {
-  const key = addonKey(addon, variant);
-  return items
-    .filter((i) => i.kind === "addon" && i.variant === key)
-    .reduce((s, i) => s + i.qty, 0);
-}

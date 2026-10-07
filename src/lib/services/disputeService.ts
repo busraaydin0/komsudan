@@ -13,7 +13,7 @@ import {
   type DisputeRow,
 } from "@/lib/db/disputes";
 import { isOrderParty } from "@/lib/services/orderService";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 
 export type PublicDispute = {
   id: string;

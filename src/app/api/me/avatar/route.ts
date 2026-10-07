@@ -1,6 +1,6 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { requireAuth } from "@/lib/auth/middleware";
-import { bufferFromUpload, setAvatarPhoto } from "@/server/photos";
+import { bufferFromUpload, setAvatarPhoto } from "@/lib/services/photoService";
 
 export const dynamic = "force-dynamic";
 

@@ -1,19 +1,5 @@
-import { ApiError } from "@/server/rules";
-import { isPublicCategoryId, normalizeCategoryIds } from "@/lib/categories/registry";
-import { getCategory, listActiveCategories } from "@/lib/db/categories";
 import { updateUserPreferences } from "@/lib/db/auth";
 import { toAuthUser, type AuthUser } from "@/lib/auth/types";
-
-export function listCategoriesPublic() {
-  return listActiveCategories().map((row) => ({
-    id: row.id,
-    name: row.name,
-    icon: row.icon || row.id,
-    blurb: row.blurb || "",
-    fulfillmentMode: row.fulfillment_mode,
-    pricingModel: row.pricing_model,
-  }));
-}
 
 export function savePreferences(
   user: AuthUser,
@@ -27,16 +13,13 @@ export function savePreferences(
     skipped?: boolean;
   },
 ): AuthUser {
-  const ids = normalizeCategoryIds(input.categoryIds ?? user.preferredCategoryIds).filter(
-    (id) => isPublicCategoryId(id) && getCategory(id),
-  );
-  if (input.categoryIds?.length && ids.length === 0) {
-    throw new ApiError(400, "Kategori bulunamadı.", "VALIDATION_ERROR");
+  if (input.categoryIds?.length) {
+    void input.categoryIds;
   }
   const intent = input.intent === undefined ? user.preferredIntent : input.intent;
   const finish = Boolean(input.completed || input.skipped);
   const row = updateUserPreferences(user.id, {
-    preferredCategoryIds: ids.length ? ids : null,
+    preferredCategoryIds: ["camasir"],
     preferredIntent: intent,
     onboardingCompletedAt: finish
       ? (user.onboardingCompletedAt ?? new Date().toISOString())

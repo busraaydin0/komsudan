@@ -12,7 +12,7 @@ function freshDb() {
 }
 
 describe("çamaşır DB ayağa kalkışı", () => {
-  it("boş DB: tek migration, camasir seed, çekirdek tablolar", () => {
+  it("boş DB: tek migration, seed, çekirdek tablolar", () => {
     const d = freshDb();
 
     const migrations = d
@@ -20,13 +20,7 @@ describe("çamaşır DB ayağa kalkışı", () => {
       .all() as { id: string }[];
     expect(migrations.map((r) => r.id)).toEqual(["0001_schema.sql"]);
 
-    const cats = d.prepare("SELECT id FROM service_categories ORDER BY id").all() as { id: string }[];
-    expect(cats.map((r) => r.id)).toEqual(["camasir"]);
-
-    const providers = d.prepare("SELECT id, category_id FROM providers ORDER BY id").all() as {
-      id: string;
-      category_id: string;
-    }[];
+    const providers = d.prepare("SELECT id FROM providers ORDER BY id").all() as { id: string }[];
     expect(providers.map((p) => p.id)).toEqual([
       "ayse",
       "burak",
@@ -37,7 +31,6 @@ describe("çamaşır DB ayağa kalkışı", () => {
       "selin",
       "zeynep",
     ]);
-    expect(providers.every((p) => p.category_id === "camasir")).toBe(true);
 
     const tables = d
       .prepare(
@@ -49,5 +42,6 @@ describe("çamaşır DB ayağa kalkışı", () => {
     expect(tables.map((t) => t.name)).toContain("handoff_codes");
     expect(tables.map((t) => t.name)).not.toContain("order_events");
     expect(tables.map((t) => t.name)).not.toContain("drop_points");
+    expect(tables.map((t) => t.name)).not.toContain("service_categories");
   });
 });

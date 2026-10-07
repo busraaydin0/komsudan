@@ -31,10 +31,6 @@ export function getConversationByOrderId(orderId: string): ConversationRow | und
     .get(orderId) as ConversationRow | undefined;
 }
 
-export function getConversationById(id: string): ConversationRow | undefined {
-  return db().prepare("SELECT * FROM conversations WHERE id = ?").get(id) as ConversationRow | undefined;
-}
-
 export function insertConversation(row: ConversationRow) {
   db()
     .prepare(

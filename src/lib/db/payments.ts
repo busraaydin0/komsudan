@@ -54,10 +54,6 @@ export function listPaymentsByOrderIds(orderIds: string[]): PaymentRow[] {
     .all(...orderIds) as PaymentRow[];
 }
 
-export function getPaymentById(id: string): PaymentRow | undefined {
-  return db().prepare("SELECT * FROM payments WHERE id = ?").get(id) as PaymentRow | undefined;
-}
-
 export function getPaymentByReference(ref: string): PaymentRow | undefined {
   return db()
     .prepare("SELECT * FROM payments WHERE provider_reference = ?")

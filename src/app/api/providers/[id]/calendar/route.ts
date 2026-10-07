@@ -1,4 +1,4 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { buildProviderCalendar } from "@/lib/services/calendarService";
 import { expireStaleRequests } from "@/lib/services/expireOrdersService";
 

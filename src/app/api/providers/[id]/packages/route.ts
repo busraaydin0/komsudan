@@ -1,4 +1,4 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { listProviderPackages } from "@/lib/services/providerService";
 
 export const dynamic = "force-dynamic";

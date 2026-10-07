@@ -17,11 +17,11 @@ import {
   recordTransition,
 } from "@/lib/db/orders";
 import type { AuthUser } from "@/lib/auth/types";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import { quoteForProviderOrder } from "@/lib/pricingServer";
 import { isOrderStatus } from "@/lib/status";
 import type { PackageId } from "@/lib/types";
-import { photosForOrder } from "@/server/photos";
+import { photosForOrder } from "@/lib/services/photoService";
 import { parseAllocations } from "@/lib/db/providerCapacity";
 import { releaseOrderCapacity } from "@/lib/services/capacityService";
 import { authorizePayment, voidPayment } from "@/lib/services/paymentService";

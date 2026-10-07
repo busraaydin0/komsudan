@@ -5,13 +5,13 @@ alwaysApply: true
 
 # Pilot kapsam
 
-PWA ve keşif **yalnız Çamaşır Yıkama**. Kayıt: `CATEGORY_IDS = ["camasir"]`. Faz atlama. Çamaşır dışı alan (davet, tamir, home-visit vb.) ekleme.
+PWA ve keşif **yalnız Çamaşır Yıkama**. Sabitler `src/lib/laundry/` (paket, boy, ek); kategori tablosu/registry yok. Faz atlama. Çamaşır dışı alan ekleme.
 
 - Teslim: kapı veya gel al noktası. Eve kimse girmez.
 - Paket: `yikama` / `katlama` / `tam`. Tutar sunucuda.
 
 ## Sıra
 
-6 Ödeme (bitti) → 6.5 kategori kaydı (yalnız çamaşır, bitti) → 6.6 keşif (bitti) → 9+ review/dispute/log.
+6 Ödeme (bitti) → 6.6 keşif (bitti) → 9+ review/dispute/log.
 
 PWA’yı kırma. Tutar/status client’tan alma. Route’ta SQL yok.

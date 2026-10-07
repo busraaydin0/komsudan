@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { PROVIDERS, SEED_REVIEWS } from "@/lib/data";
+import { PROVIDERS, SEED_REVIEWS } from "@/lib/db/seedCatalogData";
 import { EXPRESS_BUMP } from "@/lib/pricing";
 import { ensureProviderPriceGrid } from "./providerPrices";
 import { upsertCapacitySettings } from "./providerCapacity";
@@ -34,21 +34,6 @@ const SEED_CAPACITY: Record<string, { half: number; maxOrder: number; days?: num
   leyla: { half: 7, maxOrder: 4 },
 };
 
-function seedCategory(database: Database.Database) {
-  database
-    .prepare(
-      `INSERT INTO service_categories (id, name, icon, fulfillment_mode, pricing_model, is_active, blurb, sort_order)
-       VALUES ('camasir', 'Çamaşır Yıkama', 'laundry', 'delivery', 'per_piece', 1, 'Yıka, katla, kapıda bırak', 1)
-       ON CONFLICT(id) DO UPDATE SET
-         name = excluded.name,
-         icon = excluded.icon,
-         is_active = 1,
-         blurb = excluded.blurb,
-         sort_order = excluded.sort_order`,
-    )
-    .run();
-}
-
 function seedProviderDirectory() {
   for (const [i, p] of PROVIDERS.entries()) {
     const phone = SEED_PHONES[p.id] ?? `532119${String(i + 1).padStart(4, "0")}`;
@@ -64,7 +49,6 @@ function seedProviderDirectory() {
       ratingAvg: p.rating,
       ratingCount: p.reviews,
       avatarUrl: p.avatarUrl,
-      categoryId: "camasir",
     });
     for (const pack of p.packages) {
       upsertPackage({
@@ -102,9 +86,9 @@ function seedProviderDirectory() {
 /** Deterministik çamaşır pilot seed — idempotent. */
 export function seedCatalog(database: Database.Database) {
   const upProvider = database.prepare(
-    `INSERT INTO providers (id, payload, category_id)
-     VALUES (@id, @payload, @categoryId)
-     ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, category_id = excluded.category_id`,
+    `INSERT INTO providers (id, payload)
+     VALUES (@id, @payload)
+     ON CONFLICT(id) DO UPDATE SET payload = excluded.payload`,
   );
   const upReview = database.prepare(
     `INSERT INTO reviews (id, order_id, provider_id, rating, body, author, created_at)
@@ -115,12 +99,10 @@ export function seedCatalog(database: Database.Database) {
        author = excluded.author`,
   );
   const tx = database.transaction(() => {
-    seedCategory(database);
     for (const p of PROVIDERS) {
       upProvider.run({
         id: p.id,
         payload: JSON.stringify({ ...p, drops: ["kapi"] }),
-        categoryId: "camasir",
       });
       const cap = SEED_CAPACITY[p.id] ?? { half: 6, maxOrder: 4 };
       upsertCapacitySettings({

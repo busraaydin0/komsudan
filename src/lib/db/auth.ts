@@ -160,13 +160,6 @@ export function attachOrphanOrders(userId: string) {
   db().prepare("UPDATE orders SET user_id = ? WHERE user_id IS NULL").run(userId);
 }
 
-export function deliveredCount(userId: string) {
-  const row = db()
-    .prepare("SELECT COUNT(*) AS n FROM orders WHERE user_id = ? AND status = 'teslim_edildi'")
-    .get(userId) as { n: number };
-  return row.n;
-}
-
 export function countOtpSince(phone: string, sinceIso: string) {
   const row = db()
     .prepare("SELECT COUNT(*) AS n FROM otp_codes WHERE phone = ? AND created_at >= ?")

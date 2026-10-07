@@ -16,7 +16,7 @@ Build sonrası çalıştırın (`npm run build`).
 | Sipariş oluşturma süre (ms) | 62.7 | 1.8 |
 | Sipariş oluşturma `prepare()` çağrısı* | 4095 | 31 |
 
-\* `prepare()` sayacı: benchmark sırasında her `db.prepare` / `db.exec` bir kez sayılır; kod yolunda tekrarlayan `prepare()` çağrıları yüksek gösterir.
+\* `prepare()` sayacı (benchmark hook’u): benchmark sırasında her `db.prepare` / `db.exec` bir kez sayılır; kod yolunda tekrarlayan `prepare()` çağrıları yüksek gösterir.
 
 ## Notlar
 

@@ -1,4 +1,4 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { parseBody } from "@/lib/validation/parse";
 import { requireAuth } from "@/lib/auth/middleware";
 import { delayOrder } from "@/lib/services/delayOrderService";

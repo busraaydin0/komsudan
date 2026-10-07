@@ -1,7 +1,7 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { requireAuth } from "@/lib/auth/middleware";
 import { addOrderPhoto, listOrderPhotosFor } from "@/lib/services/orderService";
-import { parsePhotoUpload } from "@/server/photos";
+import { parsePhotoUpload } from "@/lib/services/photoService";
 
 export const dynamic = "force-dynamic";
 

@@ -1,4 +1,4 @@
-import type { LaundryPackageId } from "./categories/registry";
+import type { LaundryPackageId } from "./laundry/packages";
 import type { PackageId } from "./types";
 
 /** Yarım-makine birimi (tam sayı). Küçük ≈ ½ makine, Orta ≈ 1, Büyük ≈ 2 makine. */

@@ -1,5 +1,5 @@
 import type { UserRole } from "@/lib/db/auth";
-import type { LaundryPackageId, OrderPackageId } from "./categories/registry";
+import type { LaundryPackageId, OrderPackageId } from "./laundry/packages";
 
 export type PackageId = LaundryPackageId;
 
