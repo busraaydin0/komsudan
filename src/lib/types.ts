@@ -1,4 +1,5 @@
 import type { LaundryPackageId, OrderPackageId } from "./categories/registry";
+import type { LaundrySize, OrderAddonLine, PriceChangeStatus } from "./laundryModel";
 
 export type PackageId = LaundryPackageId;
 export type { OrderPackageId };
@@ -22,7 +23,14 @@ export type ServicePackage = {
   id: PackageId;
   title: string;
   blurb: string;
+  /** Liste kartı: orta boy fiyatı (geriye dönük alan adı). */
   pricePerPiece: number;
+};
+
+/** Müşteri tarafında anlık teklif için katalogdan gelir; sunucu kaynağı provider_prices. */
+export type LaundryPriceGrid = {
+  sizes: Partial<Record<PackageId, Partial<Record<LaundrySize, number>>>>;
+  addons: Record<string, number>;
 };
 
 export type FulfillmentType = "dropoff";
@@ -80,6 +88,7 @@ export type Provider = {
   reviews: number;
   ratingBreakdown?: RatingBreakdown;
   packages: ServicePackage[];
+  laundryPrices?: LaundryPriceGrid;
   capacity: number;
   remaining: number;
   hasDryer: boolean;
@@ -126,7 +135,10 @@ export type Order = {
   id: string;
   providerId: string;
   packageId: OrderPackageId;
-  pieces: number;
+  size: LaundrySize;
+  confirmedSize: LaundrySize | null;
+  addons: OrderAddonLine[];
+  machineUnits: number;
   express: boolean;
   drop: DropMethod;
   dropPointId: string | null;
@@ -147,17 +159,18 @@ export type Order = {
   customerId?: string | null;
   lifecycle?: ApiLifecycle;
   deliveryMode?: "door" | "point";
-  estimatedWeight?: number;
-  pricePerKgSnapshot?: number;
-  estimatedPrice?: number;
-  finalPrice?: number | null;
+  priceChange: PriceChangeStatus;
+  colorGroups: number | null;
+  pickupConfirmedAt: string | null;
+  cancelReason: string | null;
   updatedAt?: string;
 };
 
 export type CreateOrderInput = {
   providerId: string;
   packageId?: PackageId;
-  pieces?: number;
+  size: LaundrySize;
+  addons?: OrderAddonLine[];
   express?: boolean;
   drop: DropMethod;
   slot?: string;
