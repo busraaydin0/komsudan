@@ -9,7 +9,6 @@ export function quoteForProviderOrder(
   size: LaundrySize,
   addons: OrderAddonLine[],
   express: boolean,
-  loyaltyRate = 0,
 ): LaundryQuote {
   const sizePrice = getSizePrice(providerId, packageId, size);
   if (sizePrice == null) {
@@ -29,7 +28,6 @@ export function quoteForProviderOrder(
     size,
     addons,
     express,
-    loyaltyRate,
     sizePrice,
     addonUnitPrices,
   });

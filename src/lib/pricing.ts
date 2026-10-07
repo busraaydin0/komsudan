@@ -1,6 +1,5 @@
 import { isoDateInIstanbul } from "./capacity/istanbul";
 import { addonKey, machineUnitsFor, type LaundrySize, type OrderAddonLine } from "./laundryModel";
-import { effectiveLoyaltyRate } from "./loyalty";
 import type { PackageId } from "./types";
 
 export const COMMISSION = 0.1;
@@ -28,7 +27,6 @@ export function resolveExpress(providerOffersExpress: boolean, pickupDate: strin
 export type LaundryQuote = {
   total: number;
   before: number;
-  loyaltyRate: number;
   commission: number;
   providerNet: number;
   subtotal: number;
@@ -42,7 +40,6 @@ export function quoteLaundry(input: {
   size: LaundrySize;
   addons: OrderAddonLine[];
   express: boolean;
-  loyaltyRate?: number;
   sizePrice: number;
   addonUnitPrices: Record<string, number>;
 }): LaundryQuote {
@@ -59,15 +56,13 @@ export function quoteLaundry(input: {
   }
   const subtotal = sizePrice + addonTotal;
   const bumped = Math.round(subtotal * (input.express ? 1 + EXPRESS_BUMP : 1));
-  const rate = effectiveLoyaltyRate(input.loyaltyRate ?? 0);
   const before = bumped;
-  const total = Math.max(1, Math.round(before * (1 - rate)));
+  const total = Math.max(1, before);
   const commission = Math.round(total * COMMISSION);
   const machineUnits = machineUnitsFor(input.size, input.addons);
   return {
     total,
     before,
-    loyaltyRate: rate,
     commission,
     providerNet: total - commission,
     subtotal,

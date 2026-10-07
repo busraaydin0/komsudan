@@ -12,7 +12,6 @@ import { MessagesScreen } from "@/components/MessagesScreen";
 import { ProviderDesk } from "@/components/ProviderDesk";
 import { TabBar, type AppTab } from "@/components/TabBar";
 import { useSession } from "@/lib/api";
-import { LOYALTY_ENABLED } from "@/lib/loyalty";
 import { permissionAsked } from "@/lib/permissions";
 import type { PreferredIntent } from "@/lib/types";
 
@@ -30,7 +29,7 @@ export function AppShell() {
   const [editDiscovery, setEditDiscovery] = useState(false);
   const [discoveryDone, setDiscoveryDone] = useState(false);
   const [chatOrderId, setChatOrderId] = useState<string | null>(null);
-  const { account, loyalty, ready, reload } = useSession();
+  const { account, ready, reload } = useSession();
 
   useEffect(() => {
     setTab((prev) => prev ?? readTab(account?.preferredIntent));
@@ -108,7 +107,6 @@ export function AppShell() {
         <CustomerApp
           pane={tab === "siparis" ? "orders" : "map"}
           mapActive={tab === "harita"}
-          loyaltyLabel={LOYALTY_ENABLED ? loyalty?.label : undefined}
           meAvatar={account.avatarUrl}
           categoryIds={account.preferredCategoryIds ?? []}
           homeLat={account.homeLat}

@@ -1,7 +1,6 @@
 /** Müşteri PWA: çamaşır kayıt defterinden bakış yardımcıları. */
 
 import type { LaundrySize, OrderAddonLine } from "@/lib/laundryModel";
-import { loyaltyRate } from "@/lib/loyalty";
 import { addonKey } from "@/lib/laundryModel";
 import { quoteLaundry, resolveExpress, tl } from "@/lib/pricing";
 import type { CreateOrderInput, PackageId, Provider } from "@/lib/types";
@@ -10,7 +9,6 @@ import { CATEGORIES } from "./registry";
 export const ZERO_QUOTE = {
   total: 0,
   before: 0,
-  loyaltyRate: 0,
   commission: 0,
   providerNet: 0,
   subtotal: 0,
@@ -80,7 +78,6 @@ export function quoteForProvider(
       size: args.size,
       addons: args.addons,
       express: express && selected.express,
-      loyaltyRate: loyaltyRate(0),
       sizePrice,
       addonUnitPrices,
     });
