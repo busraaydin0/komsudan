@@ -18,15 +18,15 @@ function laundryPackagesFor(providerId: string, fallback: ServicePackage[] | und
 export function toProvider(row: {
   id: string;
   payload: string;
-  remaining: number;
   category_id?: string | null;
 }): Provider {
   const p = JSON.parse(row.payload) as Provider;
   const categoryId = row.category_id ?? p.categoryId ?? "camasir";
+  const { capacity: _legacyCap, ...restPayload } = p as Provider & { remaining?: number; capacity?: number };
+  void _legacyCap;
   return {
-    ...p,
+    ...restPayload,
     id: row.id,
-    remaining: row.remaining,
     workPhotos: p.workPhotos ?? [],
     avatarUrl: p.avatarUrl ?? null,
     recentReviews: p.recentReviews ?? [],

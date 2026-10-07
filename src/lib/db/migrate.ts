@@ -24,6 +24,31 @@ function migrationApplied(db: Database.Database, id: string) {
 }
 
 /** 0017 sonrası parça/kg kolonları kalkar; boy+ek kolonları kalır. */
+function ensureCapacityCalendar(db: Database.Database) {
+  if (!migrationApplied(db, "0018_capacity_calendar.sql")) return;
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_capacity_settings (
+      provider_id TEXT PRIMARY KEY REFERENCES providers(id),
+      half_units_per_day INTEGER NOT NULL CHECK (half_units_per_day > 0),
+      working_days TEXT NOT NULL,
+      max_units_per_order INTEGER NOT NULL CHECK (max_units_per_order > 0)
+    );
+    CREATE TABLE IF NOT EXISTS provider_capacity_days (
+      provider_id TEXT NOT NULL REFERENCES providers(id),
+      date TEXT NOT NULL,
+      max_units INTEGER NOT NULL CHECK (max_units > 0),
+      used_units INTEGER NOT NULL DEFAULT 0 CHECK (used_units >= 0),
+      PRIMARY KEY (provider_id, date),
+      CHECK (used_units <= max_units)
+    );
+  `);
+  addColumn(db, "orders", "estimated_delivery_date", "estimated_delivery_date TEXT");
+  addColumn(db, "orders", "promised_delivery_date", "promised_delivery_date TEXT");
+  addColumn(db, "orders", "capacity_allocations", "capacity_allocations TEXT");
+  addColumn(db, "orders", "delay_count", "delay_count INTEGER NOT NULL DEFAULT 0");
+  dropColumnIfExists(db, "providers", "remaining");
+}
+
 function ensureOrderSizeModel(db: Database.Database) {
   if (!migrationApplied(db, "0017_order_size_model.sql")) return;
   addColumn(db, "orders", "size", "size TEXT");
@@ -196,6 +221,7 @@ function ensureColumns(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(user_id);
   `);
   ensureOrderSizeModel(db);
+  ensureCapacityCalendar(db);
   backfillHistory(db);
   backfillPayments(db);
   backfillCategories(db);

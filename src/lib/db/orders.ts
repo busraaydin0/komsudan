@@ -43,6 +43,10 @@ export type OrderRow = {
   color_groups: number | null;
   price_change: PriceChangeStatus;
   cancel_reason: string | null;
+  estimated_delivery_date: string | null;
+  promised_delivery_date: string | null;
+  capacity_allocations: string | null;
+  delay_count: number;
 };
 
 export type InsertOrderInput = {
@@ -65,6 +69,7 @@ export type InsertOrderInput = {
   lifecycle: string;
   size: LaundrySize;
   machine_units: number;
+  estimated_delivery_date?: string | null;
   product_id?: string | null;
   product_name?: string | null;
   guest_count?: number | null;
@@ -75,17 +80,6 @@ export type InsertOrderInput = {
   visit_address?: string | null;
   address_share_consent?: number;
 };
-
-export function getRemaining(providerId: string) {
-  const row = db()
-    .prepare("SELECT remaining FROM providers WHERE id = ?")
-    .get(providerId) as { remaining: number } | undefined;
-  return row?.remaining;
-}
-
-export function addRemaining(providerId: string, delta: number) {
-  db().prepare("UPDATE providers SET remaining = remaining + ? WHERE id = ?").run(delta, providerId);
-}
 
 export function getOrderRow(id: string): OrderRow | undefined {
   return db().prepare("SELECT * FROM orders WHERE id = ?").get(id) as OrderRow | undefined;
@@ -132,7 +126,7 @@ export function insertOrderRow(input: InsertOrderInput) {
         delivery_mode, scheduled_window_start, scheduled_window_end, lifecycle,
         product_id, product_name, guest_count, allergy_note,
         fulfillment_type, visit_district, visit_neighborhood, visit_address, address_share_consent,
-        size, machine_units, price_change
+        size, machine_units, price_change, estimated_delivery_date
       ) VALUES (
         @id, @provider_id, @package_id, @express, @drop_method, @drop_point_id,
         @slot, @note, @total, @commission, @status, @created_at, @updated_at,
@@ -140,7 +134,7 @@ export function insertOrderRow(input: InsertOrderInput) {
         @delivery_mode, @scheduled_window_start, NULL, @lifecycle,
         @product_id, @product_name, @guest_count, @allergy_note,
         @fulfillment_type, @visit_district, @visit_neighborhood, @visit_address, @address_share_consent,
-        @size, @machine_units, 'none'
+        @size, @machine_units, 'none', @estimated_delivery_date
       )`,
     )
     .run({
@@ -153,6 +147,7 @@ export function insertOrderRow(input: InsertOrderInput) {
       visit_neighborhood: null,
       visit_address: null,
       address_share_consent: 0,
+      estimated_delivery_date: input.estimated_delivery_date ?? null,
       ...input,
     });
 }
@@ -297,6 +292,47 @@ export function updateOrderPriceChange(id: string, priceChange: PriceChangeStatu
 
 export function updateOrderCancelReason(id: string, reason: string, updatedAt: string) {
   db().prepare(`UPDATE orders SET cancel_reason = ?, updated_at = ? WHERE id = ?`).run(reason, updatedAt, id);
+}
+
+export function updateOrderCapacityCommit(input: {
+  id: string;
+  promisedDeliveryDate: string;
+  allocationsJson: string;
+  updatedAt: string;
+}) {
+  db()
+    .prepare(
+      `UPDATE orders SET promised_delivery_date = ?, capacity_allocations = ?, updated_at = ? WHERE id = ?`,
+    )
+    .run(input.promisedDeliveryDate, input.allocationsJson, input.updatedAt, input.id);
+}
+
+export function updateOrderDelay(input: {
+  id: string;
+  promisedDeliveryDate: string;
+  delayCount: number;
+  updatedAt: string;
+  cancelFreeHours?: number;
+}) {
+  if (input.cancelFreeHours != null) {
+    db()
+      .prepare(
+        `UPDATE orders SET promised_delivery_date = ?, delay_count = ?, cancel_free_hours = ?, updated_at = ? WHERE id = ?`,
+      )
+      .run(
+        input.promisedDeliveryDate,
+        input.delayCount,
+        input.cancelFreeHours,
+        input.updatedAt,
+        input.id,
+      );
+    return;
+  }
+  db()
+    .prepare(
+      `UPDATE orders SET promised_delivery_date = ?, delay_count = ?, updated_at = ? WHERE id = ?`,
+    )
+    .run(input.promisedDeliveryDate, input.delayCount, input.updatedAt, input.id);
 }
 
 export function runOrderTx<T>(fn: () => T): T {

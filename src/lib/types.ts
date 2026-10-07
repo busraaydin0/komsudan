@@ -89,8 +89,7 @@ export type Provider = {
   ratingBreakdown?: RatingBreakdown;
   packages: ServicePackage[];
   laundryPrices?: LaundryPriceGrid;
-  capacity: number;
-  remaining: number;
+  capacity?: ProviderCapacitySummary;
   hasDryer: boolean;
   /** Yoksa müşteri `hasDryer` ile kurutucu / boş görür. */
   dryingType?: DryingType;
@@ -103,6 +102,15 @@ export type Provider = {
   workPhotos: WorkPhoto[];
   recentReviews: Review[];
   categoryId?: string;
+};
+
+export type ProviderCapacitySummary = {
+  configured: boolean;
+  maxUnitsPerOrder: number;
+  earliestDelivery: string | null;
+  earliestDeliveryLabel: string | null;
+  weekLoad: { date: string; freeRatio: number; usedRatio: number }[];
+  weekTone: "ok" | "low" | "full";
 };
 
 export type PaymentStatus = "authorized" | "captured" | "voided";
@@ -163,6 +171,9 @@ export type Order = {
   colorGroups: number | null;
   pickupConfirmedAt: string | null;
   cancelReason: string | null;
+  estimatedDeliveryDate: string | null;
+  promisedDeliveryDate: string | null;
+  delayCount: number;
   updatedAt?: string;
 };
 

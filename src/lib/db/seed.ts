@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 import { PROVIDERS, SEED_REVIEWS } from "@/lib/data";
 import { EXPRESS_BUMP } from "@/lib/pricing";
 import { ensureProviderPriceGrid } from "./providerPrices";
+import { upsertCapacitySettings } from "./providerCapacity";
 import {
   countSlots,
   insertSlotRow,
@@ -182,10 +183,21 @@ function seedProviderDirectory() {
   }
 }
 
+const SEED_CAPACITY: Record<string, { half: number; maxOrder: number; days?: number[] }> = {
+  elif: { half: 8, maxOrder: 4 },
+  ayse: { half: 6, maxOrder: 4 },
+  merve: { half: 4, maxOrder: 4 },
+  zeynep: { half: 10, maxOrder: 4 },
+  gulsen: { half: 4, maxOrder: 2 },
+  selin: { half: 6, maxOrder: 4 },
+  burak: { half: 5, maxOrder: 4 },
+  leyla: { half: 7, maxOrder: 4 },
+};
+
 export function seedCatalog(database: Database.Database) {
   const upProvider = database.prepare(
-    `INSERT INTO providers (id, payload, remaining, category_id)
-     VALUES (@id, @payload, @remaining, @categoryId)
+    `INSERT INTO providers (id, payload, category_id)
+     VALUES (@id, @payload, @categoryId)
      ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, category_id = excluded.category_id`,
   );
   const upReview = database.prepare(
@@ -198,12 +210,17 @@ export function seedCatalog(database: Database.Database) {
   );
   const tx = database.transaction(() => {
     for (const p of PROVIDERS) {
-      const { remaining, ...rest } = p;
       upProvider.run({
         id: p.id,
-        payload: JSON.stringify({ ...rest, remaining, drops: ["kapi"] }),
-        remaining,
+        payload: JSON.stringify({ ...p, drops: ["kapi"] }),
         categoryId: "camasir",
+      });
+      const cap = SEED_CAPACITY[p.id] ?? { half: 6, maxOrder: 4 };
+      upsertCapacitySettings({
+        providerId: p.id,
+        halfUnitsPerDay: cap.half,
+        workingDays: cap.days ?? [1, 2, 3, 4, 5, 6],
+        maxUnitsPerOrder: cap.maxOrder,
       });
     }
     const knownProviders = new Set(PROVIDERS.map((p) => p.id));

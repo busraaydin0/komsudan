@@ -27,6 +27,7 @@ describe("çamaşır DB ayağa kalkışı", () => {
       "0015_wallets.sql",
       "0016_drop_points_v03.sql",
       "0017_order_size_model.sql",
+      "0018_capacity_calendar.sql",
     ]);
 
     const providers = d.prepare("SELECT id, category_id FROM providers ORDER BY id").all() as {

@@ -225,18 +225,16 @@ export function catalogProviderExists(id: string) {
 export function insertCatalogProvider(input: {
   id: string;
   payload: object;
-  remaining: number;
   categoryId: string;
 }) {
   db()
     .prepare(
-      `INSERT INTO providers (id, payload, remaining, category_id)
-       VALUES (@id, @payload, @remaining, @categoryId)`,
+      `INSERT INTO providers (id, payload, category_id)
+       VALUES (@id, @payload, @categoryId)`,
     )
     .run({
       id: input.id,
       payload: JSON.stringify(input.payload),
-      remaining: input.remaining,
       categoryId: input.categoryId,
     });
 }
