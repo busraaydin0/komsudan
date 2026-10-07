@@ -12,6 +12,7 @@ import { MessagesScreen } from "@/components/MessagesScreen";
 import { ProviderDesk } from "@/components/ProviderDesk";
 import { TabBar, type AppTab } from "@/components/TabBar";
 import { useSession } from "@/lib/api";
+import { LOYALTY_ENABLED } from "@/lib/loyalty";
 import { permissionAsked } from "@/lib/permissions";
 import type { PreferredIntent } from "@/lib/types";
 
@@ -107,7 +108,7 @@ export function AppShell() {
         <CustomerApp
           pane={tab === "siparis" ? "orders" : "map"}
           mapActive={tab === "harita"}
-          loyaltyLabel={loyalty?.label ?? "Komşu"}
+          loyaltyLabel={LOYALTY_ENABLED ? loyalty?.label : undefined}
           meAvatar={account.avatarUrl}
           categoryIds={account.preferredCategoryIds ?? []}
           homeLat={account.homeLat}

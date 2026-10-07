@@ -1,5 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { capacityLabelForPackage } from "@/lib/categories/registry";
+import { deliveredCount } from "@/lib/db/auth";
+import { loyaltyRate } from "@/lib/loyalty";
 import { estimateFor, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/pricing";
 import { isAllowedOrderSlot } from "@/lib/timeWindow";
 import { getCategoryForProvider } from "@/lib/db/categories";
@@ -310,7 +312,7 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     pieces,
     input.packageId,
     express,
-    0,
+    loyaltyRate(deliveredCount(userId)),
   );
   const id = insertPendingOrder({
     providerId: provider.id,

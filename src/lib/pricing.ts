@@ -1,4 +1,5 @@
 import { PACKAGES } from "./data";
+import { effectiveLoyaltyRate } from "./loyalty";
 import type { PackageId, Provider } from "./types";
 
 export const MIN_ORDER = 100;
@@ -49,7 +50,7 @@ export function estimateFor(
 function quote(pieces: number, base: number, express: boolean, loyaltyRate = 0) {
   const raw = pieces * base * (express ? 1 + EXPRESS_BUMP : 1);
   const before = Math.max(MIN_ORDER, Math.round(raw));
-  const rate = Math.min(0.2, Math.max(0, loyaltyRate));
+  const rate = effectiveLoyaltyRate(loyaltyRate);
   const total = Math.max(1, Math.round(before * (1 - rate)));
   const commission = Math.round(total * COMMISSION);
   return {

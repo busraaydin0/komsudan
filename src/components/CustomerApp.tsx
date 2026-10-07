@@ -1022,7 +1022,7 @@ function Checkout({
         <p className="text-xs text-[var(--muted)]">
           {!canPlace
             ? "Bu hizmette sipariş yok; fiyat cihazı görünce netleşir. "
-            : quote.loyaltyRate > 0
+            : quote.loyaltyRate > 0 && loyaltyLabel
             ? `${loyaltyLabel} · %${Math.round(quote.loyaltyRate * 100)} indirim, önce ${tl(quote.before)}. `
             : `Min. ${tl(100)}. `}
           {canPlace && walletBalance != null

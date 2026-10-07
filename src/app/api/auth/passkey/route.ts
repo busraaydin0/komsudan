@@ -1,6 +1,6 @@
 import { fail } from "@/server/http";
 import { assertPasskey, deliveredCount, enablePasskey } from "@/server/auth";
-import { loyaltyFromDelivered } from "@/lib/loyalty";
+import { loyaltyForSession } from "@/lib/loyalty";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
       : await enablePasskey(body.credentialId ?? "");
     return Response.json({
       account,
-      loyalty: loyaltyFromDelivered(deliveredCount(account.id)),
+      loyalty: loyaltyForSession(deliveredCount(account.id)),
     });
   } catch (e) {
     return fail(e);

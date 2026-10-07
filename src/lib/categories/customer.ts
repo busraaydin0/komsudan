@@ -1,5 +1,6 @@
 /** Müşteri PWA: çamaşır kayıt defterinden bakış yardımcıları. */
 
+import { loyaltyRate } from "@/lib/loyalty";
 import { estimateFor, resolveExpress, tl } from "@/lib/pricing";
 import type { CreateOrderInput, DropMethod, PackageId, Provider } from "@/lib/types";
 import { CATEGORIES } from "./registry";
@@ -56,7 +57,7 @@ export function quoteForProvider(
 ) {
   if (!selected) return ZERO_QUOTE;
   const express = resolveExpress(selected.express, args.slot ?? "");
-  return estimateFor(selected, args.pieces, args.pkg, express && selected.express, 0);
+  return estimateFor(selected, args.pieces, args.pkg, express && selected.express, loyaltyRate(0));
 }
 
 export function placeBlockReason(p: Provider): string | null {

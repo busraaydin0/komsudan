@@ -1,3 +1,6 @@
+/** Pilot v0.3 (P13): sadakat kademesi kapalı; kod kalır, fiyat etkilemez. */
+export const LOYALTY_ENABLED = false;
+
 export type LoyaltyTier = "komsu" | "guvenilir" | "sadik";
 
 export type Loyalty = {
@@ -40,6 +43,17 @@ export function loyaltyFromDelivered(delivered: number): Loyalty {
   };
 }
 
+export function effectiveLoyaltyRate(rawRate: number) {
+  if (!LOYALTY_ENABLED) return 0;
+  return Math.min(0.2, Math.max(0, rawRate));
+}
+
 export function loyaltyRate(delivered: number) {
-  return loyaltyFromDelivered(delivered).rate;
+  return effectiveLoyaltyRate(loyaltyFromDelivered(delivered).rate);
+}
+
+/** Oturum / hesap API: kapalıyken null (rozet yok). */
+export function loyaltyForSession(delivered: number): Loyalty | null {
+  if (!LOYALTY_ENABLED) return null;
+  return loyaltyFromDelivered(delivered);
 }
