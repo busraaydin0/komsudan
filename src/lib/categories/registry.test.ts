@@ -7,7 +7,10 @@ import {
   CATEGORY_IDS,
   CATEGORY_LIST,
   capacityLabelForPackage,
+  PUBLIC_CATEGORY_IDS,
   canonicalCategoryId,
+  clampPublicCategoryIds,
+  isPublicCategoryId,
   normalizeCategoryIds,
   usesFoodSm,
 } from "./registry";
@@ -73,5 +76,13 @@ describe("Kategori registry smoke", () => {
     expect(canonicalCategoryId("musluk")).toBe("tamir");
     expect(canonicalCategoryId("tamir")).toBe("tamir");
     expect(normalizeCategoryIds(["camasir", "musluk", "tamir", "foto"])).toEqual(["camasir", "tamir"]);
+  });
+
+  it("pilot keşif yalnızca çamaşır", () => {
+    expect([...PUBLIC_CATEGORY_IDS]).toEqual(["camasir"]);
+    expect(isPublicCategoryId("camasir")).toBe(true);
+    expect(isPublicCategoryId("davet")).toBe(false);
+    expect(clampPublicCategoryIds(["davet", "dikis"])).toEqual(["camasir"]);
+    expect(clampPublicCategoryIds(["camasir", "davet"])).toEqual(["camasir"]);
   });
 });

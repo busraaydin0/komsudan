@@ -1,5 +1,5 @@
 import type { Account, PreferredIntent } from "@/lib/types";
-import { normalizeCategoryIds } from "@/lib/categories/registry";
+import { isPublicCategoryId, normalizeCategoryIds } from "@/lib/categories/registry";
 import type { UserRole, UserRow } from "@/lib/db/auth";
 
 export type AuthUser = {
@@ -46,7 +46,7 @@ export function toAuthUser(row: UserRow): AuthUser {
     identityVerified: Boolean(row.identity_verified),
     passkeyEnabled: Boolean(row.passkey_id),
     avatarUrl: row.avatar_url || null,
-    preferredCategoryIds: parseCategoryIds(row.preferred_category_ids),
+    preferredCategoryIds: parseCategoryIds(row.preferred_category_ids).filter(isPublicCategoryId),
     preferredIntent: parseIntent(row.preferred_intent),
     onboardingCompletedAt: row.onboarding_completed_at ?? null,
     homeLat: row.home_lat ?? null,

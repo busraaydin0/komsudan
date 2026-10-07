@@ -1,3 +1,4 @@
+import { isPublicCategoryId } from "@/lib/categories/registry";
 import { db } from "./client";
 
 export type FulfillmentMode = "delivery" | "home_visit";
@@ -17,15 +18,17 @@ export type CategoryRow = {
 export const DEFAULT_CATEGORY_ID = "camasir";
 
 export function listActiveCategories(): CategoryRow[] {
-  return db()
-    .prepare(
-      `SELECT id, name, icon, fulfillment_mode, pricing_model, COALESCE(is_active, 1) AS is_active,
-              blurb, COALESCE(sort_order, 0) AS sort_order
-       FROM service_categories
-       WHERE COALESCE(is_active, 1) = 1
-       ORDER BY COALESCE(sort_order, 0), name COLLATE NOCASE`,
-    )
-    .all() as CategoryRow[];
+  return (
+    db()
+      .prepare(
+        `SELECT id, name, icon, fulfillment_mode, pricing_model, COALESCE(is_active, 1) AS is_active,
+                blurb, COALESCE(sort_order, 0) AS sort_order
+         FROM service_categories
+         WHERE COALESCE(is_active, 1) = 1
+         ORDER BY COALESCE(sort_order, 0), name COLLATE NOCASE`,
+      )
+      .all() as CategoryRow[]
+  ).filter((row) => isPublicCategoryId(row.id));
 }
 
 export function getCategory(id: string): CategoryRow | undefined {

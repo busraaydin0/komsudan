@@ -1,3 +1,4 @@
+import { clampPublicCategoryIds } from "@/lib/categories/registry";
 import { db, toDrop, toProvider } from "./db";
 import type { DropPoint, Provider } from "@/lib/types";
 import { workPhotosForProvider } from "./photos";
@@ -36,7 +37,7 @@ export function getDrop(id: string): DropPoint | undefined {
 }
 
 export function providersLive(categoryIds?: string[]): Provider[] {
-  const cats = categoryIds?.filter(Boolean) ?? [];
+  const cats = clampPublicCategoryIds(categoryIds);
   const avatars = listAvatarUrls();
   const inList = cats.length
     ? `WHERE COALESCE(category_id, 'camasir') IN (${cats.map((_, i) => `@c${i}`).join(",")})`

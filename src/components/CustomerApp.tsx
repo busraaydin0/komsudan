@@ -331,7 +331,7 @@ export function CustomerApp({
   onOpenMessages,
 }: Props) {
   const { providers, dropPoints, ready, reload: reloadCatalog } = useCatalog(
-    categoryIds?.length ? categoryIds : undefined,
+    categoryIds?.length ? categoryIds : ["camasir"],
   );
   const { orders, reload: reloadOrders } = useOrders();
   const [mode, setMode] = useState<MapMode>("3d");

@@ -310,6 +310,8 @@ function ensureColumns(db: Database.Database) {
       is_active = 1,
       sort_order = 15
     WHERE id = 'mezar';
+    UPDATE service_categories
+    SET is_active = CASE WHEN id = 'camasir' THEN 1 ELSE 0 END;
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS provider_services (

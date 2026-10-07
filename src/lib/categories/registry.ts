@@ -23,6 +23,20 @@ export const CATEGORY_IDS = [
 
 export type CategoryId = (typeof CATEGORY_IDS)[number];
 
+/** Pilot keşif: yalnızca çamaşır. Diğer id’ler şemada durur, is_active=0. */
+export const PUBLIC_CATEGORY_IDS = ["camasir"] as const satisfies readonly CategoryId[];
+export type PublicCategoryId = (typeof PUBLIC_CATEGORY_IDS)[number];
+
+export function isPublicCategoryId(id: string | null | undefined): id is PublicCategoryId {
+  return Boolean(id && (PUBLIC_CATEGORY_IDS as readonly string[]).includes(id));
+}
+
+/** Boş veya kapalı id gelince harita/keşif çamaşıra iner. */
+export function clampPublicCategoryIds(ids?: readonly string[] | null): PublicCategoryId[] {
+  const next = (ids ?? []).filter(isPublicCategoryId);
+  return next.length ? next : [...PUBLIC_CATEGORY_IDS];
+}
+
 /** Çamaşır dışındaki alanlar; siparişte packageId = kategori id. */
 export type CatalogCategoryId = Exclude<CategoryId, "camasir">;
 

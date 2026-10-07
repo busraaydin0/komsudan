@@ -2,7 +2,9 @@ import { ApiError } from "@/server/rules";
 import {
   CATEGORIES,
   canonicalCategoryId,
+  clampPublicCategoryIds,
   isCatalogCategoryId,
+  isPublicCategoryId,
   type CatalogCategoryId,
   type CategoryId,
 } from "@/lib/categories/registry";
@@ -263,7 +265,7 @@ export function listNearby(query: NearbyQuery) {
   const lng = query.lng ?? PILOT.center.lng;
   const radius = query.radius ?? PILOT.radiusKm;
   const origin = { lat, lng };
-  const rows = listProfilesInBox(bbox(lat, lng, radius), query.categoryIds);
+  const rows = listProfilesInBox(bbox(lat, lng, radius), clampPublicCategoryIds(query.categoryIds));
   return rows
     .map((row) => toPublic(row, origin))
     .filter((p) => (p.distanceKm ?? Infinity) <= radius)
@@ -577,6 +579,9 @@ export function ensureServiceOffer(
   },
 ) {
   const categoryId = input.categoryId ?? "camasir";
+  if (!isPublicCategoryId(categoryId)) {
+    throw new ApiError(400, "Bu hizmet alanı şu an kapalı.", "CATEGORY_INACTIVE");
+  }
   if (isCatalogCategoryId(categoryId)) {
     return ensureCatalogOffer(user, input, categoryId);
   }

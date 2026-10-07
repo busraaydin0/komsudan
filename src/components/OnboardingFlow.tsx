@@ -65,9 +65,9 @@ export function OnboardingFlow({
           return next.length ? next : ["camasir"];
         });
         setOfferCat((prev) => {
-          if (!prev) return prev;
-          const id = canonicalCategoryId(prev);
-          return known.has(id) ? id : null;
+          const id = prev ? canonicalCategoryId(prev) : null;
+          if (id && known.has(id)) return id;
+          return list[0]?.id ?? "camasir";
         });
       })
       .catch(() => setCategories([]));
@@ -132,8 +132,9 @@ export function OnboardingFlow({
       });
       return;
     }
+    if (!isCatalogCategoryId(categoryId)) return;
     await postMyOffer({
-      categoryId: isCatalogCategoryId(categoryId) ? categoryId : "davet",
+      categoryId,
       lat,
       lng,
       neighborhood: neighborhoodName,
@@ -160,7 +161,7 @@ export function OnboardingFlow({
       await persist({
         skipped: true,
         completed: true,
-        categoryIds: step === "role" ? [] : mapCategoryIds(),
+        categoryIds: step === "role" ? ["camasir"] : mapCategoryIds(),
       });
       onDone(intent);
     } catch (e) {
@@ -175,6 +176,8 @@ export function OnboardingFlow({
       setErr("En az birini seç veya şimdi değil de.");
       return;
     }
+    if (offer) setOfferCat((prev) => prev ?? "camasir");
+    if (seek) setPicked((prev) => (prev.length ? prev : ["camasir"]));
     setErr("");
     setStep("category");
   }
@@ -265,7 +268,7 @@ export function OnboardingFlow({
                 <RoleCard
                   on={seek}
                   title="Hizmet arıyorum"
-                  hint="Çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye, bahçe, kargo, çıktı, kışlık, halı, ödev, dil, mezar — komşudan al"
+                  hint="Çamaşır yıkama — komşudan al"
                   onClick={() => {
                     setSeek((v) => !v);
                     setErr("");
@@ -274,9 +277,10 @@ export function OnboardingFlow({
                 <RoleCard
                   on={offer}
                   title="Hizmet vermek istiyorum"
-                  hint="Çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye, bahçe, kargo, çıktı, kışlık, halı, ödev, dil veya mezar — alanı sonra seçersin"
+                  hint="Çamaşır yıkama — parça fiyatı ve kurutmayı sonra yazarsın"
                   onClick={() => {
                     setOffer((v) => !v);
+                    setOfferCat((prev) => prev ?? "camasir");
                     setLaundryAdded(false);
                     setErr("");
                   }}
@@ -289,24 +293,26 @@ export function OnboardingFlow({
             <>
               <h1 className="font-[family-name:var(--font-display)] text-2xl">
                 {offer && seek
-                  ? "Alanlar"
+                  ? "Çamaşır yıkama"
                   : offer
-                    ? "Hangi alanda hizmet vereceksin?"
-                    : "Hangi hizmetler?"}
+                    ? "Hizmet vereceğin alan"
+                    : "Hizmet alanı"}
               </h1>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 {offer && seek
-                  ? "Aradığın alanlar birden fazla olabilir. Vereceğin hizmet tek alan."
+                  ? "Pilot: çamaşır yıkama. Vereceksen parça fiyatı ve kurutmayı yaz."
                   : offer
-                    ? "Bir komşu bir alan."
-                    : "Birden fazla seçebilirsin. Liste uzayınca ara."}
+                    ? "Pilot: çamaşır yıkama. Parça fiyatı ve kurutmayı yaz."
+                    : "Pilot: komşudan çamaşır yıkama."}
               </p>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ara: çamaşır, davet, dikiş, tamir, teknoloji, araba, kurye, bahçe, kargo, çıktı, kışlık, halı, ödev, dil, mezar…"
-                className="mt-4 w-full rounded-2xl bg-[var(--paper)] px-3 py-3 text-base ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
-              />
+              {categories.length > 1 ? (
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Ara…"
+                  className="mt-4 w-full rounded-2xl bg-[var(--paper)] px-3 py-3 text-base ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
+                />
+              ) : null}
               {seek && (
                 <>
                   {offer && <p className="mt-4 text-sm font-medium">Hizmet arıyorum</p>}
