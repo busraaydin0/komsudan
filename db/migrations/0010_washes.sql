@@ -1,7 +1,4 @@
--- Araba yıkama: Tip A teslim. Araç yıkanır, yerinde bırakılır / alınır.
-
-INSERT OR IGNORE INTO service_categories (id, name, fulfillment_mode, pricing_model)
-VALUES ('araba', 'Araba Yıkama', 'delivery', 'fixed');
+-- Araba yıkama kartı (WashServiceEditor). Ayrı kategori satırı yok; tablo korundu.
 
 CREATE TABLE IF NOT EXISTS provider_washes (
   id TEXT PRIMARY KEY,

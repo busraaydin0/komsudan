@@ -10,11 +10,11 @@ async function customer(phone: string) {
 }
 
 describe("savePreferences kategori eşlemesi", () => {
-  it("silinen musluk id’sini Tamir’e çevirir; kapalı alanlar tercihten düşer", async () => {
+  it("çamaşır dışı id tercihten düşer; camasir kalır", async () => {
     const user = await customer("5550000891");
     const next = savePreferences(user, {
       intent: "seek",
-      categoryIds: ["camasir", "musluk"],
+      categoryIds: ["camasir", "davet"],
       completed: true,
     });
     expect(next.preferredCategoryIds).toEqual(["camasir"]);

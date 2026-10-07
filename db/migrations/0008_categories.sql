@@ -1,4 +1,4 @@
--- Faz 6.5: kategori iskeleti. Çamaşır delivery + parça fiyatı. Yeni kategori yok.
+-- Faz 6.5: kategori iskeleti. Yalnız çamaşır. Yeni kategori yok.
 
 CREATE TABLE IF NOT EXISTS service_categories (
   id TEXT PRIMARY KEY,
@@ -10,4 +10,4 @@ CREATE TABLE IF NOT EXISTS service_categories (
 );
 
 INSERT OR IGNORE INTO service_categories (id, name, fulfillment_mode, pricing_model)
-VALUES ('camasir', 'Çamaşır', 'delivery', 'per_piece');
+VALUES ('camasir', 'Çamaşır Yıkama', 'delivery', 'per_piece');

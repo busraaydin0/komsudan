@@ -117,7 +117,7 @@ describe("yorum kırılımı", () => {
     insertReview({
       id: "rev-test-dim",
       order_id: null,
-      provider_id: "serkan",
+      provider_id: "burak",
       rating: 4,
       body: "Yalnızca kalite ve tekrar var.",
       author: "B.B.",
@@ -125,7 +125,7 @@ describe("yorum kırılımı", () => {
       quality: 5,
       would_repeat: 1,
     });
-    const live = ratingBreakdown("serkan");
+    const live = ratingBreakdown("burak");
     expect(live.quality).toBe(5);
     expect(live.timeliness).toBeNull();
     expect(live.communication).toBeNull();

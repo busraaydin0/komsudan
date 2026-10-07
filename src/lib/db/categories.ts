@@ -1,3 +1,4 @@
+/** Keşif ve sipariş: `service_categories` yalnız `camasir`. Yeni id önce kayda, sonra SQL’e. */
 import { isPublicCategoryId } from "@/lib/categories/registry";
 import { db } from "./client";
 

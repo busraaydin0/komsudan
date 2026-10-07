@@ -1,9 +1,4 @@
--- Faz 8: Tamir alt-tipi home_visit. Aynı sipariş tablosu.
--- Kolonlar ensureColumns ile eklenir (tekrar ALTER patlamasın).
--- Ayrı musluk kategorisi / provider_taps yok.
-
-DELETE FROM service_categories WHERE id = 'musluk';
-DROP TABLE IF EXISTS provider_taps;
+-- Randevu satırı (eski Tip B). Çamaşır siparişi kullanmasa da tablo durur.
 
 CREATE TABLE IF NOT EXISTS appointments (
   id TEXT PRIMARY KEY,
