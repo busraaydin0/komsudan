@@ -41,7 +41,14 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 - `ready` → `completed`: müşteri onayı veya kod; kararı fazda sabitle, client status yazmasın
 - Review: yalnızca `completed` sonrası, sipariş başına bir
 
+## Kapı doğrulama ve fiyat değişikliği (P1)
+
+- `accepted` → `dropped_off` öncesi: hizmet veren `confirmed_size`, ek adetleri, `color_groups` (1–3), en az bir `dropoff` fotoğrafı girer (`pickup_confirmed_at`).
+- Sipariştekinden **büyük boy** veya **fazla ek** → `price_change = pending`; müşteri onayı olmadan `dropped_off` yok.
+- Müşteri reddederse → `cancelled`, `cancel_reason = size_rejected`, ödeme void, kapasite iade.
+- Onay mekanizması: `orders.price_change` alanı (`none` | `pending` | `approved` | `rejected`). Ayrı dispute tablosu değil.
+
 ## Fiyat ve ödeme
 
-Tutar backend'de paketten hesaplanır. Client tutarına güvenme.
+Tutar backend'de boy + ek tablolarından hesaplanır. Client tutarına güvenme.
 MVP: create'te authorize, `completed`'te capture, iptalde void/refund. Komisyon backend'de; hizmet verene haftalık manuel. iyzico Marketplace v2.

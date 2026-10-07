@@ -2,7 +2,16 @@ import { randomInt, randomUUID } from "node:crypto";
 import { capacityLabelForPackage } from "@/lib/categories/registry";
 import { deliveredCount } from "@/lib/db/auth";
 import { loyaltyRate } from "@/lib/loyalty";
-import { estimateFor, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/pricing";
+import { addonKey, type LaundrySize, type OrderAddonLine } from "@/lib/laundryModel";
+import { assertReadyForDroppedOff } from "@/lib/pickupRules";
+import {
+  addonsFromItems,
+  insertOrderItem,
+  listOrderItems,
+} from "@/lib/db/orderItems";
+import { ensureProviderPriceGrid, getAddonPrice } from "@/lib/db/providerPrices";
+import { clampMachineUnits, resolveExpress } from "@/lib/pricing";
+import { quoteForProviderOrder } from "@/lib/pricingServer";
 import { isAllowedOrderSlot } from "@/lib/timeWindow";
 import { getCategoryForProvider } from "@/lib/db/categories";
 import { strategyFor } from "@/lib/fulfillment";
@@ -10,7 +19,6 @@ import {
   canAddPhotos,
   canCancel,
   lifecycleOf,
-  nextStatus,
   PICKUP_CODE_LEN,
   PICKUP_CODE_TRIES,
   pilotFromLifecycle,
@@ -60,6 +68,15 @@ import { holdForOrder } from "@/lib/services/walletService";
 
 export type OrderAction = "accept" | "reject" | "advance" | "deliver";
 
+function nextLifecycleStep(current: ApiLifecycle, packageId: PackageId): ApiLifecycle | null {
+  if (current === "accepted") return "dropped_off";
+  if (current === "dropped_off") return "washing";
+  if (current === "washing") return packageId === "tam" ? "ironing" : "ready";
+  if (current === "ironing") return "ready";
+  if (current === "ready") return null;
+  return null;
+}
+
 function genCode() {
   return randomInt(0, 10 ** PICKUP_CODE_LEN)
     .toString()
@@ -88,11 +105,17 @@ function toOrder(row: OrderRow, _viewer?: AuthUser, lean = false): Order {
   const status = row.status as OrderStatus;
   const pay = paymentForOrder(row.id);
   const payStatus = (pay?.status ?? row.payment_status) as PaymentStatus;
+  const items = lean ? [] : listOrderItems(row.id);
+  const addons = addonsFromItems(items);
+  const size = (row.size ?? items.find((i) => i.kind === "size")?.variant) as LaundrySize;
   return {
     id: row.id,
     providerId: row.provider_id,
     packageId: row.package_id as Order["packageId"],
-    pieces: row.pieces,
+    size: size ?? "orta",
+    confirmedSize: row.confirmed_size,
+    addons,
+    machineUnits: row.machine_units,
     express: Boolean(row.express),
     drop,
     dropPointId: row.drop_point_id,
@@ -112,10 +135,10 @@ function toOrder(row: OrderRow, _viewer?: AuthUser, lean = false): Order {
     customerId: row.user_id,
     lifecycle: lifecycleOf(status, row.lifecycle) as Order["lifecycle"],
     deliveryMode: (row.delivery_mode as "door" | "point" | null) ?? deliveryMode(),
-    estimatedWeight: row.estimated_weight ?? row.pieces,
-    pricePerKgSnapshot: row.price_per_kg_snapshot ?? 0,
-    estimatedPrice: row.estimated_price ?? row.total,
-    finalPrice: row.final_price,
+    priceChange: row.price_change ?? "none",
+    colorGroups: row.color_groups,
+    pickupConfirmedAt: row.pickup_confirmed_at,
+    cancelReason: row.cancel_reason,
     updatedAt: row.updated_at,
   };
 }
@@ -204,16 +227,21 @@ function validateDropAndSlot(provider: NonNullable<ReturnType<typeof getProvider
   }
 }
 
+function normalizeAddons(raw?: OrderAddonLine[]) {
+  return (raw ?? []).filter((a) => a.qty > 0);
+}
+
 function insertPendingOrder(args: {
   providerId: string;
   packageId: string;
-  pieces: number;
+  size: LaundrySize;
+  addons: OrderAddonLine[];
   express: boolean;
   drop: DropMethod;
   dropPointId: string | null;
   slot: string;
   note: string;
-  quote: { total: number; commission: number; perPiece: number };
+  quote: { total: number; commission: number; machineUnits: number; sizePrice: number };
   userId: string;
 }) {
   const now = new Date().toISOString();
@@ -222,16 +250,15 @@ function insertPendingOrder(args: {
   runOrderTx(() => {
     const remaining = getRemaining(args.providerId);
     if (remaining == null) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
-    if (remaining < args.pieces) {
+    if (remaining < args.quote.machineUnits) {
       throw new ApiError(409, `Bugün yalnızca ${remaining} ${capacityLabel} var.`, "CAPACITY");
     }
     holdForOrder(args.userId, id, args.quote.total);
-    addRemaining(args.providerId, -args.pieces);
+    addRemaining(args.providerId, -args.quote.machineUnits);
     insertOrderRow({
       id,
       provider_id: args.providerId,
       package_id: args.packageId,
-      pieces: args.pieces,
       express: args.express ? 1 : 0,
       drop_method: args.drop,
       drop_point_id: args.dropPointId,
@@ -243,12 +270,11 @@ function insertPendingOrder(args: {
       created_at: now,
       updated_at: now,
       user_id: args.userId,
-      price_per_kg_snapshot: args.quote.perPiece,
-      estimated_weight: args.pieces,
-      estimated_price: args.quote.total,
       delivery_mode: deliveryMode(),
       scheduled_window_start: args.slot,
       lifecycle: "pending",
+      size: args.size,
+      machine_units: args.quote.machineUnits,
       product_id: null,
       product_name: null,
       guest_count: null,
@@ -259,6 +285,25 @@ function insertPendingOrder(args: {
       visit_address: null,
       address_share_consent: 0,
     });
+    insertOrderItem({
+      order_id: id,
+      kind: "size",
+      variant: args.size,
+      qty: 1,
+      unit_price: args.quote.sizePrice,
+    });
+    for (const a of args.addons) {
+      const key = addonKey(a.addon, a.variant);
+      const unit = getAddonPrice(args.providerId, a.addon, a.variant);
+      if (unit == null) throw new ApiError(400, "Ek fiyatı tanımlı değil.", "VALIDATION_ERROR");
+      insertOrderItem({
+        order_id: id,
+        kind: "addon",
+        variant: key,
+        qty: a.qty,
+        unit_price: unit,
+      });
+    }
     recordTransition({
       orderId: id,
       fromStatus: null,
@@ -280,10 +325,6 @@ function insertPendingOrder(args: {
 }
 
 function createLaundryOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const pieces = Math.round(input.pieces ?? NaN);
-  if (!Number.isFinite(pieces) || pieces < PIECES_MIN || pieces > PIECES_MAX) {
-    throw new ApiError(400, `Parça sayısı ${PIECES_MIN}–${PIECES_MAX} olmalı.`, "VALIDATION_ERROR");
-  }
   if (!input.packageId) {
     throw new ApiError(400, "Paket seç.", "VALIDATION_ERROR");
   }
@@ -297,17 +338,27 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
   }
 
   validateDropAndSlot(provider, input);
-  const quote = estimateFor(
-    provider,
-    pieces,
+  ensureProviderPriceGrid(provider.id);
+  const addons = normalizeAddons(input.addons);
+  const quote = quoteForProviderOrder(
+    provider.id,
     input.packageId,
+    input.size,
+    addons,
     express,
     loyaltyRate(deliveredCount(userId)),
   );
+  const remaining = getRemaining(provider.id);
+  const units = clampMachineUnits(quote.machineUnits, remaining ?? undefined);
+  if (units !== quote.machineUnits) {
+    throw new ApiError(409, "Kapasite bu boy ve ekler için yeterli değil.", "CAPACITY");
+  }
+
   const id = insertPendingOrder({
     providerId: provider.id,
     packageId: input.packageId,
-    pieces,
+    size: input.size,
+    addons,
     express,
     drop: "kapi",
     dropPointId: null,
@@ -321,7 +372,7 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     id,
     provider_id: provider.id,
     user_id: userId,
-    pieces,
+    machineUnits: quote.machineUnits,
   });
   return order;
 }
@@ -403,6 +454,7 @@ export function applyStatus(
   const pack = row.package_id as PackageId;
   assertCanMove(row, from, next, pack);
   assertStatusRole(user, row, next);
+  if (next === "dropped_off") assertReadyForDroppedOff(row);
 
   const now = new Date().toISOString();
   if (next === "completed") verifyPickupCode(row, code, now);
@@ -431,7 +483,6 @@ export function applyStatus(
         resetAttempts: true,
         paymentStatus: "captured",
         paidAt: now,
-        finalPrice: row.total,
       });
     } else if (voidPay) {
       updateOrderStatus({
@@ -455,7 +506,7 @@ export function applyStatus(
       note: note?.trim().slice(0, 200) || null,
       at: now,
     });
-    if (voidPay) addRemaining(row.provider_id, row.pieces);
+    if (voidPay) addRemaining(row.provider_id, row.machine_units);
     if (capture) capturePayment(id, now);
     if (voidPay) voidPayment(id, now);
   });
@@ -497,12 +548,9 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
     }
     next = "completed";
   } else if (action === "advance") {
-    const n = nextStatus(order.status, order.packageId);
-    if (!n) throw new ApiError(409, "Daha ileri durum yok.", "INVALID_TRANSITION");
-    if (n === "teslim_edildi") {
-      throw new ApiError(409, "Teslim için müşterinin kodunu gir.", "INVALID_TRANSITION");
-    }
-    next = lifecycleOf(n);
+    const step = nextLifecycleStep(currentLifecycle(row), order.packageId);
+    if (!step) throw new ApiError(409, "Daha ileri durum yok.", "INVALID_TRANSITION");
+    next = step;
   } else {
     throw new ApiError(400, "Bu sipariş için bu aksiyon yok.", "VALIDATION_ERROR");
   }

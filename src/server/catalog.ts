@@ -1,9 +1,29 @@
 import { clampPublicCategoryIds } from "@/lib/categories/registry";
+import { addonKey } from "@/lib/laundryModel";
+import {
+  ensureProviderPriceGrid,
+  listAddonPrices,
+  listSizePrices,
+} from "@/lib/db/providerPrices";
 import { db, toProvider } from "./db";
-import type { Provider } from "@/lib/types";
+import type { LaundryPriceGrid, Provider } from "@/lib/types";
 import { workPhotosForProvider } from "./photos";
 import { ratingBreakdown, ratingForProvider, reviewsForProvider } from "@/lib/services/reviewService";
 import { listAvatarUrls } from "@/lib/db/providers";
+
+function laundryPricesForProvider(p: Provider): LaundryPriceGrid {
+  ensureProviderPriceGrid(p.id);
+  const sizes: LaundryPriceGrid["sizes"] = {};
+  for (const pack of p.packages) {
+    const rows = listSizePrices(p.id, pack.id);
+    sizes[pack.id] = Object.fromEntries(rows.map((r) => [r.size, r.price]));
+  }
+  const addons: Record<string, number> = {};
+  for (const row of listAddonPrices(p.id)) {
+    addons[addonKey(row.addon, row.variant)] = row.price;
+  }
+  return { sizes, addons };
+}
 
 function hydrate(p: Provider, avatars: Record<string, string>, full: boolean): Provider {
   const live = ratingForProvider(p.id, { rating: p.rating, reviews: p.reviews });
@@ -15,6 +35,7 @@ function hydrate(p: Provider, avatars: Record<string, string>, full: boolean): P
     avatarUrl: avatars[p.id] || p.avatarUrl || null,
     workPhotos: full ? workPhotosForProvider(p.id, 12) : (p.workPhotos ?? []),
     recentReviews: full ? reviewsForProvider(p.id).slice(0, 6) : (p.recentReviews ?? []),
+    laundryPrices: laundryPricesForProvider(p),
   };
 }
 

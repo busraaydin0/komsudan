@@ -46,12 +46,17 @@ function pushTo(userId: string | null | undefined, input: {
   }
 }
 
-export function notifyNewOrder(row: { id: string; provider_id: string; user_id: string | null; pieces: number }) {
+export function notifyNewOrder(row: {
+  id: string;
+  provider_id: string;
+  user_id: string | null;
+  machineUnits: number;
+}) {
   if (row.provider_id === row.user_id) return;
   const order = getOrderRow(row.id);
   const copy = pickOrderNotice("created", {
     packageId: order?.package_id,
-    pieces: order?.guest_count ?? order?.pieces ?? row.pieces,
+    machineUnits: order?.machine_units ?? row.machineUnits,
     productName: order?.product_name,
     orderId: row.id,
   });
@@ -76,7 +81,7 @@ export function notifyStatusChange(input: {
   const other = actorId === customerId ? providerId : customerId;
   const ctx = {
     packageId: row.package_id,
-    pieces: row.guest_count ?? row.pieces,
+    machineUnits: row.machine_units,
     productName: row.product_name,
     orderId: row.id,
     pickupCode: pickupCode ?? undefined,
@@ -142,7 +147,7 @@ export function notifyStatusChange(input: {
 export function notifyPickupCodeRotated(row: OrderRow, code: string) {
   const copy = pickOrderNotice("pickup", {
     packageId: row.package_id,
-    pieces: row.guest_count ?? row.pieces,
+    machineUnits: row.machine_units,
     productName: row.product_name,
     orderId: row.id,
     pickupCode: code,
