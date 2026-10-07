@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
+import type { LaundrySize, PriceChangeStatus } from "@/lib/laundryModel";
 import { db } from "./client";
 
 export type OrderRow = {
   id: string;
   provider_id: string;
   package_id: string;
-  pieces: number;
   express: number;
   drop_method: string;
   drop_point_id: string | null;
@@ -21,11 +21,6 @@ export type OrderRow = {
   paid_at: string | null;
   payment_status: string;
   user_id: string | null;
-  price_per_kg_snapshot: number | null;
-  estimated_weight: number | null;
-  actual_weight: number | null;
-  estimated_price: number | null;
-  final_price: number | null;
   delivery_mode: string | null;
   scheduled_window_start: string | null;
   scheduled_window_end: string | null;
@@ -41,13 +36,19 @@ export type OrderRow = {
   address_share_consent: number;
   dispute_window_hours: number | null;
   cancel_free_hours: number | null;
+  size: LaundrySize | null;
+  confirmed_size: LaundrySize | null;
+  machine_units: number;
+  pickup_confirmed_at: string | null;
+  color_groups: number | null;
+  price_change: PriceChangeStatus;
+  cancel_reason: string | null;
 };
 
 export type InsertOrderInput = {
   id: string;
   provider_id: string;
   package_id: string;
-  pieces: number;
   express: number;
   drop_method: string;
   drop_point_id: string | null;
@@ -59,12 +60,11 @@ export type InsertOrderInput = {
   created_at: string;
   updated_at: string;
   user_id: string;
-  price_per_kg_snapshot: number;
-  estimated_weight: number;
-  estimated_price: number;
   delivery_mode: string;
   scheduled_window_start: string;
   lifecycle: string;
+  size: LaundrySize;
+  machine_units: number;
   product_id?: string | null;
   product_name?: string | null;
   guest_count?: number | null;
@@ -126,21 +126,21 @@ export function insertOrderRow(input: InsertOrderInput) {
   db()
     .prepare(
       `INSERT INTO orders (
-        id, provider_id, package_id, pieces, express, drop_method, drop_point_id,
+        id, provider_id, package_id, express, drop_method, drop_point_id,
         slot, note, total, commission, status, created_at, updated_at,
         pickup_code, code_attempts, paid_at, payment_status, user_id,
-        price_per_kg_snapshot, estimated_weight, actual_weight, estimated_price, final_price,
         delivery_mode, scheduled_window_start, scheduled_window_end, lifecycle,
         product_id, product_name, guest_count, allergy_note,
-        fulfillment_type, visit_district, visit_neighborhood, visit_address, address_share_consent
+        fulfillment_type, visit_district, visit_neighborhood, visit_address, address_share_consent,
+        size, machine_units, price_change
       ) VALUES (
-        @id, @provider_id, @package_id, @pieces, @express, @drop_method, @drop_point_id,
+        @id, @provider_id, @package_id, @express, @drop_method, @drop_point_id,
         @slot, @note, @total, @commission, @status, @created_at, @updated_at,
         NULL, 0, NULL, 'authorized', @user_id,
-        @price_per_kg_snapshot, @estimated_weight, NULL, @estimated_price, NULL,
         @delivery_mode, @scheduled_window_start, NULL, @lifecycle,
         @product_id, @product_name, @guest_count, @allergy_note,
-        @fulfillment_type, @visit_district, @visit_neighborhood, @visit_address, @address_share_consent
+        @fulfillment_type, @visit_district, @visit_neighborhood, @visit_address, @address_share_consent,
+        @size, @machine_units, 'none'
       )`,
     )
     .run({
@@ -231,15 +231,14 @@ export function updateOrderStatus(input: {
   resetAttempts?: boolean;
   paymentStatus?: string;
   paidAt?: string | null;
-  finalPrice?: number | null;
 }) {
   if (input.pickupCode !== undefined && input.resetAttempts && input.paymentStatus === "captured") {
     db()
       .prepare(
         `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'captured', paid_at = ?, pickup_code = NULL,
-         code_attempts = 0, final_price = ?, updated_at = ? WHERE id = ?`,
+         code_attempts = 0, updated_at = ? WHERE id = ?`,
       )
-      .run(input.status, input.lifecycle, input.paidAt, input.finalPrice ?? null, input.updatedAt, input.id);
+      .run(input.status, input.lifecycle, input.paidAt, input.updatedAt, input.id);
     return;
   }
   if (input.paymentStatus === "voided") {
@@ -261,6 +260,43 @@ export function updateOrderStatus(input: {
   db()
     .prepare("UPDATE orders SET status = ?, lifecycle = ?, updated_at = ? WHERE id = ?")
     .run(input.status, input.lifecycle, input.updatedAt, input.id);
+}
+
+export function updateOrderPickupConfirm(input: {
+  id: string;
+  confirmedSize: LaundrySize;
+  colorGroups: number;
+  machineUnits: number;
+  total: number;
+  commission: number;
+  priceChange: PriceChangeStatus;
+  at: string;
+}) {
+  db()
+    .prepare(
+      `UPDATE orders SET confirmed_size = ?, color_groups = ?, machine_units = ?,
+       pickup_confirmed_at = ?, total = ?, commission = ?, price_change = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .run(
+      input.confirmedSize,
+      input.colorGroups,
+      input.machineUnits,
+      input.at,
+      input.total,
+      input.commission,
+      input.priceChange,
+      input.at,
+      input.id,
+    );
+}
+
+export function updateOrderPriceChange(id: string, priceChange: PriceChangeStatus, updatedAt: string) {
+  db().prepare(`UPDATE orders SET price_change = ?, updated_at = ? WHERE id = ?`).run(priceChange, updatedAt, id);
+}
+
+export function updateOrderCancelReason(id: string, reason: string, updatedAt: string) {
+  db().prepare(`UPDATE orders SET cancel_reason = ?, updated_at = ? WHERE id = ?`).run(reason, updatedAt, id);
 }
 
 export function runOrderTx<T>(fn: () => T): T {

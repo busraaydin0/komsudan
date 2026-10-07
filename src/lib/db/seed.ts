@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { PROVIDERS, SEED_REVIEWS } from "@/lib/data";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
+import { ensureProviderPriceGrid } from "./providerPrices";
 import {
   countSlots,
   insertSlotRow,
@@ -159,6 +160,7 @@ function seedProviderDirectory() {
         express_surcharge_pct: p.express ? EXPRESS_BUMP : 0,
       });
     }
+    ensureProviderPriceGrid(p.id);
     if (countSlots(p.id) === 0) {
       const windows = [...new Set(p.slots.map((s) => s.replace(/^(Bugün|Yarın) /, "")))];
       for (const day of [1, 2, 3, 4, 5]) {
