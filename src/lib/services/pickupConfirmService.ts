@@ -19,8 +19,8 @@ import {
 import type { AuthUser } from "@/lib/auth/types";
 import { ApiError } from "@/server/rules";
 import { quoteForProviderOrder } from "@/lib/pricingServer";
-import { lifecycleOf, pilotFromLifecycle } from "@/lib/status";
-import type { OrderStatus, PackageId } from "@/lib/types";
+import { isOrderStatus } from "@/lib/status";
+import type { PackageId } from "@/lib/types";
 import { photosForOrder } from "@/server/photos";
 import { parseAllocations } from "@/lib/db/providerCapacity";
 import { releaseOrderCapacity } from "@/lib/services/capacityService";
@@ -44,8 +44,7 @@ export function confirmPickupAtDoor(
   const row = getOrderRow(orderId);
   if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
   assertProviderAtDoor(user, row);
-  const lc = lifecycleOf(row.status as OrderStatus, row.lifecycle);
-  if (lc !== "accepted") {
+  if (!isOrderStatus(row.status) || row.status !== "accepted") {
     throw new ApiError(409, "Kapı doğrulaması yalnızca kabul sonrası.", "INVALID_TRANSITION");
   }
   const photos = photosForOrder(orderId);
@@ -120,8 +119,6 @@ export function respondPriceChange(user: AuthUser, orderId: string, action: "app
     throw new ApiError(409, "Bekleyen fiyat değişikliği yok.", "INVALID_TRANSITION");
   }
   const now = new Date().toISOString();
-  const fromLc = lifecycleOf(row.status as OrderStatus, row.lifecycle);
-
   if (action === "approve") {
     updateOrderPriceChange(orderId, "approved", now);
     return orderId;
@@ -132,17 +129,14 @@ export function respondPriceChange(user: AuthUser, orderId: string, action: "app
     updateOrderCancelReason(orderId, "size_rejected", now);
     updateOrderStatus({
       id: orderId,
-      status: pilotFromLifecycle("cancelled"),
-      lifecycle: "cancelled",
+      status: "cancelled",
       updatedAt: now,
       paymentStatus: "voided",
     });
     recordTransition({
       orderId,
       fromStatus: row.status,
-      toStatus: "iptal",
-      fromLifecycle: fromLc,
-      toLifecycle: "cancelled",
+      toStatus: "cancelled",
       actorId: user.id,
       actorRole: user.role,
       note: "size_rejected",

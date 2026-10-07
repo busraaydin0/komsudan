@@ -10,8 +10,7 @@ import {
 import { getOrderRow, updateOrderPickupSummaryApproved } from "@/lib/db/orders";
 import type { AuthUser } from "@/lib/auth/types";
 import { ApiError } from "@/server/rules";
-import { lifecycleOf } from "@/lib/status";
-import type { OrderStatus } from "@/lib/types";
+import { isOrderStatus } from "@/lib/status";
 import { notifyHandoffCodeRotated } from "@/lib/services/notificationService";
 
 export const HANDOFF_PIN_LEN = 4;
@@ -38,8 +37,7 @@ export function pickupHandoffActive(row: NonNullable<ReturnType<typeof getOrderR
 }
 
 export function returnHandoffActive(row: NonNullable<ReturnType<typeof getOrderRow>>) {
-  const lc = lifecycleOf(row.status as OrderStatus, row.lifecycle);
-  if (lc !== "ready") return false;
+  if (!isOrderStatus(row.status) || row.status !== "ready") return false;
   if (row.admin_hold) return false;
   const hc = getHandoffCode(row.id, "return");
   if (!hc || hc.locked || hc.used_at) return false;

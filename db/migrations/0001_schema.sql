@@ -176,8 +176,10 @@ CREATE TABLE orders (
   note TEXT NOT NULL DEFAULT '',
   total INTEGER NOT NULL,
   commission INTEGER NOT NULL,
-  status TEXT NOT NULL,
-  lifecycle TEXT,
+  status TEXT NOT NULL CHECK (status IN (
+    'pending', 'accepted', 'dropped_off', 'washing', 'ironing', 'ready',
+    'admin_pending', 'completed', 'rejected', 'cancelled', 'disputed'
+  )),
   payment_status TEXT NOT NULL DEFAULT 'authorized',
   paid_at TEXT,
   delivery_mode TEXT,
@@ -225,8 +227,6 @@ CREATE TABLE order_status_history (
   order_id TEXT NOT NULL REFERENCES orders(id),
   from_status TEXT,
   to_status TEXT NOT NULL,
-  from_lifecycle TEXT,
-  to_lifecycle TEXT NOT NULL,
   actor_id TEXT,
   actor_role TEXT,
   note TEXT,

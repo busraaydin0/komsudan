@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { canAddPhotos } from "@/lib/status";
-import type { OrderPhotoKind, OrderStatus, WorkPhoto } from "@/lib/types";
+import type { OrderPhotoKind, WorkPhoto } from "@/lib/types";
+import { canAddPhotos, isOrderStatus } from "@/lib/status";
 import { db, uploadsDir } from "./db";
 import { ApiError } from "./rules";
 import { setUserAvatar } from "@/lib/db/auth";
@@ -135,7 +135,7 @@ export function addPhoto(orderId: string, buf: Buffer, kind: OrderPhotoKind = "d
     .prepare("SELECT id, provider_id, status FROM orders WHERE id = ?")
     .get(orderId) as { id: string; provider_id: string; status: string } | undefined;
   if (!order) throw new ApiError(404, "Sipariş yok.");
-  if (!canAddPhotos(order.status as OrderStatus)) {
+  if (!isOrderStatus(order.status) || !canAddPhotos(order.status)) {
     throw new ApiError(409, "Bu aşamada fotoğraf eklenmez.");
   }
   const extra = (

@@ -2,8 +2,7 @@ import { insertDeliveryOverride, getDeliveryOverrideByOrder, resolveDeliveryOver
 import { getOrderRow, setOrderAdminHold } from "@/lib/db/orders";
 import type { AuthUser } from "@/lib/auth/types";
 import { ApiError } from "@/server/rules";
-import { lifecycleOf } from "@/lib/status";
-import type { OrderStatus } from "@/lib/types";
+import { isOrderStatus } from "@/lib/status";
 import { photosForOrder } from "@/server/photos";
 import { notifyDeliveryOverrideOpened } from "@/lib/services/notificationService";
 import { completeOrderOverride } from "@/lib/services/orderService";
@@ -21,8 +20,9 @@ export function requestDeliveryOverride(
   if (user.role !== "admin" && row.provider_id !== user.id) {
     throw new ApiError(403, "Kodsuz teslim talebini hizmet veren açar.", "FORBIDDEN");
   }
-  const lc = lifecycleOf(row.status as OrderStatus, row.lifecycle);
-  if (lc !== "ready") throw new ApiError(409, "Talep yalnızca hazır siparişte.", "INVALID_TRANSITION");
+  if (!isOrderStatus(row.status) || row.status !== "ready") {
+    throw new ApiError(409, "Talep yalnızca hazır siparişte.", "INVALID_TRANSITION");
+  }
   if (getDeliveryOverrideByOrder(orderId)?.status === "pending") {
     throw new ApiError(409, "Bekleyen talep var.", "CONFLICT");
   }

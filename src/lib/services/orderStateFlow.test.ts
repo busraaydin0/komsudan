@@ -6,8 +6,7 @@ import { ensureProviderPriceGrid } from "@/lib/db/providerPrices";
 import { getOrderRow, insertOrderRow } from "@/lib/db/orders";
 import { getHandoffCode } from "@/lib/db/handoffCodes";
 import type { Order } from "@/lib/types";
-import type { ApiLifecycle, OrderStatus } from "@/lib/types";
-import { lifecycleOf } from "@/lib/status";
+import type { OrderStatusId } from "@/lib/status";
 import { loadUser, requestOtp, verifyOtp } from "./authService";
 import { applyOrderAction, getOrderFor } from "./orderService";
 import { confirmPickupAtDoor, respondPriceChange } from "./pickupConfirmService";
@@ -22,9 +21,8 @@ const MINI_PNG = Buffer.from(
   "base64",
 );
 
-/** Refaktör boyunca geçerli: canonical sipariş durumu. */
-export function canonicalStatus(order: Pick<Order, "status" | "lifecycle">): ApiLifecycle {
-  return order.lifecycle ?? lifecycleOf(order.status as OrderStatus);
+export function canonicalStatus(order: Pick<Order, "status">): OrderStatusId {
+  return order.status;
 }
 
 async function customer(phone: string) {
@@ -45,13 +43,12 @@ function seedPending(id: string, userId: string, packageId: "yikama" | "katlama"
     note: "",
     total: 150,
     commission: 15,
-    status: "onay_bekliyor",
+    status: "pending",
     created_at: now,
     updated_at: now,
     user_id: userId,
     delivery_mode: "door",
     scheduled_window_start: now,
-    lifecycle: "pending",
     size: "kucuk",
     machine_units: 1,
     estimated_delivery_date: "2026-10-10",
@@ -146,13 +143,12 @@ describe("sipariş durum akışı (karakterizasyon)", () => {
       note: "",
       total: 150,
       commission: 15,
-      status: "teslim_alindi",
+      status: "accepted",
       created_at: now,
       updated_at: now,
       user_id: user.id,
       delivery_mode: "door",
       scheduled_window_start: now,
-      lifecycle: "accepted",
       size: "kucuk",
       machine_units: 1,
     });
@@ -163,9 +159,7 @@ describe("sipariş durum akışı (karakterizasyon)", () => {
     const cust = loadUser(user.id)!;
     respondPriceChange(cust, "ord-flow-pc", "reject");
     const row = getOrderRow("ord-flow-pc")!;
-    expect(canonicalStatus({ status: row.status as OrderStatus, lifecycle: row.lifecycle as ApiLifecycle })).toBe(
-      "cancelled",
-    );
+    expect(row.status).toBe("cancelled");
     expect(paymentForOrder("ord-flow-pc")?.status).toBe("voided");
   });
 
@@ -174,10 +168,7 @@ describe("sipariş durum akışı (karakterizasyon)", () => {
     seedPending("ord-flow-exp", cust.id);
     const n = expireStaleRequests(new Date("2026-10-08T09:05:00+03:00"));
     expect(n).toBeGreaterThanOrEqual(1);
-    const row = getOrderRow("ord-flow-exp")!;
-    expect(canonicalStatus({ status: row.status as OrderStatus, lifecycle: row.lifecycle as ApiLifecycle })).toBe(
-      "rejected",
-    );
+    expect(getOrderRow("ord-flow-exp")!.status).toBe("rejected");
   });
 
   it("completed sonrası itiraz kaydı açılır (sipariş completed kalır)", async () => {

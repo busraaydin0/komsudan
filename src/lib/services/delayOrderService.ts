@@ -2,14 +2,13 @@ import { dateAtNoonIstanbul, isoDateInIstanbul } from "@/lib/capacity/istanbul";
 import { getOrderRow, updateOrderDelay } from "@/lib/db/orders";
 import type { AuthUser } from "@/lib/auth/types";
 import { ApiError } from "@/server/rules";
-import { lifecycleOf } from "@/lib/status";
-import type { OrderStatus } from "@/lib/types";
+import { isOrderStatus, type OrderStatusId } from "@/lib/status";
 import { notifyOrderDelayed } from "./notificationService";
 
 const MAX_DELAY_MS = 72 * 3_600_000;
 
-function canDelayLifecycle(lc: string) {
-  return lc === "accepted" || lc === "dropped_off" || lc === "washing" || lc === "ironing" || lc === "ready";
+function canDelayStatus(status: OrderStatusId) {
+  return status === "accepted" || status === "dropped_off" || status === "washing" || status === "ironing" || status === "ready";
 }
 
 export function delayOrder(user: AuthUser, orderId: string, reason: string, extendHours: number) {
@@ -18,8 +17,7 @@ export function delayOrder(user: AuthUser, orderId: string, reason: string, exte
   if (user.role !== "admin" && row.provider_id !== user.id) {
     throw new ApiError(403, "Ertelemeyi hizmet veren yapar.", "FORBIDDEN");
   }
-  const lc = lifecycleOf(row.status as OrderStatus, row.lifecycle);
-  if (!canDelayLifecycle(lc)) {
+  if (!isOrderStatus(row.status) || !canDelayStatus(row.status)) {
     throw new ApiError(409, "Bu aşamada erteleme yok.", "INVALID_TRANSITION");
   }
   const note = reason.trim();

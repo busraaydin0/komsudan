@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { canReview } from "@/lib/status";
-import type { OrderStatus, RatingBreakdown, Review } from "@/lib/types";
+import { canReview, isOrderStatus } from "@/lib/status";
+import type { RatingBreakdown, Review } from "@/lib/types";
 import { bayesianRating } from "@/lib/rating";
 import { getOrderRow } from "@/lib/db/orders";
 import {
@@ -111,7 +111,7 @@ export function reviewForOrder(orderId: string): Review | null {
 export function createReview(orderId: string, input: ReviewWriteInput, author: string): Review {
   const order = getOrderRow(orderId);
   if (!order) throw new ApiError(404, "Sipariş yok.");
-  if (!canReview(order.status as OrderStatus)) {
+  if (!isOrderStatus(order.status) || !canReview(order.status)) {
     throw new ApiError(409, "Yorum ancak teslimden sonra.");
   }
   if (getReviewByOrderId(orderId)) throw new ApiError(409, "Bu siparişe yorum zaten var.");

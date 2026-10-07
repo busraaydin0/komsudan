@@ -23,13 +23,12 @@ function seedOrder(id: string, userId: string, providerId = "elif") {
     note: "",
     total: 240,
     commission: 24,
-    status: "teslim_edildi",
+    status: "completed",
     created_at: now,
     updated_at: now,
     user_id: userId,
     delivery_mode: "door",
     scheduled_window_start: now,
-    lifecycle: "completed",
     size: "orta",
     machine_units: 2,
   });
@@ -62,7 +61,7 @@ describe("itiraz kaydı", () => {
     const closed = resolveDispute(provider!, opened.id);
     expect(closed.status).toBe("resolved");
     expect(closed.resolvedAt).toBeTruthy();
-    expect(getOrderRow("ord-dsp-1")?.status).toBe("teslim_edildi");
+    expect(getOrderRow("ord-dsp-1")?.status).toBe("completed");
 
     const again = openDispute(provider!, "ord-dsp-1", "Sağlayıcı da itiraz açabilsin diye.");
     expect(again.openerRole).toBe("provider");

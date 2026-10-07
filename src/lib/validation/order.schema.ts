@@ -53,19 +53,3 @@ export const deliveryOverrideResolveSchema = z.object({
   reason: z.string().min(3).max(500),
 });
 
-export const patchStatusSchema = z.object({
-  status: z.enum([
-    "pending",
-    "accepted",
-    "dropped_off",
-    "washing",
-    "ironing",
-    "ready",
-    "completed",
-    "rejected",
-    "cancelled",
-    "disputed",
-  ]),
-  code: z.string().optional(),
-  note: z.string().max(200).optional(),
-});

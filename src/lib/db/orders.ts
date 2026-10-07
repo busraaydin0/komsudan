@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { LaundrySize, PriceChangeStatus } from "@/lib/laundryModel";
+import type { OrderStatusId } from "@/lib/status";
 import { db } from "./client";
 
 export type OrderRow = {
@@ -20,7 +21,6 @@ export type OrderRow = {
   user_id: string | null;
   delivery_mode: string | null;
   scheduled_window_start: string | null;
-  lifecycle: string | null;
   size: LaundrySize | null;
   confirmed_size: LaundrySize | null;
   machine_units: number;
@@ -51,13 +51,12 @@ export type InsertOrderInput = {
   note: string;
   total: number;
   commission: number;
-  status: string;
+  status: OrderStatusId;
   created_at: string;
   updated_at: string;
   user_id: string | null;
   delivery_mode: string;
   scheduled_window_start: string;
-  lifecycle: string;
   size: LaundrySize;
   machine_units: number;
   estimated_delivery_date?: string | null;
@@ -83,7 +82,7 @@ export function customerHasOpenOrder(userId: string) {
   const row = db()
     .prepare(
       `SELECT 1 AS n FROM orders
-       WHERE user_id = ? AND status NOT IN ('teslim_edildi', 'iptal')
+       WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected', 'disputed')
        LIMIT 1`,
     )
     .get(userId) as { n: number } | undefined;
@@ -106,12 +105,12 @@ export function insertOrderRow(input: InsertOrderInput) {
       `INSERT INTO orders (
         id, provider_id, package_id, express, drop_method, slot, note, total, commission,
         status, created_at, updated_at, payment_status, user_id, delivery_mode,
-        scheduled_window_start, lifecycle, size, machine_units, price_change,
+        scheduled_window_start, size, machine_units, price_change,
         estimated_delivery_date, respond_by, public_code
       ) VALUES (
         @id, @provider_id, @package_id, @express, @drop_method, @slot, @note, @total, @commission,
         @status, @created_at, @updated_at, 'authorized', @user_id, @delivery_mode,
-        @scheduled_window_start, @lifecycle, @size, @machine_units, 'none',
+        @scheduled_window_start, @size, @machine_units, 'none',
         @estimated_delivery_date, @respond_by, @public_code
       )`,
     )
@@ -130,7 +129,7 @@ export function updateOrderPickupSummaryApproved(id: string, at: string) {
 export function setOrderAdminHold(id: string, hold: boolean, disputeWindowEnd: string | null, updatedAt: string) {
   db()
     .prepare(
-      `UPDATE orders SET admin_hold = ?, dispute_window_end = ?, lifecycle = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE orders SET admin_hold = ?, dispute_window_end = ?, status = ?, updated_at = ? WHERE id = ?`,
     )
     .run(hold ? 1 : 0, disputeWindowEnd, hold ? "admin_pending" : "ready", updatedAt, id);
 }
@@ -140,8 +139,6 @@ export type HistoryRow = {
   order_id: string;
   from_status: string | null;
   to_status: string;
-  from_lifecycle: string | null;
-  to_lifecycle: string;
   actor_id: string | null;
   actor_role: string | null;
   note: string | null;
@@ -152,8 +149,6 @@ export function recordTransition(input: {
   orderId: string;
   fromStatus: string | null;
   toStatus: string;
-  fromLifecycle: string | null;
-  toLifecycle: string;
   actorId: string | null;
   actorRole: string | null;
   note: string | null;
@@ -162,17 +157,14 @@ export function recordTransition(input: {
   db()
     .prepare(
       `INSERT INTO order_status_history (
-        id, order_id, from_status, to_status, from_lifecycle, to_lifecycle,
-        actor_id, actor_role, note, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, order_id, from_status, to_status, actor_id, actor_role, note, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       `h-${randomUUID().slice(0, 12)}`,
       input.orderId,
       input.fromStatus,
       input.toStatus,
-      input.fromLifecycle,
-      input.toLifecycle,
       input.actorId,
       input.actorRole,
       input.note,
@@ -188,8 +180,7 @@ export function listHistoryRows(orderId: string): HistoryRow[] {
 
 export function updateOrderStatus(input: {
   id: string;
-  status: string;
-  lifecycle: string;
+  status: OrderStatusId;
   updatedAt: string;
   resetAttempts?: boolean;
   paymentStatus?: string;
@@ -198,22 +189,20 @@ export function updateOrderStatus(input: {
   if (input.resetAttempts && input.paymentStatus === "captured") {
     db()
       .prepare(
-        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'captured', paid_at = ?, updated_at = ? WHERE id = ?`,
+        `UPDATE orders SET status = ?, payment_status = 'captured', paid_at = ?, updated_at = ? WHERE id = ?`,
       )
-      .run(input.status, input.lifecycle, input.paidAt, input.updatedAt, input.id);
+      .run(input.status, input.paidAt, input.updatedAt, input.id);
     return;
   }
   if (input.paymentStatus === "voided") {
     db()
-      .prepare(
-        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'voided', updated_at = ? WHERE id = ?`,
-      )
-      .run(input.status, input.lifecycle, input.updatedAt, input.id);
+      .prepare(`UPDATE orders SET status = ?, payment_status = 'voided', updated_at = ? WHERE id = ?`)
+      .run(input.status, input.updatedAt, input.id);
     return;
   }
   db()
-    .prepare("UPDATE orders SET status = ?, lifecycle = ?, updated_at = ? WHERE id = ?")
-    .run(input.status, input.lifecycle, input.updatedAt, input.id);
+    .prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?")
+    .run(input.status, input.updatedAt, input.id);
 }
 
 export function updateOrderPickupConfirm(input: {
@@ -228,29 +217,28 @@ export function updateOrderPickupConfirm(input: {
 }) {
   db()
     .prepare(
-      `UPDATE orders SET confirmed_size = ?, color_groups = ?, machine_units = ?,
-       pickup_confirmed_at = ?, total = ?, commission = ?, price_change = ?, updated_at = ?
-       WHERE id = ?`,
+      `UPDATE orders SET confirmed_size = ?, color_groups = ?, machine_units = ?, total = ?, commission = ?,
+        price_change = ?, pickup_confirmed_at = ?, updated_at = ? WHERE id = ?`,
     )
     .run(
       input.confirmedSize,
       input.colorGroups,
       input.machineUnits,
-      input.at,
       input.total,
       input.commission,
       input.priceChange,
+      input.at,
       input.at,
       input.id,
     );
 }
 
-export function updateOrderPriceChange(id: string, priceChange: PriceChangeStatus, updatedAt: string) {
-  db().prepare(`UPDATE orders SET price_change = ?, updated_at = ? WHERE id = ?`).run(priceChange, updatedAt, id);
+export function updateOrderPriceChange(id: string, priceChange: PriceChangeStatus, at: string) {
+  db().prepare(`UPDATE orders SET price_change = ?, updated_at = ? WHERE id = ?`).run(priceChange, at, id);
 }
 
-export function updateOrderCancelReason(id: string, reason: string, updatedAt: string) {
-  db().prepare(`UPDATE orders SET cancel_reason = ?, updated_at = ? WHERE id = ?`).run(reason, updatedAt, id);
+export function updateOrderCancelReason(id: string, reason: string, at: string) {
+  db().prepare(`UPDATE orders SET cancel_reason = ?, updated_at = ? WHERE id = ?`).run(reason, at, id);
 }
 
 export function updateOrderCapacityCommit(input: {

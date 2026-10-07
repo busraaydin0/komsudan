@@ -33,17 +33,17 @@ import { strategyFor } from "@/lib/fulfillment";
 import {
   canAddPhotos,
   canCancel,
-  lifecycleOf,
-  pilotFromLifecycle,
+  canTransition,
+  isOrderStatus,
+  nextOperationalStatus,
+  type OrderStatusId,
 } from "@/lib/status";
 import type {
-  ApiLifecycle,
   AppointmentWindow,
   CreateOrderInput,
   DropMethod,
   Order,
   OrderPhotoKind,
-  OrderStatus,
   OrderStatusEvent,
   PackageId,
   PaymentStatus,
@@ -77,15 +77,6 @@ import { holdForOrder } from "@/lib/services/walletService";
 
 export type OrderAction = "accept" | "reject" | "advance" | "deliver";
 
-function nextLifecycleStep(current: ApiLifecycle, packageId: PackageId): ApiLifecycle | null {
-  if (current === "accepted") return "dropped_off";
-  if (current === "dropped_off") return "washing";
-  if (current === "washing") return packageId === "tam" ? "ironing" : "ready";
-  if (current === "ironing") return "ready";
-  if (current === "ready") return null;
-  return null;
-}
-
 function deliveryMode(): "door" {
   return "door";
 }
@@ -105,7 +96,7 @@ function assertDeliveryPhoto(orderId: string) {
 
 function toOrder(row: OrderRow, viewer?: AuthUser, lean = false): Order {
   const drop = row.drop_method as DropMethod;
-  const status = row.status as OrderStatus;
+  const status = row.status as OrderStatusId;
   const pay = paymentForOrder(row.id);
   const payStatus = (pay?.status ?? row.payment_status) as PaymentStatus;
   const items = lean ? [] : listOrderItems(row.id);
@@ -149,7 +140,6 @@ function toOrder(row: OrderRow, viewer?: AuthUser, lean = false): Order {
     paidAt: payStatus === "captured" ? (pay?.updatedAt ?? row.paid_at) : row.paid_at,
     payment: pay,
     customerId: row.user_id,
-    lifecycle: lifecycleOf(status, row.lifecycle) as Order["lifecycle"],
     deliveryMode: (row.delivery_mode as "door" | "point" | null) ?? deliveryMode(),
     priceChange: row.price_change ?? "none",
     colorGroups: row.color_groups,
@@ -286,13 +276,12 @@ function insertPendingOrder(args: {
       note: args.note,
       total: args.quote.total,
       commission: args.quote.commission,
-      status: "onay_bekliyor",
+      status: "pending",
       created_at: now,
       updated_at: now,
       user_id: args.userId,
       delivery_mode: deliveryMode(),
       scheduled_window_start: `${args.pickup.date}T${args.pickup.windowStart}:00+03:00`,
-      lifecycle: "pending",
       size: args.size,
       machine_units: args.quote.machineUnits,
       estimated_delivery_date: args.estimatedDeliveryDate,
@@ -321,9 +310,7 @@ function insertPendingOrder(args: {
     recordTransition({
       orderId: id,
       fromStatus: null,
-      toStatus: "onay_bekliyor",
-      fromLifecycle: null,
-      toLifecycle: "pending",
+      toStatus: "pending",
       actorId: args.userId,
       actorRole: "customer",
       note: null,
@@ -418,8 +405,11 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
   return order;
 }
 
-function currentLifecycle(row: OrderRow): ApiLifecycle {
-  return lifecycleOf(row.status as OrderStatus, row.lifecycle);
+function orderStatus(row: OrderRow): OrderStatusId {
+  if (!isOrderStatus(row.status)) {
+    throw new ApiError(500, "Geçersiz sipariş durumu.", "INTERNAL");
+  }
+  return row.status;
 }
 
 function assertFulfillmentReady(providerId: string) {
@@ -431,16 +421,23 @@ function assertFulfillmentReady(providerId: string) {
   return strat;
 }
 
-function assertCanMove(row: OrderRow, from: ApiLifecycle, to: ApiLifecycle, packageId: PackageId) {
-  const strat = strategyFor(
-    getCategoryForProvider(row.provider_id).fulfillment_mode,
-    getCategoryForProvider(row.provider_id).id,
-    "dropoff",
-  );
-  if (!strat.ready) {
-    throw new ApiError(409, "Bu hizmet tipi henüz açık değil.", "CATEGORY_NOT_READY");
+function assertCanMove(row: OrderRow, from: OrderStatusId, to: OrderStatusId, user: AuthUser, packageId: PackageId) {
+  assertFulfillmentReady(row.provider_id);
+  const isOrderParty = row.user_id === user.id || row.provider_id === user.id;
+  const roleForCheck =
+    user.role === "admin"
+      ? "admin"
+      : !REQUIRE_PROVIDER_TO_MUTATE && canMutateOrder(user, row)
+        ? "provider"
+        : user.role;
+  if (
+    canTransition(from, to, roleForCheck, {
+      packageId,
+      isOrderParty,
+    })
+  ) {
+    return;
   }
-  if (strat.canTransition(from, to, packageId)) return;
   if (to === "ironing" && packageId !== "tam") {
     throw new ApiError(409, "Ütü bu pakette yok.", "INVALID_TRANSITION");
   }
@@ -450,16 +447,6 @@ function assertCanMove(row: OrderRow, from: ApiLifecycle, to: ApiLifecycle, pack
   throw new ApiError(409, "Bu duruma geçilemez.", "INVALID_TRANSITION");
 }
 
-function assertStatusRole(user: AuthUser, row: OrderRow, next: ApiLifecycle) {
-  if (user.role === "admin") return;
-  if (next === "completed") {
-    if (row.user_id === user.id || row.provider_id === user.id) return;
-    throw new ApiError(403, "Teslimi yalnızca taraflar onaylar.", "FORBIDDEN");
-  }
-  if (canMutateOrder(user, row)) return;
-  throw new ApiError(403, "Bu siparişi yalnızca hizmet veren ilerletebilir.", "FORBIDDEN");
-}
-
 export function completeOrderOverride(user: AuthUser, orderId: string, reason: string) {
   return applyStatus(orderId, user, "completed", undefined, `override:${reason}`, { skipHandoff: true });
 }
@@ -467,7 +454,7 @@ export function completeOrderOverride(user: AuthUser, orderId: string, reason: s
 export function applyStatus(
   id: string,
   user: AuthUser,
-  next: ApiLifecycle,
+  next: OrderStatusId,
   code?: string,
   note?: string,
   opts?: { skipHandoff?: boolean },
@@ -476,10 +463,9 @@ export function applyStatus(
   if (!row || !canSeeOrder(user, row)) {
     throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
   }
-  const from = currentLifecycle(row);
+  const from = orderStatus(row);
   const pack = row.package_id as PackageId;
-  assertCanMove(row, from, next, pack);
-  assertStatusRole(user, row, next);
+  assertCanMove(row, from, next, user, pack);
   if (next === "dropped_off") assertReadyForDroppedOff(row);
 
   const now = new Date().toISOString();
@@ -491,19 +477,17 @@ export function applyStatus(
     verifyHandoffPin(row, "return", code, user.id, now);
   }
 
-  const nextPilot = pilotFromLifecycle(next);
   const capture = next === "completed";
   const voidPay = next === "rejected" || next === "cancelled";
 
   runOrderTx(() => {
     if (next === "ready") {
       issueReturnHandoffCode(id);
-      updateOrderStatus({ id, status: nextPilot, lifecycle: next, updatedAt: now });
+      updateOrderStatus({ id, status: next, updatedAt: now });
     } else if (capture) {
       updateOrderStatus({
         id,
-        status: nextPilot,
-        lifecycle: next,
+        status: next,
         updatedAt: now,
         resetAttempts: true,
         paymentStatus: "captured",
@@ -512,20 +496,17 @@ export function applyStatus(
     } else if (voidPay) {
       updateOrderStatus({
         id,
-        status: nextPilot,
-        lifecycle: next,
+        status: next,
         updatedAt: now,
         paymentStatus: "voided",
       });
     } else {
-      updateOrderStatus({ id, status: nextPilot, lifecycle: next, updatedAt: now });
+      updateOrderStatus({ id, status: next, updatedAt: now });
     }
     recordTransition({
       orderId: id,
-      fromStatus: row.status,
-      toStatus: nextPilot,
-      fromLifecycle: from,
-      toLifecycle: next,
+      fromStatus: from,
+      toStatus: next,
       actorId: user.id,
       actorRole: user.role,
       note: note?.trim().slice(0, 200) || null,
@@ -555,10 +536,10 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
   }
 
   const order = toOrder(row);
-  let next: ApiLifecycle;
+  let next: OrderStatusId;
 
   if (action === "accept") {
-    if (order.status !== "onay_bekliyor") {
+    if (order.status !== "pending") {
       throw new ApiError(409, "Bu sipariş kabul edilemez.", "INVALID_TRANSITION");
     }
     const items = listOrderItems(id);
@@ -584,14 +565,14 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
     if (!canCancel(order.status)) {
       throw new ApiError(409, "Bu aşamada iptal yok.", "INVALID_TRANSITION");
     }
-    next = currentLifecycle(row) === "pending" ? "rejected" : "cancelled";
+    next = orderStatus(row) === "pending" ? "rejected" : "cancelled";
   } else if (action === "deliver") {
-    if (order.status !== "hazir" || order.adminHold) {
+    if (order.status !== "ready" || order.adminHold) {
       throw new ApiError(409, "Kod ancak hazır siparişte geçer.", "INVALID_TRANSITION");
     }
     next = "completed";
   } else if (action === "advance") {
-    const step = nextLifecycleStep(currentLifecycle(row), order.packageId);
+    const step = nextOperationalStatus(orderStatus(row), order.packageId);
     if (!step) throw new ApiError(409, "Daha ileri durum yok.", "INVALID_TRANSITION");
     if (step === "dropped_off" && !code) {
       throw new ApiError(400, "Alım kodu gerekli.", "VALIDATION_ERROR");
@@ -616,10 +597,8 @@ export function listOrderHistory(user: AuthUser, id: string): OrderStatusEvent[]
   getOrderFor(user, id);
   return listHistoryRows(id).map((row) => ({
     id: row.id,
-    from: row.from_lifecycle || (row.from_status
-      ? lifecycleOf(row.from_status as OrderStatus, row.from_lifecycle)
-      : null),
-    to: row.to_lifecycle || lifecycleOf(row.to_status as OrderStatus, row.to_lifecycle),
+    from: row.from_status,
+    to: row.to_status,
     actorId: row.actor_id,
     actorRole: row.actor_role,
     note: row.note,
@@ -640,7 +619,7 @@ export function addOrderPhoto(user: AuthUser, id: string, buf: Buffer, kindRaw?:
   if (!canMutateOrder(user, row)) {
     throw new ApiError(403, "Fotoğrafı hizmet veren ekler.", "FORBIDDEN");
   }
-  if (!canAddPhotos(row.status as OrderStatus)) {
+  if (!canAddPhotos(orderStatus(row))) {
     throw new ApiError(409, "Bu aşamada fotoğraf eklenmez.", "INVALID_TRANSITION");
   }
   return addPhoto(id, buf, parsePhotoKind(kindRaw));

@@ -41,13 +41,12 @@ function seedAccepted(id: string, userId: string) {
     note: "",
     total: 150,
     commission: 15,
-    status: "teslim_alindi",
+    status: "accepted",
     created_at: now,
     updated_at: now,
     user_id: userId,
     delivery_mode: "door",
     scheduled_window_start: now,
-    lifecycle: "accepted",
     size: "kucuk",
     machine_units: 1,
     public_code: "KL-TEST",
@@ -131,7 +130,7 @@ describe("handoff kod sistemi", () => {
     });
     const held = getOrderRow("ord-ho-5")!;
     expect(held.admin_hold).toBe(1);
-    expect(held.lifecycle).toBe("admin_pending");
+    expect(held.status).toBe("admin_pending");
 
     const plainAdmin = await customer("5550000706");
     setUserRole(plainAdmin.id, "admin");
@@ -143,7 +142,7 @@ describe("handoff kod sistemi", () => {
     setUserSuperAdmin(plainAdmin.id, true);
     adminResolveOverride(loadUser(plainAdmin.id)!, "ord-ho-5", true, "Pilot onay: foto ve konum uygun");
     const done = getOrderRow("ord-ho-5")!;
-    expect(done.lifecycle).toBe("completed");
+    expect(done.status).toBe("completed");
     expect(done.payment_status).toBe("captured");
   });
 });

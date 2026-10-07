@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
-import type { ApiLifecycle, AppNotification } from "@/lib/types";
+import type { AppNotification } from "@/lib/types";
+import type { OrderStatusId } from "@/lib/status";
 import { ApiError } from "@/server/rules";
 import type { AuthUser } from "@/lib/auth/types";
 import { formatDeliveryDayTr } from "@/lib/capacity/istanbul";
@@ -71,8 +72,8 @@ export function notifyNewOrder(row: {
 
 export function notifyStatusChange(input: {
   row: OrderRow;
-  from: ApiLifecycle;
-  next: ApiLifecycle;
+  from: OrderStatusId;
+  next: OrderStatusId;
   actorId: string;
 }) {
   const { row, from, next, actorId } = input;

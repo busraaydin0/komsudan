@@ -50,7 +50,7 @@ describe("yorum ortalaması", () => {
   });
 });
 
-function seedOrder(id: string, userId: string, status: string, lifecycle: string, providerId = "elif") {
+function seedOrder(id: string, userId: string, status: string, providerId = "elif") {
   const now = new Date().toISOString();
   insertOrderRow({
     id,
@@ -62,13 +62,12 @@ function seedOrder(id: string, userId: string, status: string, lifecycle: string
     note: "",
     total: 180,
     commission: 18,
-    status,
+    status: status as "completed",
     created_at: now,
     updated_at: now,
     user_id: userId,
     delivery_mode: "door",
     scheduled_window_start: now,
-    lifecycle,
     size: "orta",
     machine_units: 2,
   });
@@ -149,9 +148,9 @@ describe("yorum kırılımı", () => {
 describe("yorum yazma kuralları", () => {
   it("aynı siparişe ikinci yorumu, iptali ve tamamlanmamış siparişi reddeder", async () => {
     const user = await customer("5550000301");
-    seedOrder("ord-rev-ok", user.id, "teslim_edildi", "completed");
-    seedOrder("ord-rev-cancel", user.id, "iptal", "cancelled");
-    seedOrder("ord-rev-open", user.id, "onay_bekliyor", "pending");
+    seedOrder("ord-rev-ok", user.id, "completed");
+    seedOrder("ord-rev-cancel", user.id, "cancelled");
+    seedOrder("ord-rev-open", user.id, "pending");
 
     const first = createReview(
       "ord-rev-ok",

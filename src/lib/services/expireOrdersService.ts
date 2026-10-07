@@ -15,7 +15,6 @@ import { releaseOrderCapacity } from "@/lib/services/capacityService";
 import { buildProviderCalendar } from "@/lib/services/calendarService";
 import { voidPayment } from "@/lib/services/paymentService";
 import { notifyOrderExpired, notifyRespondReminder } from "@/lib/services/notificationService";
-import { pilotFromLifecycle } from "@/lib/status";
 import { db } from "@/lib/db/client";
 
 const PICKUP_CUTOFF_MS = 60 * 60 * 1000;
@@ -26,23 +25,20 @@ function markReminderSent(orderId: string) {
 
 function expireOne(orderId: string, now: string) {
   const row = getOrderRow(orderId);
-  if (!row || row.lifecycle !== "pending" || row.status !== "onay_bekliyor") return false;
+  if (!row || row.status !== "pending") return false;
 
   runOrderTx(() => {
     updateOrderCancelReason(orderId, "expired", now);
     updateOrderStatus({
       id: orderId,
-      status: pilotFromLifecycle("rejected"),
-      lifecycle: "rejected",
+      status: "rejected",
       updatedAt: now,
       paymentStatus: "voided",
     });
     recordTransition({
       orderId,
-      fromStatus: row.status,
-      toStatus: "iptal",
-      fromLifecycle: "pending",
-      toLifecycle: "rejected",
+      fromStatus: "pending",
+      toStatus: "rejected",
       actorId: null,
       actorRole: "system",
       note: "expired",
@@ -97,7 +93,7 @@ function shouldExpire(row: NonNullable<ReturnType<typeof getOrderRow>>, nowMs: n
 
 function maybeRemind(row: NonNullable<ReturnType<typeof getOrderRow>>, nowMs: number) {
   if (row.respond_reminder_sent || !row.respond_by) return;
-  if (row.lifecycle !== "pending") return;
+  if (row.status !== "pending") return;
   const half = Date.parse(respondReminderAt(new Date(row.created_at), row.respond_by));
   if (nowMs < half) return;
   notifyRespondReminder(row);
@@ -110,7 +106,7 @@ export function expireStaleRequests(now = new Date()): number {
   const nowMs = now.getTime();
   let n = 0;
   for (const row of listOrderRowsAll()) {
-    if (row.lifecycle !== "pending" || row.status !== "onay_bekliyor") continue;
+    if (row.status !== "pending") continue;
     maybeRemind(row, nowMs);
     if (shouldExpire(row, nowMs) && expireOne(row.id, nowIso)) n += 1;
   }

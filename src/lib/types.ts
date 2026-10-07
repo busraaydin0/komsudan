@@ -1,4 +1,5 @@
 import type { LaundryPackageId, OrderPackageId } from "./categories/registry";
+import type { OrderStatusId } from "./status";
 import type { LaundrySize, OrderAddonLine, PriceChangeStatus } from "./laundryModel";
 
 export type PackageId = LaundryPackageId;
@@ -8,14 +9,8 @@ export type DryingType = "makine" | "ip" | "ikisi";
 export type MapMode = "2d" | "3d";
 export type TrustTier = "yeni" | "kurucu" | "guvenilir";
 
-export type OrderStatus =
-  | "onay_bekliyor"
-  | "teslim_alindi"
-  | "yikaniyor"
-  | "utuleniyor"
-  | "hazir"
-  | "teslim_edildi"
-  | "iptal";
+export type { OrderStatusId } from "./status";
+export type OrderStatus = OrderStatusId;
 
 export type LngLat = { lng: number; lat: number };
 
@@ -126,20 +121,6 @@ export type AppPayment = {
   updatedAt: string;
 };
 
-/** Hedef JSON API yaşam döngüsü. PWA hâlâ Türkçe `OrderStatus` saklar. */
-export type ApiLifecycle =
-  | "pending"
-  | "accepted"
-  | "dropped_off"
-  | "washing"
-  | "ironing"
-  | "ready"
-  | "completed"
-  | "rejected"
-  | "cancelled"
-  | "disputed"
-  | "admin_pending";
-
 export type Order = {
   id: string;
   providerId: string;
@@ -158,7 +139,7 @@ export type Order = {
   fulfillmentType?: FulfillmentType;
   total: number;
   commission: number;
-  status: OrderStatus;
+  status: OrderStatusId;
   createdAt: string;
   photos: WorkPhoto[];
   review: Review | null;
@@ -174,7 +155,6 @@ export type Order = {
   paidAt: string | null;
   payment?: AppPayment;
   customerId?: string | null;
-  lifecycle?: ApiLifecycle;
   deliveryMode?: "door" | "point";
   priceChange: PriceChangeStatus;
   colorGroups: number | null;

@@ -33,13 +33,12 @@ function seedAcceptedOrder(id: string, userId: string) {
     note: "",
     total: 150,
     commission: 15,
-    status: "teslim_alindi",
+    status: "accepted",
     created_at: now,
     updated_at: now,
     user_id: userId,
     delivery_mode: "door",
     scheduled_window_start: now,
-    lifecycle: "accepted",
     size: "kucuk",
     machine_units: 1,
   });
@@ -72,7 +71,7 @@ describe("fiyat onayı akışı", () => {
     approvePickupSummary(user, "ord-pc-1");
     const pin = getHandoffCode("ord-pc-1", "pickup")!.code;
     applyOrderAction("ord-pc-1", "advance", provider, pin);
-    expect(getOrderRow("ord-pc-1")!.lifecycle).toBe("dropped_off");
+    expect(getOrderRow("ord-pc-1")!.status).toBe("dropped_off");
   });
 
   it("müşteri red → iptal size_rejected", async () => {
@@ -87,7 +86,7 @@ describe("fiyat onayı akışı", () => {
     });
     respondPriceChange(user, "ord-pc-2", "reject");
     const row = getOrderRow("ord-pc-2")!;
-    expect(row.status).toBe("iptal");
+    expect(row.status).toBe("cancelled");
     expect(row.cancel_reason).toBe("size_rejected");
     expect(row.payment_status).toBe("voided");
   });
