@@ -53,9 +53,9 @@ const CAMASIR: CategoryDef = {
   table: "service_packages",
   domainLib: "pricing.ts",
   editor: "LaundryProfile",
-  unitQty: "parça",
-  capacityLabel: "parça yer",
-  seatPhrase: "parça yer",
+  unitQty: "birim",
+  capacityLabel: "makine birimi",
+  seatPhrase: "makine birimi",
   offerBio: "",
 };
 

@@ -6,7 +6,7 @@ export type NoticeKind = "created" | "accepted" | "ready" | "completed" | "rejec
 
 export type NoticeCtx = {
   packageId?: string | null;
-  pieces: number;
+  machineUnits: number;
   productName?: string | null;
   orderId: string;
   pickupCode?: string | null;
@@ -25,7 +25,7 @@ export function noticeCategory(packageId?: string | null): string {
 }
 
 function qtyLabel(n: number): string {
-  return `${n} parça`;
+  return `${n} makine birimi`;
 }
 
 function pick<T>(list: T[]): T {
@@ -34,7 +34,7 @@ function pick<T>(list: T[]): T {
 
 function fill(t: Template, ctx: NoticeCtx): Line {
   const code = ctx.pickupCode ? ` Teslim kodun: ${ctx.pickupCode}.` : "";
-  const qty = qtyLabel(ctx.pieces);
+  const qty = qtyLabel(ctx.machineUnits);
   return {
     title: t.title,
     body: t.body({

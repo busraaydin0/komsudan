@@ -23,8 +23,8 @@ describe("Kategori registry smoke", () => {
   });
 
   it("çamaşır kapasite parça yer", () => {
-    expect(capacityLabelForPackage("yikama")).toBe("parça yer");
-    expect(capacityLabelForPackage("camasir")).toBe("parça yer");
+    expect(capacityLabelForPackage("yikama")).toBe("makine birimi");
+    expect(capacityLabelForPackage("camasir")).toBe("makine birimi");
   });
 
   it("zod enum camasir kabul eder, yabancı id’yi reddeder", () => {

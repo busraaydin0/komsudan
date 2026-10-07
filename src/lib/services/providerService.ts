@@ -29,7 +29,7 @@ import {
 } from "@/lib/db/providers";
 import { getCategory } from "@/lib/db/categories";
 import { ratingBreakdown, ratingForProvider } from "@/lib/services/reviewService";
-import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
+import { EXPRESS_BUMP } from "@/lib/pricing";
 import type { DropMethod, DryingType, PackageId, Provider, ServicePackage } from "@/lib/types";
 import type { AuthUser } from "@/lib/auth/types";
 
@@ -186,7 +186,7 @@ export function patchMyProfile(
         provider_id: user.id,
         name: meta.title,
         price_per_kg: pack.pricePerPiece,
-        min_order_amount: MIN_ORDER,
+        min_order_amount: 0,
         express_available: express ? 1 : 0,
         express_surcharge_pct: express ? EXPRESS_BUMP : 0,
         is_active: 1,
@@ -375,7 +375,7 @@ export function ensureLaundryOffer(
       provider_id: user.id,
       name: meta.title,
       price_per_kg: pack.pricePerPiece,
-      min_order_amount: MIN_ORDER,
+      min_order_amount: 0,
       express_available: 0,
       express_surcharge_pct: 0,
       is_active: 1,

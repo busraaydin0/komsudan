@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import { PROVIDERS, SEED_REVIEWS } from "@/lib/data";
-import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
+import { EXPRESS_BUMP } from "@/lib/pricing";
 import { ensureProviderPriceGrid } from "./providerPrices";
 import {
   countSlots,
@@ -155,7 +155,7 @@ function seedProviderDirectory() {
         provider_id: p.id,
         name: pack.title,
         price_per_kg: pack.pricePerPiece,
-        min_order_amount: MIN_ORDER,
+        min_order_amount: 0,
         express_available: p.express ? 1 : 0,
         express_surcharge_pct: p.express ? EXPRESS_BUMP : 0,
       });
