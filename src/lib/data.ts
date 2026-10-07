@@ -1,10 +1,4 @@
-import type {
-  DropPoint,
-  LngLat,
-  Provider,
-  Review,
-  ServicePackage,
-} from "./types";
+import type { LngLat, Provider, Review, ServicePackage } from "./types";
 
 export const PILOT = {
   id: "cankaya-cukurambar",
@@ -59,7 +53,7 @@ export const PROVIDERS: Provider[] = [
     hasDryer: true,
     express: true,
     trust: "kurucu",
-    drops: ["kapi", "nokta"],
+    drops: ["kapi"],
     slots,
     bio: "Kurucu hizmet veren. Makine kurutucu var, aynı gün bitirebiliyor.",
     workPhotos: [],
@@ -80,7 +74,7 @@ export const PROVIDERS: Provider[] = [
     hasDryer: false,
     express: false,
     trust: "guvenilir",
-    drops: ["kapi", "nokta"],
+    drops: ["kapi"],
     slots: slots.slice(2),
     bio: "Kurutma ipte; yağmurlu günde ertesi sabaha kayabilir.",
     workPhotos: [],
@@ -101,7 +95,7 @@ export const PROVIDERS: Provider[] = [
     hasDryer: true,
     express: true,
     trust: "kurucu",
-    drops: ["kapi", "nokta"],
+    drops: ["kapi"],
     slots,
     bio: "Ütü ağırlıklı. Gömlek ve iş kıyafeti için tercih ediliyor.",
     workPhotos: [],
@@ -120,9 +114,9 @@ export const PROVIDERS: Provider[] = [
     hasDryer: false,
     express: false,
     trust: "yeni",
-    drops: ["nokta"],
+    drops: ["kapi"],
     slots: slots.slice(2),
-    bio: "İlk siparişlerde yalnızca gel al noktası. Yıkama ve katlama.",
+    bio: "Kapıda teslim. Yıkama ve katlama.",
     workPhotos: [],
     recentReviews: [],
   },
@@ -139,7 +133,7 @@ export const PROVIDERS: Provider[] = [
     hasDryer: true,
     express: true,
     trust: "kurucu",
-    drops: ["kapi", "nokta"],
+    drops: ["kapi"],
     slots,
     bio: "En çok tekrar sipariş alan kurucu. Çocuklu aileler tercih ediyor.",
     workPhotos: [],
@@ -159,7 +153,7 @@ export const PROVIDERS: Provider[] = [
     dryingType: "ip",
     express: false,
     trust: "yeni",
-    drops: ["nokta"],
+    drops: ["kapi"],
     slots: slots.slice(2),
     bio: "İpte kurutma, yıkama ve katlama. Ütü yok — o Elif veya Merve’de.",
     workPhotos: [],
@@ -179,9 +173,9 @@ export const PROVIDERS: Provider[] = [
     dryingType: "makine",
     express: true,
     trust: "guvenilir",
-    drops: ["kapi", "nokta"],
+    drops: ["kapi"],
     slots,
-    bio: "Bahçelievler. Makine kurutucu, gömlek ütüsü. Çukurambar’a kapı veya nokta.",
+    bio: "Bahçelievler. Makine kurutucu, gömlek ütüsü. Çukurambar’a kapı teslim.",
     workPhotos: [],
     recentReviews: [],
   },
@@ -199,9 +193,9 @@ export const PROVIDERS: Provider[] = [
     dryingType: "ip",
     express: false,
     trust: "yeni",
-    drops: ["nokta"],
+    drops: ["kapi"],
     slots: slots.slice(1),
-    bio: "Çayyolu. İpte kurutma; yağmurda bir gün kayabilir. Gel al noktasında teslim.",
+    bio: "Çayyolu. İpte kurutma; yağmurda bir gün kayabilir. Kapıda teslim.",
     workPhotos: [],
     recentReviews: [],
   },
@@ -244,7 +238,7 @@ export const SEED_REVIEWS: Review[] = [
     providerId: "gulsen",
     orderId: null,
     rating: 4,
-    body: "Katlaması düzgün. Gel al noktasında 10 dk bekledim, o kadar.",
+    body: "Katlaması düzgün. Kapıda teslim 10 dk sürdü, o kadar.",
     author: "H.T.",
     createdAt: "2026-05-19T14:00:00.000Z",
   },
@@ -286,43 +280,12 @@ export const SEED_REVIEWS: Review[] = [
   },
 ];
 
-export const DROP_POINTS: DropPoint[] = [
-  {
-    id: "muhtarlik",
-    name: "Çukurambar Muhtarlık",
-    hint: "Öğretmenler Caddesi, giriş dolabı 08:00–21:00",
-    loc: { lng: 32.80274, lat: 39.90363 },
-  },
-  {
-    id: "cadde",
-    name: "1427. Cadde",
-    hint: "Restoran hattı, kafe önü teslim",
-    loc: { lng: 32.8041, lat: 39.8996 },
-  },
-  {
-    id: "park",
-    name: "Kızılırmak Parkı",
-    hint: "Park girişi, kafe terası",
-    loc: { lng: 32.8102, lat: 39.9068 },
-  },
-  {
-    id: "site",
-    name: "Öğretmenler site kapısı",
-    hint: "Güvenlik kulübesi, isim söylemen yeterli",
-    loc: { lng: 32.7989, lat: 39.9051 },
-  },
-];
-
 export function providerById(id: string) {
   return PROVIDERS.find((p) => p.id === id);
-}
-
-export function dropById(id: string) {
-  return DROP_POINTS.find((d) => d.id === id);
 }
 
 export function trustLabel(tier: Provider["trust"]) {
   if (tier === "kurucu") return "Kurucu";
   if (tier === "guvenilir") return "Kapı açık";
-  return "Gel al noktası";
+  return "Yeni komşu";
 }

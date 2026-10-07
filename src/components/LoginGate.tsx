@@ -116,7 +116,7 @@ export function LoginGate({
           Önceliğimiz, kendinizi evinizde gibi güvende hissetmeniz.
         </p>
         <p className="mt-1.5 text-sm text-[var(--muted)]">
-          Çukurambar. Çamaşır kapıda veya gel al noktasında; eve kimse girmez.
+          Çukurambar. Çamaşır kapında; eve kimse girmez.
         </p>
 
         <ol className="mt-8 flex gap-2 text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
@@ -255,7 +255,7 @@ export function LoginGate({
           {err && <p className="mt-3 text-sm text-[var(--clay)]">{err}</p>}
         </div>
         <p className="mt-auto pt-6 text-center text-[11px] text-[var(--muted)]">
-          Çamaşır kapıda veya gel al noktasında. Eve kimse girmez.
+          Çamaşır kapında. Eve kimse girmez.
         </p>
       </div>
     </div>

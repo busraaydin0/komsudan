@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Komşudan",
     short_name: "Komşudan",
-    description: "Çukurambar. Çamaşırı kapıda veya gel al noktasında bırak, komşu işlesin.",
+    description: "Çukurambar. Çamaşırı kapında bırak, komşu işlesin.",
     start_url: "/",
     scope: "/",
     display: "standalone",

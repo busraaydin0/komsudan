@@ -1,5 +1,5 @@
 import { PACKAGES } from "@/lib/data";
-import type { DropPoint, Provider, ServicePackage } from "@/lib/types";
+import type { Provider, ServicePackage } from "@/lib/types";
 import { listPackages } from "./providers";
 
 function laundryPackagesFor(providerId: string, fallback: ServicePackage[] | undefined): ServicePackage[] {
@@ -33,8 +33,4 @@ export function toProvider(row: {
     categoryId,
     packages: laundryPackagesFor(row.id, p.packages),
   };
-}
-
-export function toDrop(row: { payload: string }): DropPoint {
-  return JSON.parse(row.payload) as DropPoint;
 }

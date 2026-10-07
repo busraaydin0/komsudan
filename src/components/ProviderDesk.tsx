@@ -6,7 +6,7 @@ import { fetchOrderMessages, patchOrder, uploadOrderPhoto, useCatalog, useOrders
 import { MessageBadge } from "@/components/OrderThread";
 import { tl } from "@/lib/pricing";
 import { canAddPhotos, nextStatus } from "@/lib/status";
-import type { DropPoint, Order, OrderStatus, Provider } from "@/lib/types";
+import type { Order, OrderStatus, Provider } from "@/lib/types";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
 import { LaundryProfile } from "@/components/LaundryProfile";
 import { ProviderPayoutPanel } from "@/components/ProviderPayoutPanel";
@@ -50,7 +50,7 @@ export function ProviderDesk({
   onOpenMessages?: (orderId: string) => void;
 }) {
   const { account } = useSession();
-  const { providers, dropPoints, reload: reloadCatalog } = useCatalog();
+  const { providers, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload, err: ordersErr } = useOrders();
   const open = orders.filter((o) => o.status !== "teslim_edildi" && o.status !== "iptal");
   const [openMonth, setOpenMonth] = useState<string | null>(null);
@@ -124,7 +124,6 @@ export function ProviderDesk({
                       key={o.id}
                       order={o}
                       providers={providers}
-                      dropPoints={dropPoints}
                       onChanged={reloadAll}
                       delay={i * 40}
                       onOpenMessages={onOpenMessages}
@@ -159,7 +158,6 @@ export function ProviderDesk({
                                 key={o.id}
                                 order={o}
                                 providers={providers}
-                                dropPoints={dropPoints}
                                 onChanged={reloadAll}
                                 delay={i * 30}
                                 onOpenMessages={onOpenMessages}
@@ -193,14 +191,12 @@ export function ProviderDesk({
 function OrderCard({
   order,
   providers,
-  dropPoints,
   onChanged,
   delay,
   onOpenMessages,
 }: {
   order: Order;
   providers: Provider[];
-  dropPoints: DropPoint[];
   onChanged: () => void;
   delay: number;
   onOpenMessages?: (orderId: string) => void;
@@ -213,7 +209,6 @@ function OrderCard({
   const pack =
     p?.packages.find((x) => x.id === order.packageId) ??
     PACKAGES.find((x) => x.id === order.packageId);
-  const drop = dropPoints.find((d) => d.id === order.dropPointId);
   const next = nextStatus(order.status, order.packageId);
 
   useEffect(() => {
@@ -265,7 +260,7 @@ function OrderCard({
       <p className="mt-1 text-sm text-[var(--muted)]">
         {new Date(order.createdAt).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
         {" · "}
-        {order.drop === "kapi" ? "Kapı teslim" : drop?.name ?? "Gel al noktası"} · {order.slot}
+        Kapı teslim · {order.slot}
       </p>
       {order.note && <p className="mt-1 text-sm">Not: {order.note}</p>}
       {order.photos.length > 0 && <PhotoStrip photos={order.photos} size="sm" />}

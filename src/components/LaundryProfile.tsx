@@ -8,7 +8,7 @@ import { tl } from "@/lib/pricing";
 import { seatTone } from "@/lib/seat";
 import { Avatar } from "@/components/Avatar";
 import { PhotoStrip, ReviewList } from "@/components/Photos";
-import type { DropMethod, DryingType, PackageId, Provider } from "@/lib/types";
+import type { DryingType, PackageId, Provider } from "@/lib/types";
 
 export function LaundryProfile({
   me,
@@ -20,7 +20,6 @@ export function LaundryProfile({
   const [bio, setBio] = useState("");
   const [dryingType, setDryingType] = useState<DryingType>("makine");
   const [express, setExpress] = useState(false);
-  const [drops, setDrops] = useState<DropMethod[]>(["nokta"]);
   const [offered, setOffered] = useState<PackageId[]>(["yikama", "katlama", "tam"]);
   const [prices, setPrices] = useState<Record<PackageId, number>>({
     yikama: 9,
@@ -36,7 +35,6 @@ export function LaundryProfile({
     setBio(me.bio);
     setDryingType(dryingFromProvider(me));
     setExpress(me.express);
-    setDrops(me.drops.length ? me.drops : ["nokta"]);
     const ids = me.packages.map((p) => p.id);
     setOffered(ids.length ? ids : ["katlama"]);
     setPrices({
@@ -58,14 +56,6 @@ export function LaundryProfile({
     setOk("");
   }
 
-  function toggleDrop(d: DropMethod) {
-    setDrops((prev) => {
-      if (prev.includes(d)) return prev.length === 1 ? prev : prev.filter((x) => x !== d);
-      return d === "kapi" ? ["kapi", ...prev.filter((x) => x !== "kapi")] : [...prev, "nokta"];
-    });
-    setOk("");
-  }
-
   async function save() {
     if (offered.length === 0) {
       setErr("En az bir paket açık olsun.");
@@ -80,7 +70,7 @@ export function LaundryProfile({
         dryingType,
         hasDryer: dryingType !== "ip",
         express,
-        drops,
+        drops: ["kapi"],
         packages: offered.map((id) => ({ id, pricePerPiece: prices[id] })),
       });
       setOk("Müşterinin göreceği profil kaydedildi.");
@@ -205,18 +195,9 @@ export function LaundryProfile({
         >
           Aynı gün
         </button>
-        {(["kapi", "nokta"] as const).map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => toggleDrop(d)}
-            className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
-              drops.includes(d) ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
-            }`}
-          >
-            {d === "kapi" ? "Kapı" : "Gel al noktası"}
-          </button>
-        ))}
+        <span className="k-chip rounded-full px-3 py-1.5 text-sm ring-1 bg-[var(--teal)] text-white ring-[var(--teal)]">
+          Kapı teslim
+        </span>
       </div>
 
       {err && <p className="mt-3 text-sm text-[var(--clay)]">{err}</p>}

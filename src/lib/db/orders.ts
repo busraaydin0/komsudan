@@ -87,11 +87,6 @@ export function addRemaining(providerId: string, delta: number) {
   db().prepare("UPDATE providers SET remaining = remaining + ? WHERE id = ?").run(delta, providerId);
 }
 
-export function dropPointExists(id: string) {
-  const row = db().prepare("SELECT id FROM drop_points WHERE id = ?").get(id) as { id: string } | undefined;
-  return Boolean(row);
-}
-
 export function getOrderRow(id: string): OrderRow | undefined {
   return db().prepare("SELECT * FROM orders WHERE id = ?").get(id) as OrderRow | undefined;
 }

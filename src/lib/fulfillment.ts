@@ -8,7 +8,7 @@ export type FulfillmentStrategy = {
   canTransition: (from: ApiLifecycle, to: ApiLifecycle, packageId: PackageId) => boolean;
 };
 
-/** Çamaşır teslim (kapı / nokta). PWA davranışı buradan değişmez. */
+/** Çamaşır teslim (kapı). PWA davranışı buradan değişmez. */
 export const deliveryStrategy: FulfillmentStrategy = {
   mode: "delivery",
   ready: true,

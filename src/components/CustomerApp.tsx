@@ -39,8 +39,6 @@ import { canCancel, trackSteps } from "@/lib/status";
 import { PhotoStrip, RatingBreakdownView, ReviewComposer, ReviewList } from "@/components/Photos";
 import { Avatar } from "@/components/Avatar";
 import type {
-  DropMethod,
-  DropPoint,
   LngLat,
   MapMode,
   Order,
@@ -129,7 +127,7 @@ export function CustomerApp({
   onEditDiscovery,
   onOpenMessages,
 }: Props) {
-  const { providers, dropPoints, ready, reload: reloadCatalog } = useCatalog(
+  const { providers, ready, reload: reloadCatalog } = useCatalog(
     clampPublicCategoryIds(categoryIds),
   );
   const { orders, reload: reloadOrders } = useOrders();
@@ -139,10 +137,8 @@ export function CustomerApp({
   const [hello, setHello] = useState(true);
   const [sheet, setSheet] = useState<Sheet>("list");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dropId, setDropId] = useState<string | null>(null);
   const [pkg, setPkg] = useState<PackageId>("tam");
   const [pieces, setPieces] = useState(16);
-  const [drop, setDrop] = useState<DropMethod>("nokta");
   const [slot, setSlot] = useState("");
   const [note, setNote] = useState("");
   const [dryerOnly, setDryerOnly] = useState(false);
@@ -225,9 +221,6 @@ export function CustomerApp({
     if (selected) {
       setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
       setSlot(defaultPilotSlot());
-      setDrop(selected.drops.includes("kapi") ? "kapi" : "nokta");
-      if (!selected.drops.includes("nokta")) setDropId(null);
-      else if (!dropId) setDropId(dropPoints[0]?.id ?? null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
@@ -274,8 +267,6 @@ export function CustomerApp({
       }
       const order = await postOrder(
         placeOrderInput(selected, {
-          drop,
-          dropPointId: dropId,
           slot,
           note,
           pkg,
@@ -300,17 +291,11 @@ export function CustomerApp({
       <MapCanvas
         mode={mode}
         selectedId={selectedId}
-        dropId={drop === "nokta" ? dropId : null}
         user={user}
         meAvatar={meAvatar}
         providers={providers}
-        dropPoints={dropPoints}
         visible={mapActive}
         onSelect={openProvider}
-        onSelectDrop={(id) => {
-          setDropId(id);
-          setDrop("nokta");
-        }}
       />
       <div className="k-map-vignette pointer-events-none absolute inset-0 z-[1]" />
 
@@ -366,15 +351,6 @@ export function CustomerApp({
           >
             Kurutucu var
           </button>
-          <span className="k-glass inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs ring-1 ring-[var(--line)]">
-            <span className="inline-grid h-3.5 w-3.5 place-items-center rounded-[3px] bg-[var(--clay)] text-[var(--paper)]" aria-hidden>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
-                <path d="M7 7h10l-.8 11.2a2 2 0 0 1-2 1.8H9.8a2 2 0 0 1-2-1.8L7 7Z" stroke="currentColor" strokeWidth="2.2" />
-                <path d="M9 7V5.8A3 3 0 0 1 12 3a3 3 0 0 1 3 2.8V7" stroke="currentColor" strokeWidth="2.2" />
-              </svg>
-            </span>
-            Gel al noktası
-          </span>
         </div>
         {far && (
           <p className="k-glass k-rise pointer-events-auto mt-2 max-w-[16rem] rounded-xl px-3 py-2 text-xs text-[var(--muted)] ring-1 ring-[var(--line)]">
@@ -497,11 +473,6 @@ export function CustomerApp({
                   const start = parsed?.startMin ?? 18 * 60;
                   setSlot(formatPilotSlot(want ? "bugun" : "yarin", start));
                 }}
-                drop={drop}
-                onDrop={setDrop}
-                dropId={dropId}
-                dropPoints={dropPoints}
-                onDropId={setDropId}
                 slot={slot}
                 onSlot={setSlot}
                 note={note}
@@ -838,11 +809,6 @@ function Checkout({
   onPieces,
   express,
   onExpress,
-  drop,
-  onDrop,
-  dropId,
-  dropPoints,
-  onDropId,
   slot,
   onSlot,
   note,
@@ -861,17 +827,12 @@ function Checkout({
   onPieces: (n: number) => void;
   express: boolean;
   onExpress: (v: boolean) => void;
-  drop: DropMethod;
-  onDrop: (v: DropMethod) => void;
-  dropId: string | null;
-  dropPoints: DropPoint[];
-  onDropId: (id: string) => void;
   slot: string;
   onSlot: (s: string) => void;
   note: string;
   onNote: (s: string) => void;
   quote: { total: number; before: number; loyaltyRate: number; commission: number; providerNet: number };
-  loyaltyLabel: string;
+  loyaltyLabel?: string;
   walletBalance: number | null;
   payGate: 0 | 1 | null;
   err: string;
@@ -879,7 +840,7 @@ function Checkout({
   onBack: () => void;
   onPlace: () => void;
 }) {
-  const { drops, canPlace } = checkoutMeta(p);
+  const { canPlace } = checkoutMeta(p);
   const cap = Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
   const [draft, setDraft] = useState(String(pieces));
 
@@ -969,38 +930,7 @@ function Checkout({
           Aynı gün (+%25)
         </label>
       )}
-      <h3 className="mt-5 text-sm font-medium">Teslimat</h3>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {drops.map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => onDrop(d)}
-            className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
-              drop === d ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
-            }`}
-          >
-            {d === "kapi" ? "Kapı" : "Gel al noktası"}
-          </button>
-        ))}
-      </div>
-      {drop === "nokta" && (
-        <div className="mt-2 grid gap-1.5">
-          {dropPoints.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => onDropId(d.id)}
-              className={`k-chip rounded-xl px-3 py-2 text-left text-sm ring-1 ${
-                dropId === d.id ? "bg-[var(--sand)] ring-[var(--clay)]" : "ring-[var(--line)]"
-              }`}
-            >
-              {d.name}
-              <span className="block text-xs text-[var(--muted)]">{d.hint}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      <p className="mt-4 text-sm text-[var(--muted)]">Teslim: kapında bırak, hazır olunca yine kapında al.</p>
       <h3 className="mt-5 text-sm font-medium">Saat</h3>
       <SlotWheel slot={slot} onSlot={onSlot} />
       <textarea

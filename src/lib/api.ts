@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { CategoryId } from "./categories/registry";
-import type { Account, AppNotification, CreateOrderInput, DropPoint, MessageInboxThread, Order, OrderConversation, OrderMessage, Provider, Review, WalletActivity, WalletSnapshot, WorkPhoto } from "./types";
+import type { Account, AppNotification, CreateOrderInput, MessageInboxThread, Order, OrderConversation, OrderMessage, Provider, Review, WalletActivity, WalletSnapshot, WorkPhoto } from "./types";
 import type { Loyalty } from "./loyalty";
 
 export type Catalog = {
   providers: Provider[];
-  dropPoints: DropPoint[];
 };
 
 function errorMessage(data: { error?: unknown }) {
@@ -30,14 +29,14 @@ function unwrap<T>(data: { data?: T } & Partial<T>): T {
 }
 
 export function useCatalog(categoryIds?: string[]) {
-  const [catalog, setCatalog] = useState<Catalog>({ providers: [], dropPoints: [] });
+  const [catalog, setCatalog] = useState<Catalog>({ providers: [] });
   const [ready, setReady] = useState(false);
   const filterKey = (categoryIds ?? []).join(",");
 
   const reload = useCallback(async () => {
     const qs = filterKey ? `?category_id=${encodeURIComponent(filterKey)}` : "";
     const data = await readJson<Catalog>(await fetch(`/api/catalog${qs}`));
-    setCatalog({ providers: data.providers, dropPoints: data.dropPoints });
+    setCatalog({ providers: data.providers });
     setReady(true);
   }, [filterKey]);
 
@@ -499,7 +498,7 @@ export async function patchMyProviderProfile(body: {
   status?: "active" | "paused";
   categoryId?: string;
   express?: boolean;
-  drops?: ("kapi" | "nokta")[];
+  drops?: "kapi"[];
   packages?: { id: "yikama" | "katlama" | "tam"; pricePerPiece: number }[];
 }) {
   const data = unwrap(
@@ -548,15 +547,4 @@ export async function postMyAvailability(body: {
     }),
   );
 }
-
-export async function postMyDropPoint(body: { label: string; lat: number; lng: number }) {
-  await readJson(
-    await fetch("/api/providers/me/drop-points", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-  );
-}
-
 

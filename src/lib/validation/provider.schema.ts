@@ -20,7 +20,7 @@ export const profilePatchSchema = z.object({
   status: z.enum(["active", "paused"]).optional(),
   categoryId: z.string().trim().min(1).max(80).optional(),
   express: z.boolean().optional(),
-  drops: z.array(z.enum(["kapi", "nokta"])).min(1).max(2).optional(),
+  drops: z.array(z.literal("kapi")).min(1).max(1).optional(),
   packages: z
     .array(
       z.object({

@@ -33,15 +33,6 @@ export type PackageRow = {
   category_id: string | null;
 };
 
-export type DropRow = {
-  id: string;
-  provider_id: string;
-  label: string;
-  lat: number;
-  lng: number;
-  is_active: number;
-};
-
 export type SlotRow = {
   id: string;
   provider_id: string;
@@ -305,42 +296,6 @@ export function listPackages(providerId: string, activeOnly = true): PackageRow[
     ? `SELECT * FROM service_packages WHERE provider_id = ? AND is_active = 1`
     : `SELECT * FROM service_packages WHERE provider_id = ?`;
   return db().prepare(sql).all(providerId) as PackageRow[];
-}
-
-export function upsertDrop(row: DropRow) {
-  db()
-    .prepare(
-      `INSERT INTO provider_drop_points (id, provider_id, label, lat, lng, is_active)
-       VALUES (@id, @provider_id, @label, @lat, @lng, @is_active)
-       ON CONFLICT(id) DO UPDATE SET
-         label = excluded.label, lat = excluded.lat, lng = excluded.lng`,
-    )
-    .run(row);
-}
-
-export function listDrops(providerId: string, activeOnly = true): DropRow[] {
-  const sql = activeOnly
-    ? `SELECT * FROM provider_drop_points WHERE provider_id = ? AND is_active = 1`
-    : `SELECT * FROM provider_drop_points WHERE provider_id = ?`;
-  return db().prepare(sql).all(providerId) as DropRow[];
-}
-
-export function insertDrop(input: { providerId: string; label: string; lat: number; lng: number }): DropRow {
-  const row: DropRow = {
-    id: randomUUID(),
-    provider_id: input.providerId,
-    label: input.label,
-    lat: input.lat,
-    lng: input.lng,
-    is_active: 1,
-  };
-  db()
-    .prepare(
-      `INSERT INTO provider_drop_points (id, provider_id, label, lat, lng, is_active)
-       VALUES (@id, @provider_id, @label, @lat, @lng, @is_active)`,
-    )
-    .run(row);
-  return row;
 }
 
 export function countSlots(providerId: string) {

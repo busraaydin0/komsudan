@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireReadyAccount(req);
     const body = await parseBody(req, createOrderSchema);
-    const order = createOrder({ ...body, dropPointId: body.dropPointId ?? null }, user.id);
+    const order = createOrder(body, user.id);
     return ok({ order }, 201);
   } catch (e) {
     return fail(e);

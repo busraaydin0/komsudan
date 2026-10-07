@@ -2,7 +2,7 @@
 
 import { loyaltyRate } from "@/lib/loyalty";
 import { estimateFor, resolveExpress, tl } from "@/lib/pricing";
-import type { CreateOrderInput, DropMethod, PackageId, Provider } from "@/lib/types";
+import type { CreateOrderInput, PackageId, Provider } from "@/lib/types";
 import { CATEGORIES } from "./registry";
 
 export const ZERO_QUOTE = {
@@ -15,7 +15,7 @@ export const ZERO_QUOTE = {
 };
 
 export function helloBlurb(): string {
-  return CATEGORIES.camasir.offerBio || "Eve kimse girmez. Çamaşırı kapıda veya gel al noktasında bırak.";
+  return CATEGORIES.camasir.offerBio || "Eve kimse girmez. Çamaşırı kapında bırak.";
 }
 
 export function notePlaceholder(): string {
@@ -68,8 +68,6 @@ export function placeBlockReason(p: Provider): string | null {
 export function placeOrderInput(
   p: Provider,
   args: {
-    drop: DropMethod;
-    dropPointId: string | null;
     slot: string;
     note: string;
     pkg: PackageId;
@@ -79,8 +77,7 @@ export function placeOrderInput(
 ): CreateOrderInput {
   return {
     providerId: p.id,
-    drop: args.drop,
-    dropPointId: args.drop === "nokta" ? args.dropPointId : null,
+    drop: "kapi",
     slot: args.slot ?? "",
     note: args.note,
     packageId: args.pkg,
@@ -89,9 +86,8 @@ export function placeOrderInput(
   };
 }
 
-export function checkoutMeta(p: Provider): { drops: DropMethod[]; canPlace: boolean } {
+export function checkoutMeta(p: Provider): { canPlace: boolean } {
   return {
-    drops: p.drops,
     canPlace: !p.categoryId || p.categoryId === "camasir",
   };
 }

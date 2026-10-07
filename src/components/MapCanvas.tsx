@@ -5,7 +5,7 @@ import { Map, Marker, setWorkerUrl, type StyleSpecification } from "maplibre-gl"
 import { PILOT } from "@/lib/data";
 import { initials } from "@/lib/avatar";
 import { seatTone } from "@/lib/seat";
-import type { DropPoint, LngLat, MapMode, Provider } from "@/lib/types";
+import type { LngLat, MapMode, Provider } from "@/lib/types";
 
 /** Next/Turbopack does not emit the worker next to maplibre-gl-shared.mjs. */
 setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
@@ -32,13 +32,10 @@ const STYLE: StyleSpecification = {
 type Props = {
   mode: MapMode;
   selectedId: string | null;
-  dropId: string | null;
   user: LngLat | null;
   meAvatar?: string | null;
   providers: Provider[];
-  dropPoints: DropPoint[];
   onSelect: (id: string) => void;
-  onSelectDrop: (id: string) => void;
   visible?: boolean;
 };
 
@@ -51,23 +48,17 @@ function tightBounds(): [[number, number], [number, number]] {
 
 let cameraGen = 0;
 
-function pinKey(providers: Provider[], dropPoints: DropPoint[]) {
-  return [
-    ...providers.map((p) => `${p.id}:${p.loc.lng}:${p.loc.lat}:${p.avatarUrl ?? ""}`),
-    ...dropPoints.map((d) => `${d.id}:${d.loc.lng}:${d.loc.lat}`),
-  ].join("|");
+function pinKey(providers: Provider[]) {
+  return providers.map((p) => `${p.id}:${p.loc.lng}:${p.loc.lat}:${p.avatarUrl ?? ""}`).join("|");
 }
 
 export function MapCanvas({
   mode,
   selectedId,
-  dropId,
   user,
   meAvatar,
   providers,
-  dropPoints,
   onSelect,
-  onSelectDrop,
   visible = true,
 }: Props) {
   const root = useRef<HTMLDivElement>(null);
@@ -75,21 +66,15 @@ export function MapCanvas({
   const markers = useRef<Marker[]>([]);
   const userMarker = useRef<Marker | null>(null);
   const onSelectRef = useRef(onSelect);
-  const onSelectDropRef = useRef(onSelectDrop);
   const modeRef = useRef(mode);
   const providersRef = useRef(providers);
-  const dropPointsRef = useRef(dropPoints);
   const selectedRef = useRef(selectedId);
-  const dropIdRef = useRef(dropId);
   const [mapReady, setMapReady] = useState(false);
   onSelectRef.current = onSelect;
-  onSelectDropRef.current = onSelectDrop;
   modeRef.current = mode;
   providersRef.current = providers;
-  dropPointsRef.current = dropPoints;
   selectedRef.current = selectedId;
-  dropIdRef.current = dropId;
-  const pins = pinKey(providers, dropPoints);
+  const pins = pinKey(providers);
 
   useEffect(() => {
     if (!root.current || mapRef.current) return;
@@ -175,37 +160,10 @@ export function MapCanvas({
           .addTo(map),
       );
     });
-    dropPoints.forEach((d, i) => {
-      const el = document.createElement("button");
-      el.type = "button";
-      el.className = "katla-drop";
-      el.dataset.drop = d.id;
-      el.title = d.name;
-      el.setAttribute("aria-label", `Gel al noktası: ${d.name}`);
-      el.style.setProperty("--pin-delay", `${80 + i * 40}ms`);
-      const mark = document.createElement("span");
-      mark.className = "mark";
-      mark.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 7h10l-.8 11.2a2 2 0 0 1-2 1.8H9.8a2 2 0 0 1-2-1.8L7 7Z" stroke="currentColor" stroke-width="1.9"/><path d="M9 7V5.8A3 3 0 0 1 12 3a3 3 0 0 1 3 2.8V7" stroke="currentColor" stroke-width="1.9"/></svg>`;
-      const stem = document.createElement("span");
-      stem.className = "stem";
-      el.append(mark, stem);
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        onSelectDropRef.current(d.id);
-      });
-      next.push(
-        new Marker({ element: el, anchor: "bottom" })
-          .setLngLat([d.loc.lng, d.loc.lat])
-          .addTo(map),
-      );
-    });
     markers.current = next;
     for (const m of next) {
       const el = m.getElement();
-      el.classList.toggle(
-        "is-on",
-        el.dataset.id === selectedRef.current || el.dataset.drop === dropIdRef.current,
-      );
+      el.classList.toggle("is-on", el.dataset.id === selectedRef.current);
     }
     return () => {
       next.forEach((m) => m.remove());
@@ -231,8 +189,7 @@ export function MapCanvas({
     for (const m of markers.current) {
       const el = m.getElement();
       const id = el.dataset.id;
-      const drop = el.dataset.drop;
-      el.classList.toggle("is-on", id === selectedId || drop === dropId);
+      el.classList.toggle("is-on", id === selectedId);
     }
     const map = mapRef.current;
     if (!map) return;
@@ -250,19 +207,7 @@ export function MapCanvas({
       });
       return;
     }
-    if (!dropId) return;
-    const d = dropPointsRef.current.find((x) => x.id === dropId);
-    if (!d) return;
-    map.easeTo({
-      center: [d.loc.lng, d.loc.lat],
-      zoom: Math.max(map.getZoom(), 16),
-      duration: 650,
-      offset: [0, -64],
-      pitch: modeRef.current === "3d" ? Math.max(map.getPitch(), 52) : 0,
-      bearing: modeRef.current === "3d" ? map.getBearing() : 0,
-      essential: true,
-    });
-  }, [selectedId, dropId]);
+  }, [selectedId]);
 
   useEffect(() => {
     for (const m of markers.current) {

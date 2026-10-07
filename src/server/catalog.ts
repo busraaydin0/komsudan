@@ -1,6 +1,6 @@
 import { clampPublicCategoryIds } from "@/lib/categories/registry";
-import { db, toDrop, toProvider } from "./db";
-import type { DropPoint, Provider } from "@/lib/types";
+import { db, toProvider } from "./db";
+import type { Provider } from "@/lib/types";
 import { workPhotosForProvider } from "./photos";
 import { ratingBreakdown, ratingForProvider, reviewsForProvider } from "@/lib/services/reviewService";
 import { listAvatarUrls } from "@/lib/db/providers";
@@ -23,17 +23,6 @@ export function getProvider(id: string): Provider | undefined {
     .prepare("SELECT id, payload, remaining, category_id FROM providers WHERE id = ?")
     .get(id) as { id: string; payload: string; remaining: number; category_id: string | null } | undefined;
   return row ? hydrate(toProvider(row), listAvatarUrls(), true) : undefined;
-}
-
-export function listDrops(): DropPoint[] {
-  return (db().prepare("SELECT payload FROM drop_points").all() as { payload: string }[]).map(toDrop);
-}
-
-export function getDrop(id: string): DropPoint | undefined {
-  const row = db()
-    .prepare("SELECT payload FROM drop_points WHERE id = ?")
-    .get(id) as { payload: string } | undefined;
-  return row ? toDrop(row) : undefined;
 }
 
 export function providersLive(categoryIds?: string[]): Provider[] {

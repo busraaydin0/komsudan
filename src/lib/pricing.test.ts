@@ -25,7 +25,7 @@ function laundry(price: number): Provider {
     hasDryer: true,
     express: false,
     trust: "yeni",
-    drops: ["nokta"],
+    drops: ["kapi"],
     slots: ["10:00"],
     bio: "",
     workPhotos: [],

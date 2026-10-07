@@ -31,7 +31,6 @@ import { getProfile } from "@/lib/db/providers";
 import {
   addRemaining,
   bumpCodeAttempts,
-  dropPointExists,
   getOrderRow,
   getRemaining,
   insertOrderRow,
@@ -71,8 +70,8 @@ function digits(raw: string) {
   return raw.replace(/\D/g, "");
 }
 
-function deliveryMode(drop: DropMethod): "door" | "point" {
-  return drop === "kapi" ? "door" : "point";
+function deliveryMode(_drop: DropMethod): "door" {
+  return "door";
 }
 
 function ensurePickupCode(row: OrderRow) {
@@ -196,22 +195,13 @@ function requireSlot(input: CreateOrderInput) {
 }
 
 function validateDropAndSlot(provider: NonNullable<ReturnType<typeof getProvider>>, input: CreateOrderInput) {
-  if (!provider.drops.includes(input.drop)) {
+  if (input.drop !== "kapi" || !provider.drops.includes("kapi")) {
     throw new ApiError(400, "Bu teslimat yöntemi kapalı.", "VALIDATION_ERROR");
-  }
-
-  let dropPointId: string | null = null;
-  if (input.drop === "nokta") {
-    if (!input.dropPointId || !dropPointExists(input.dropPointId)) {
-      throw new ApiError(400, "Gel al noktası seç.", "VALIDATION_ERROR");
-    }
-    dropPointId = input.dropPointId;
   }
 
   if (!isAllowedOrderSlot(requireSlot(input), provider.slots)) {
     throw new ApiError(400, "Saat 09:00–19:00 içinde, 15 dakikanın katı olmalı.", "VALIDATION_ERROR");
   }
-  return dropPointId;
 }
 
 function insertPendingOrder(args: {
@@ -306,7 +296,7 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     throw new ApiError(400, "Bu komşu aynı gün almıyor.", "VALIDATION_ERROR");
   }
 
-  const dropPointId = validateDropAndSlot(provider, input);
+  validateDropAndSlot(provider, input);
   const quote = estimateFor(
     provider,
     pieces,
@@ -319,8 +309,8 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     packageId: input.packageId,
     pieces,
     express,
-    drop: input.drop,
-    dropPointId,
+    drop: "kapi",
+    dropPointId: null,
     slot: requireSlot(input),
     note: (input.note ?? "").trim().slice(0, 500),
     quote,

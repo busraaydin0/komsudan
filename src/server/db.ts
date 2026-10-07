@@ -1,1 +1,1 @@
-export { db, uploadsDir, toProvider, toDrop } from "@/lib/db";
+export { db, uploadsDir, toProvider } from "@/lib/db";

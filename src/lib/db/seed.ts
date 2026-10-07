@@ -1,10 +1,9 @@
 import type Database from "better-sqlite3";
-import { DROP_POINTS, PROVIDERS, SEED_REVIEWS } from "@/lib/data";
+import { PROVIDERS, SEED_REVIEWS } from "@/lib/data";
 import { EXPRESS_BUMP, MIN_ORDER } from "@/lib/pricing";
 import {
   countSlots,
   insertSlotRow,
-  upsertDrop,
   upsertPackage,
   upsertProfile,
   upsertProviderUser,
@@ -23,14 +22,6 @@ const SEED_PHONES: Record<string, string> = {
 };
 
 const KEEP_SEED_IDS = new Set(PROVIDERS.map((p) => p.id));
-
-function deliveryMode(drops: Array<"kapi" | "nokta">): "door" | "point" | "both" {
-  const door = drops.includes("kapi");
-  const point = drops.includes("nokta");
-  if (door && point) return "both";
-  if (door) return "door";
-  return "point";
-}
 
 function tableExists(database: Database.Database, name: string) {
   return Boolean(
@@ -105,7 +96,6 @@ function pruneLeftoverSeedProviders(database: Database.Database) {
   delIf("reviews", `DELETE FROM reviews WHERE provider_id IN (${ph})`);
   delIf("gallery_photos", `DELETE FROM gallery_photos WHERE provider_id IN (${ph})`);
   delIf("service_packages", `DELETE FROM service_packages WHERE provider_id IN (${ph})`);
-  delIf("provider_drop_points", `DELETE FROM provider_drop_points WHERE provider_id IN (${ph})`);
   delIf("availability_slots", `DELETE FROM availability_slots WHERE provider_id IN (${ph})`);
   run(`DELETE FROM providers WHERE id IN (${ph})`);
   delIf("provider_profiles", `DELETE FROM provider_profiles WHERE user_id IN (${ph})`);
@@ -169,21 +159,8 @@ function seedProviderDirectory() {
         express_surcharge_pct: p.express ? EXPRESS_BUMP : 0,
       });
     }
-    if (p.drops.includes("nokta")) {
-      for (const d of DROP_POINTS) {
-        upsertDrop({
-          id: `${p.id}:${d.id}`,
-          provider_id: p.id,
-          label: d.name,
-          lat: d.loc.lat,
-          lng: d.loc.lng,
-          is_active: 1,
-        });
-      }
-    }
     if (countSlots(p.id) === 0) {
       const windows = [...new Set(p.slots.map((s) => s.replace(/^(Bugün|Yarın) /, "")))];
-      const mode = deliveryMode(p.drops);
       for (const day of [1, 2, 3, 4, 5]) {
         for (const window of windows) {
           const [start, end] = window.split("–");
@@ -194,7 +171,7 @@ function seedProviderDirectory() {
             day_of_week: day,
             start_time: start,
             end_time: end,
-            delivery_mode: mode,
+            delivery_mode: "door",
             is_active: 1,
           });
         }
@@ -209,10 +186,6 @@ export function seedCatalog(database: Database.Database) {
      VALUES (@id, @payload, @remaining, @categoryId)
      ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, category_id = excluded.category_id`,
   );
-  const upDrop = database.prepare(
-    `INSERT INTO drop_points (id, payload) VALUES (@id, @payload)
-     ON CONFLICT(id) DO UPDATE SET payload = excluded.payload`,
-  );
   const upReview = database.prepare(
     `INSERT INTO reviews (id, order_id, provider_id, rating, body, author, created_at)
      VALUES (@id, @order_id, @provider_id, @rating, @body, @author, @created_at)
@@ -226,13 +199,10 @@ export function seedCatalog(database: Database.Database) {
       const { remaining, ...rest } = p;
       upProvider.run({
         id: p.id,
-        payload: JSON.stringify({ ...rest, remaining }),
+        payload: JSON.stringify({ ...rest, remaining, drops: ["kapi"] }),
         remaining,
         categoryId: "camasir",
       });
-    }
-    for (const d of DROP_POINTS) {
-      upDrop.run({ id: d.id, payload: JSON.stringify(d) });
     }
     const knownProviders = new Set(PROVIDERS.map((p) => p.id));
     for (const r of SEED_REVIEWS) {

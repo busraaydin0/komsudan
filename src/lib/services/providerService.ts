@@ -14,9 +14,7 @@ import {
   countSlots,
   getProfile,
   insertCatalogProvider,
-  insertDrop,
   insertSlot,
-  listDrops,
   listPackages,
   listProfilesInBox,
   listSlots,
@@ -25,7 +23,6 @@ import {
   upsertPackage,
   upsertProfile,
   deactivateOtherPackages,
-  type DropRow,
   type PackageRow,
   type ProfileRow,
   type SlotRow,
@@ -52,16 +49,6 @@ function toPackage(row: PackageRow) {
     minOrderAmount: row.min_order_amount,
     expressAvailable: Boolean(row.express_available),
     expressSurchargePct: row.express_surcharge_pct,
-  };
-}
-
-function toDrop(row: DropRow) {
-  return {
-    id: row.id,
-    providerId: row.provider_id,
-    label: row.label,
-    lat: row.lat,
-    lng: row.lng,
   };
 }
 
@@ -100,7 +87,6 @@ function toPublic(row: ProfileRow, origin?: { lat: number; lng: number }) {
     commissionRate: row.commission_rate,
     categoryId: row.category_id ?? "camasir",
     packages: listPackages(row.user_id).map(toPackage),
-    dropPoints: listDrops(row.user_id).map(toDrop),
     availability: listSlots(row.user_id).map(toSlot),
     distanceKm: origin
       ? Math.round(haversineKm(origin, { lat: row.lat, lng: row.lng }) * 1000) / 1000
@@ -221,7 +207,7 @@ export function patchMyProfile(
   patchCatalogPayload(user.id, {
     ...(catalogPacks ? { packages: catalogPacks } : {}),
     ...(patch.express !== undefined ? { express: patch.express } : {}),
-    ...(patch.drops ? { drops: patch.drops } : {}),
+    ...(patch.drops ? { drops: ["kapi"] as DropMethod[] } : {}),
     ...(patch.dryingType
       ? { dryingType: patch.dryingType, hasDryer: hasDryerFrom(patch.dryingType) }
       : {}),
@@ -288,7 +274,7 @@ function ensureDirectoryEntry(
     });
   }
 
-  const drops: DropMethod[] = ["kapi", "nokta"];
+  const drops: DropMethod[] = ["kapi"];
   const payload: Provider = {
     id: user.id,
     name: user.name || "Komşu",
@@ -340,26 +326,17 @@ function ensureDirectoryEntry(
         dayOfWeek: day,
         startTime: "18:00",
         endTime: "19:00",
-        deliveryMode: "both",
+        deliveryMode: "door",
       });
       insertSlot({
         providerId: user.id,
         dayOfWeek: day,
         startTime: "19:00",
         endTime: "20:00",
-        deliveryMode: "both",
+        deliveryMode: "door",
       });
     }
   }
-  if (listDrops(user.id).length === 0) {
-    insertDrop({
-      providerId: user.id,
-      label: neighborhood,
-      lat: input.lat,
-      lng: input.lng,
-    });
-  }
-
   const row = getProfile(user.id);
   if (!row) throw new ApiError(500, "Profil oluşturulamadı.", "INTERNAL");
   return toPublic(row);
@@ -466,15 +443,4 @@ export function addMyAvailability(
     }),
   );
 }
-
-export function listMyDropPoints(user: AuthUser) {
-  requireProvider(user);
-  return listDrops(user.id).map(toDrop);
-}
-
-export function addMyDropPoint(user: AuthUser, input: { label: string; lat: number; lng: number }) {
-  requireProvider(user);
-  return toDrop(insertDrop({ providerId: user.id, ...input }));
-}
-
 

@@ -183,7 +183,7 @@ function ensureColumns(db: Database.Database) {
     UPDATE service_categories SET is_active = 1 WHERE is_active IS NULL;
     UPDATE service_categories SET
       name = 'Çamaşır Yıkama',
-      blurb = 'Yıka, katla, kapıda veya gel al noktasında bırak',
+      blurb = 'Yıka, katla, kapıda bırak',
       sort_order = 1,
       is_active = 1
     WHERE id = 'camasir';
@@ -210,6 +210,8 @@ function ensureColumns(db: Database.Database) {
     db.exec(`DROP TABLE IF EXISTS ${name}`);
   }
   db.exec(`DROP TABLE IF EXISTS provider_washes`);
+  db.exec(`DROP TABLE IF EXISTS provider_drop_points`);
+  db.exec(`DROP TABLE IF EXISTS drop_points`);
   addColumn(db, "orders", "product_id", "product_id TEXT");
   addColumn(db, "orders", "product_name", "product_name TEXT");
   addColumn(db, "orders", "guest_count", "guest_count INTEGER");

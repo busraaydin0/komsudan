@@ -11,8 +11,7 @@ export const createOrderSchema = z.object({
     .max(PIECES_MAX, `Parça sayısı ${PIECES_MIN}–${PIECES_MAX} olmalı.`)
     .optional(),
   express: z.boolean().optional().default(false),
-  drop: z.enum(["kapi", "nokta"]),
-  dropPointId: z.string().min(1).nullable().optional(),
+  drop: z.literal("kapi").optional().default("kapi"),
   slot: z.string().min(1, "Saat dilimi gerekli."),
   note: z.string().max(500).optional().default(""),
 });

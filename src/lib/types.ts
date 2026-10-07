@@ -2,7 +2,7 @@ import type { LaundryPackageId, OrderPackageId } from "./categories/registry";
 
 export type PackageId = LaundryPackageId;
 export type { OrderPackageId };
-export type DropMethod = "kapi" | "nokta";
+export type DropMethod = "kapi";
 export type DryingType = "makine" | "ip" | "ikisi";
 export type MapMode = "2d" | "3d";
 export type TrustTier = "yeni" | "kurucu" | "guvenilir";
@@ -96,13 +96,6 @@ export type Provider = {
   categoryId?: string;
 };
 
-export type DropPoint = {
-  id: string;
-  name: string;
-  hint: string;
-  loc: LngLat;
-};
-
 export type PaymentStatus = "authorized" | "captured" | "voided";
 
 export type AppPayment = {
@@ -167,7 +160,6 @@ export type CreateOrderInput = {
   pieces?: number;
   express?: boolean;
   drop: DropMethod;
-  dropPointId: string | null;
   slot?: string;
   note: string;
 };
