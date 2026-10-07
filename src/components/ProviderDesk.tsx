@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { PACKAGES } from "@/lib/data";
 import { fetchOrderMessages, patchOrder, uploadOrderPhoto, useCatalog, useOrders, useSession } from "@/lib/api";
 import { MessageBadge } from "@/components/OrderThread";
-import { usesFoodSm } from "@/lib/categories/registry";
 import { tl } from "@/lib/pricing";
 import { canAddPhotos, nextStatus } from "@/lib/status";
 import type { DropPoint, Order, OrderStatus, Provider } from "@/lib/types";
@@ -218,9 +217,7 @@ function OrderCard({
     p?.packages.find((x) => x.id === order.packageId) ??
     PACKAGES.find((x) => x.id === order.packageId);
   const drop = dropPoints.find((d) => d.id === order.dropPointId);
-  const food = Boolean(order.productName || order.allergyNote);
-  const catalog = usesFoodSm(order.packageId);
-  const next = nextStatus(order.status, order.packageId, catalog);
+  const next = nextStatus(order.status, order.packageId);
 
   useEffect(() => {
     let alive = true;
@@ -241,11 +238,6 @@ function OrderCard({
       clearInterval(t);
     };
   }, [order.id]);
-
-  const foodLabel: Partial<Record<OrderStatus, string>> = {
-    teslim_alindi: "Hazırlanıyor",
-    hazir: "Hazır",
-  };
 
   async function act(action: "accept" | "reject" | "advance" | "deliver") {
     if (busy) return;
@@ -268,19 +260,11 @@ function OrderCard({
       style={{ animationDelay: `${delay}ms` }}
     >
       <p className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE[order.status] ?? "bg-[var(--paper)] text-[var(--muted)]"}`}>
-        {catalog && foodLabel[order.status] ? foodLabel[order.status] : (LABEL[order.status] ?? order.status)}
+        {LABEL[order.status] ?? order.status}
       </p>
       <p className="mt-2 font-medium">
-        {p?.name} ·{" "}
-        {food
-          ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : catalog
-            ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
-            : `${order.pieces} parça · ${pack?.title}`}
+        {p?.name} · {order.pieces} parça · {pack?.title}
       </p>
-      {food && order.allergyNote && (
-        <p className="mt-1 text-sm text-[var(--muted)]">Alerji: {order.allergyNote}</p>
-      )}
       <p className="mt-1 text-sm text-[var(--muted)]">
         {new Date(order.createdAt).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
         {" · "}
@@ -322,7 +306,7 @@ function OrderCard({
             onClick={() => void act("advance")}
             className="k-press k-cta rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs text-[var(--paper)]"
           >
-            {busy ? "…" : food && next === "hazir" ? "Hazır" : LABEL[next]}
+            {busy ? "…" : LABEL[next]}
           </button>
         )}
         <button

@@ -99,11 +99,15 @@ export function categoryDef(id: CategoryId): CategoryDef {
 }
 
 /** Çamaşır yıkama/ütü SM. `food` eski çağrıları korur; kayıtta başka alan yok. */
-export function usesFoodSm(_packageId: string, food = false): boolean {
+export function usesFoodSm(packageId: string, food = false): boolean {
+  if (isLaundryPackageId(packageId) || isCategoryId(packageId)) return food;
   return food;
 }
 
-export function capacityLabelForPackage(_packageId: string): string {
+export function capacityLabelForPackage(packageId: string): string {
+  if (isLaundryPackageId(packageId) || isCategoryId(packageId)) {
+    return CATEGORIES.camasir.capacityLabel;
+  }
   return CATEGORIES.camasir.capacityLabel;
 }
 

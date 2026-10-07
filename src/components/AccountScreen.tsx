@@ -248,7 +248,7 @@ export function AccountScreen({
           >
             <span>
               <span className="block text-sm font-medium">Keşif tercihleri</span>
-              <span className="text-xs text-[var(--muted)]">Rol, hizmet alanı, konum</span>
+              <span className="text-xs text-[var(--muted)]">Rol ve konum</span>
             </span>
             <span className="text-xs text-[var(--clay)]">Düzenle</span>
           </button>

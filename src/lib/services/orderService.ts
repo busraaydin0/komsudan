@@ -4,7 +4,7 @@ import { estimateFor, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/prici
 import { isAllowedOrderSlot } from "@/lib/timeWindow";
 import { loyaltyRate } from "@/lib/loyalty";
 import { getCategoryForProvider } from "@/lib/db/categories";
-import { strategyFor, homeVisitStrategy, isHomeVisitFulfillment } from "@/lib/fulfillment";
+import { strategyFor, isHomeVisitFulfillment } from "@/lib/fulfillment";
 import {
   homeVisitNext,
   isHomeVisitStatus,

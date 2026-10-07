@@ -19,27 +19,21 @@ import {
 import { seatLabel, seatTone } from "@/lib/seat";
 import { postOrder, postReview, patchOrder, fetchWallet, useCatalog, useOrders } from "@/lib/api";
 import {
-  applyQtyAndDrop,
   catalogOfferCount,
   checkoutBackLabel,
   checkoutMeta,
   continueCta,
   emptyCatalogCopy,
   helloBlurb,
-  isUnitCatalog,
-  listCatalogHint,
   listEmptyPriceLabel,
   listPrice,
   listPricedTag,
   notePlaceholder,
-  pickCatalog,
   placeBlockReason,
   placeOrderInput,
   quoteForProvider,
-  selectedCatalogName,
-  selectedFallbackName,
 } from "@/lib/categories/customer";
-import { seatPhraseFor, usesFoodSm } from "@/lib/categories/registry";
+import { clampPublicCategoryIds, seatPhraseFor } from "@/lib/categories/registry";
 import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
 import { canCancel, trackSteps } from "@/lib/status";
 import { PhotoStrip, RatingBreakdownView, ReviewComposer, ReviewList } from "@/components/Photos";
@@ -64,11 +58,6 @@ const MapCanvas = dynamic(() => import("./MapCanvas").then((m) => m.MapCanvas), 
 });
 
 const PIECES = [8, 12, 16, 24, 32];
-
-function laundryInFilter(ids?: string[]) {
-  if (!ids?.length) return true;
-  return ids.includes("camasir");
-}
 
 type NearbySort = "near" | "far" | "priceHigh" | "priceLow" | "rating" | "reviews" | "space";
 
@@ -143,7 +132,7 @@ export function CustomerApp({
   onOpenMessages,
 }: Props) {
   const { providers, dropPoints, ready, reload: reloadCatalog } = useCatalog(
-    categoryIds?.length ? categoryIds : ["camasir"],
+    clampPublicCategoryIds(categoryIds),
   );
   const { orders, reload: reloadOrders } = useOrders();
   const [mode, setMode] = useState<MapMode>("3d");
@@ -154,10 +143,7 @@ export function CustomerApp({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
   const [pkg, setPkg] = useState<PackageId>("tam");
-  const [productId, setProductId] = useState<string | null>(null);
   const [pieces, setPieces] = useState(16);
-  const [guests, setGuests] = useState(8);
-  const [allergy, setAllergy] = useState("");
   const [drop, setDrop] = useState<DropMethod>("nokta");
   const [slot, setSlot] = useState("");
   const [note, setNote] = useState("");
@@ -174,7 +160,7 @@ export function CustomerApp({
   const origin = user ?? home ?? PILOT.center;
   const ranked = useMemo(() => {
     return providers
-      .filter((p) => (p.categoryId && p.categoryId !== "camasir" ? true : dryerOnly ? p.hasDryer : true))
+      .filter((p) => (dryerOnly ? p.hasDryer : true))
       .map((p) => ({ p, km: kmBetween(origin, p.loc) }))
       .sort((a, b) => a.km - b.km);
   }, [origin, dryerOnly, providers]);
@@ -182,16 +168,15 @@ export function CustomerApp({
 
   const selected = selectedId ? providers.find((p) => p.id === selectedId) : undefined;
   const active = orders.find((o) => o.id === activeId) ?? orders[0];
-  const catalogPick = selected ? pickCatalog(selected, productId) : {};
   const express = resolveExpress(Boolean(selected?.express), slot);
   const quote = quoteForProvider(selected, {
-    guests,
+    guests: pieces,
     pieces,
     pkg,
     express,
     slot,
     loyaltyRate,
-    pick: catalogPick,
+    pick: {},
   });
   const payGate: 0 | 1 | null =
     walletBalance == null ? null : walletBalance >= quote.total ? 1 : 0;
@@ -246,7 +231,6 @@ export function CustomerApp({
       setPkg(selected.packages.some((x) => x.id === pkg) ? pkg : (selected.packages[0]?.id ?? "tam"));
       setSlot(defaultPilotSlot());
       setDrop(selected.drops.includes("kapi") ? "kapi" : "nokta");
-      setAllergy("");
       if (!selected.drops.includes("nokta")) setDropId(null);
       else if (!dropId) setDropId(dropPoints[0]?.id ?? null);
     }
@@ -287,20 +271,20 @@ export function CustomerApp({
     setErr("");
     setPlacing(true);
     try {
-      const blocked = placeBlockReason(selected, catalogPick, allergy);
+      const blocked = placeBlockReason(selected, {}, "");
       if (blocked) {
         setErr(blocked);
         setPlacing(false);
         return;
       }
       const order = await postOrder(
-        placeOrderInput(selected, catalogPick, {
+        placeOrderInput(selected, {}, {
           drop,
           dropPointId: dropId,
           slot,
           note,
-          guests,
-          allergy,
+          guests: pieces,
+          allergy: "",
           pkg,
           pieces,
           express,
@@ -378,7 +362,6 @@ export function CustomerApp({
       {pane === "map" && (
       <div className="pointer-events-none absolute top-[calc(env(safe-area-inset-top)+5rem)] left-3 z-10">
         <div className="k-rise pointer-events-auto flex flex-wrap gap-1.5" style={{ animationDelay: "90ms" }}>
-          {laundryInFilter(categoryIds) && (
           <button
             type="button"
             onClick={() => setDryerOnly((v) => !v)}
@@ -390,12 +373,6 @@ export function CustomerApp({
           >
             Kurutucu var
           </button>
-          )}
-          {categoryIds && categoryIds.length > 0 && (
-            <span className="k-glass inline-flex items-center rounded-full px-2.5 py-1.5 text-xs ring-1 ring-[var(--line)]">
-              Seçili hizmet
-            </span>
-          )}
           <span className="k-glass inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs ring-1 ring-[var(--line)]">
             <span className="inline-grid h-3.5 w-3.5 place-items-center rounded-[3px] bg-[var(--clay)] text-[var(--paper)]" aria-hidden>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
@@ -506,17 +483,12 @@ export function CustomerApp({
                 km={kmBetween(origin, selected.loc)}
                 pkg={pkg}
                 onPkg={setPkg}
-                productId={productId}
-                onProduct={setProductId}
                 onBack={() => {
                   setSheet("list");
                   setSelectedId(null);
                 }}
                 onNext={() => {
-                  const next = applyQtyAndDrop(selected, productId, { guests, drop, pieces }, clampPieces);
-                  setGuests(next.guests);
-                  setDrop(next.drop);
-                  setPieces(next.pieces);
+                  setPieces(clampPieces(pieces, selected.remaining));
                   setSheet("checkout");
                 }}
               />
@@ -526,11 +498,6 @@ export function CustomerApp({
                 p={selected}
                 pieces={pieces}
                 onPieces={(n) => setPieces(clampPieces(n, selected.remaining))}
-                guests={guests}
-                onGuests={setGuests}
-                allergy={allergy}
-                onAllergy={setAllergy}
-                productName={selectedCatalogName(selected, productId)}
                 express={express}
                 onExpress={(want) => {
                   const parsed = parsePilotSlot(slot);
@@ -715,7 +682,7 @@ function List({
                     <span className="block font-medium">{p.name}</span>
                     <span className="mt-0.5 block text-xs text-[var(--muted)]">
                       {p.neighborhood} · {formatKm(km)} · {trustLabel(p.trust)}
-                      {isUnitCatalog(p) ? listCatalogHint(p) : dryingListLabel(p) ? ` · ${dryingListLabel(p)}` : ""}
+                      {dryingListLabel(p) ? ` · ${dryingListLabel(p)}` : ""}
                       {load ? (
                         <span className={tag}>
                           {" · "}
@@ -756,8 +723,6 @@ function ProviderPane({
   km,
   pkg,
   onPkg,
-  productId,
-  onProduct,
   onBack,
   onNext,
 }: {
@@ -765,13 +730,10 @@ function ProviderPane({
   km: number;
   pkg: PackageId;
   onPkg: (id: PackageId) => void;
-  productId: string | null;
-  onProduct: (id: string) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
   const tone = seatTone(p.remaining, p.capacity);
-  const unitCatalog = isUnitCatalog(p);
   const canNext = catalogOfferCount(p) > 0;
   return (
     <div className="flex min-h-full flex-col">
@@ -809,7 +771,7 @@ function ProviderPane({
         </>
       )}
       <div className="mt-4 grid gap-2">
-        {!unitCatalog && p.packages.map((pack) => (
+        {p.packages.map((pack) => (
               <button
                 key={pack.id}
                 type="button"
@@ -881,11 +843,6 @@ function Checkout({
   p,
   pieces,
   onPieces,
-  guests,
-  onGuests,
-  allergy,
-  onAllergy,
-  productName,
   express,
   onExpress,
   drop,
@@ -909,11 +866,6 @@ function Checkout({
   p: Provider;
   pieces: number;
   onPieces: (n: number) => void;
-  guests: number;
-  onGuests: (n: number) => void;
-  allergy: string;
-  onAllergy: (s: string) => void;
-  productName?: string;
   express: boolean;
   onExpress: (v: boolean) => void;
   drop: DropMethod;
@@ -934,37 +886,24 @@ function Checkout({
   onBack: () => void;
   onPlace: () => void;
 }) {
-  const unitPriced = isUnitCatalog(p);
-  const { unit, bounds, drops: foodDrops, unitPrice, canPlace } = checkoutMeta(p, {});
-  const cap = unitPriced ? bounds.max : Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
-  const minCount = unitPriced ? bounds.min : PIECES_MIN;
-  const [draft, setDraft] = useState(String(unitPriced ? guests : pieces));
+  const { drops, canPlace } = checkoutMeta(p, {});
+  const cap = Math.min(PIECES_MAX, p.remaining > 0 ? p.remaining : PIECES_MAX);
+  const [draft, setDraft] = useState(String(pieces));
 
   useEffect(() => {
-    setDraft(String(unitPriced ? guests : pieces));
-  }, [unitPriced, guests, pieces]);
-
-  function clampGuests(n: number) {
-    if (!Number.isFinite(n)) return bounds.min;
-    return Math.min(bounds.max, Math.max(bounds.min, Math.round(n)));
-  }
+    setDraft(String(pieces));
+  }, [pieces]);
 
   function typeCount(raw: string) {
-    const digits = raw.replace(/\D/g, "").slice(0, unit.id === "sayfa" || unit.id === "kg" ? 3 : 2);
+    const digits = raw.replace(/\D/g, "").slice(0, 2);
     setDraft(digits);
     if (!digits) return;
-    if (unitPriced) onGuests(clampGuests(Number(digits)));
-    else onPieces(clampPieces(Number(digits), p.remaining));
+    onPieces(clampPieces(Number(digits), p.remaining));
   }
 
   function commitCount() {
-    if (unitPriced) onGuests(clampGuests(Number(draft) || bounds.min));
-    else onPieces(clampPieces(Number(draft) || PIECES_MIN, p.remaining));
+    onPieces(clampPieces(Number(draft) || PIECES_MIN, p.remaining));
   }
-
-  const count = unitPriced ? guests : pieces;
-  const qtyTitle =
-    unit.id === "kisi" ? "Kaç kişilik?" : unit.id === "kg" ? "Kaç kg?" : `Kaç ${unit.qty}?`;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -972,20 +911,16 @@ function Checkout({
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
         {checkoutBackLabel(p)}
       </button>
-      <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">
-        {unitPriced ? qtyTitle : "Kaç parça?"}
-      </h2>
+      <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Kaç parça?</h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        {unitPriced
-          ? `${productName ?? selectedFallbackName(p)} · ${tl(unitPrice)}/${unit.label.toLowerCase()}. ${bounds.min}–${cap} ${unit.qty}.`
-          : `Gömlek, pantolon, tişört birer parça. Nevresim / yorgan iki sayılır. Sen yaz, 1–${cap}.`}
+        Gömlek, pantolon, tişört birer parça. Nevresim / yorgan iki sayılır. Sen yaz, 1–{cap}.
       </p>
       <div className="mt-3 flex items-center gap-2">
         <button
           type="button"
-          aria-label={unitPriced ? `Bir ${unit.qty} azalt` : "Bir parça azalt"}
-          disabled={count <= minCount}
-          onClick={() => (unitPriced ? onGuests(count - 1) : onPieces(count - 1))}
+          aria-label="Bir parça azalt"
+          disabled={pieces <= PIECES_MIN}
+          onClick={() => onPieces(pieces - 1)}
           className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
         >
           −
@@ -993,7 +928,7 @@ function Checkout({
         <input
           inputMode="numeric"
           pattern="[0-9]*"
-          aria-label={unitPriced ? `${unit.qty} sayısı` : "Parça sayısı"}
+          aria-label="Parça sayısı"
           value={draft}
           onChange={(e) => typeCount(e.target.value)}
           onBlur={commitCount}
@@ -1001,25 +936,23 @@ function Checkout({
         />
         <button
           type="button"
-          aria-label={unitPriced ? `Bir ${unit.qty} ekle` : "Bir parça ekle"}
-          disabled={count >= cap}
-          onClick={() => (unitPriced ? onGuests(count + 1) : onPieces(count + 1))}
+          aria-label="Bir parça ekle"
+          disabled={pieces >= cap}
+          onClick={() => onPieces(pieces + 1)}
           className="k-press grid h-11 w-11 place-items-center rounded-full text-lg ring-1 ring-[var(--line)] disabled:opacity-40"
         >
           +
         </button>
-        <span className="text-sm text-[var(--muted)]">{unitPriced ? unit.qty : "parça"}</span>
+        <span className="text-sm text-[var(--muted)]">parça</span>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {(unitPriced ? [bounds.min, 4, 8, 12, 16, 24].filter((n, i, a) => n <= cap && a.indexOf(n) === i) : PIECES)
-          .filter((n) => n <= cap)
-          .map((n) => (
+        {PIECES.filter((n) => n <= cap).map((n) => (
           <button
             key={n}
             type="button"
-            onClick={() => (unitPriced ? onGuests(n) : onPieces(n))}
+            onClick={() => onPieces(n)}
             className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
-              count === n
+              pieces === n
                 ? "bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]"
                 : "ring-[var(--line)]"
             }`}
@@ -1028,12 +961,12 @@ function Checkout({
           </button>
         ))}
       </div>
-      {p.remaining > 0 && p.remaining < (unitPriced ? bounds.max : PIECES_MAX) && (
+      {p.remaining > 0 && p.remaining < PIECES_MAX && (
         <p className="mt-2 text-xs text-[var(--muted)]">
-          Bugün en fazla {p.remaining} {unitPriced ? unit.qty : "parça"} yer var.
+          Bugün en fazla {p.remaining} parça yer var.
         </p>
       )}
-      {!unitPriced && p.express && (
+      {p.express && (
         <label className="mt-4 flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -1045,7 +978,7 @@ function Checkout({
       )}
       <h3 className="mt-5 text-sm font-medium">Teslimat</h3>
       <div className="mt-2 flex flex-wrap gap-2">
-        {foodDrops.map((d) => (
+        {drops.map((d) => (
           <button
             key={d}
             type="button"
@@ -1098,9 +1031,7 @@ function Checkout({
             ? "Bu hizmette sipariş yok; fiyat cihazı görünce netleşir. "
             : quote.loyaltyRate > 0
             ? `${loyaltyLabel} · %${Math.round(quote.loyaltyRate * 100)} indirim, önce ${tl(quote.before)}. `
-            : unitPriced
-              ? `${unit.qty} × ${unit.label.toLowerCase()} fiyatı. `
-              : `Min. ${tl(100)}. `}
+            : `Min. ${tl(100)}. `}
           {canPlace && walletBalance != null
             ? `Bakiye ${tl(walletBalance)}. Ödeme ${payGate === 1 ? "1 · alınır" : "0 · alınmaz"}. `
             : ""}
@@ -1144,9 +1075,7 @@ function Track({
   onReload: () => void;
   onOpenMessages?: (orderId: string) => void;
 }) {
-  const food = Boolean(order.productName || order.allergyNote);
-  const catalog = usesFoodSm(order.packageId);
-  const steps = trackSteps(order.packageId, catalog);
+  const steps = trackSteps(order.packageId);
   const idx = steps.indexOf(order.status);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -1157,17 +1086,8 @@ function Track({
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Sipariş {order.id}</h2>
       <p className="text-sm text-[var(--muted)]">
-        {provider?.name} ·{" "}
-        {food
-          ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : catalog
-            ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
-            : `${order.pieces} parça`}{" "}
-        · {tl(order.total)}
+        {provider?.name} · {order.pieces} parça · {tl(order.total)}
       </p>
-      {food && order.allergyNote && (
-        <p className="mt-1 text-sm text-[var(--muted)]">Alerji: {order.allergyNote}</p>
-      )}
       {order.status === "iptal" && (
         <p className="mt-3 text-sm text-[var(--clay)]">
           Sipariş iptal edildi. Bakiyedeki tutanak çözüldü, para çekilmedi.
@@ -1233,7 +1153,7 @@ function Track({
                   current || done ? "text-[var(--ink)]" : "text-[var(--muted)]"
                 } ${current ? "font-medium" : ""}`}
               >
-                {food && s === "teslim_alindi" ? "Hazırlanıyor" : STEP_LABEL[s]}
+                {STEP_LABEL[s]}
               </span>
             </li>
           );

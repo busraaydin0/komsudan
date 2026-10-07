@@ -2,7 +2,7 @@
 
 import { estimateFor, resolveExpress, tl } from "@/lib/pricing";
 import type { CreateOrderInput, DropMethod, PackageId, Provider } from "@/lib/types";
-import { isCategoryId } from "./registry";
+import { CATEGORIES, clampPublicCategoryIds, isCategoryId } from "./registry";
 
 export const ZERO_QUOTE = {
   total: 0,
@@ -17,11 +17,16 @@ export type QtyUnit = { id: string; label: string; qty: string };
 
 export type CatalogPick = Record<string, never>;
 
-export function isUnitCatalog(_p: Pick<Provider, "categoryId">): boolean {
-  return false;
+function defFor(categoryId?: string | null) {
+  return isCategoryId(categoryId) ? CATEGORIES[categoryId] : CATEGORIES.camasir;
 }
 
-export function catalogNames(_p: Provider): { id: string; name: string }[] {
+export function isUnitCatalog(p: Pick<Provider, "categoryId">): boolean {
+  return defFor(p.categoryId).catalogKey !== "packages";
+}
+
+export function catalogNames(p: Provider): { id: string; name: string }[] {
+  if (defFor(p.categoryId).catalogKey === "packages") return [];
   return [];
 }
 
@@ -34,7 +39,8 @@ export function hasCatalogId(p: Provider, id: string | null): boolean {
   return catalogNames(p).some((x) => x.id === id);
 }
 
-export function pickCatalog(_p: Provider, _productId: string | null): CatalogPick {
+export function pickCatalog(p: Provider, productId: string | null): CatalogPick {
+  if (!productId || defFor(p.categoryId).catalogKey === "packages") return {};
   return {};
 }
 
@@ -42,11 +48,13 @@ export function selectedCatalogName(p: Provider, productId: string | null): stri
   return catalogNames(p).find((x) => x.id === productId)?.name ?? catalogNames(p)[0]?.name;
 }
 
-export function helloBlurb(_categoryIds?: string[]): string {
-  return "Eve kimse girmez. Çamaşırı kapıda veya gel al noktasında bırak.";
+export function helloBlurb(categoryIds?: string[]): string {
+  const id = clampPublicCategoryIds(categoryIds)[0];
+  return defFor(id).offerBio || "Eve kimse girmez. Çamaşırı kapıda veya gel al noktasında bırak.";
 }
 
-export function notePlaceholder(_categoryId?: string): string {
+export function notePlaceholder(categoryId?: string): string {
+  if (defFor(categoryId).id !== "camasir") return "";
   return "Nevresim, leke, hassas kumaş, kapı kodu…";
 }
 
@@ -54,32 +62,34 @@ export function listPrice(p: Provider): number | null {
   return p.packages.find((x) => x.id === "tam")?.pricePerPiece ?? p.packages.at(-1)?.pricePerPiece ?? null;
 }
 
-export function listCatalogHint(_p: Provider): string {
+export function listCatalogHint(p: Provider): string {
+  if (defFor(p.categoryId).catalogKey === "packages") return "";
   return "";
 }
 
-export function listEmptyPriceLabel(_p: Provider): string {
-  return "paket yok";
+export function listEmptyPriceLabel(p: Provider): string {
+  return defFor(p.categoryId).catalogKey === "packages" ? "paket yok" : "paket yok";
 }
 
-export function listPricedTag(_p: Provider, price: number): string {
-  return `${tl(price)}/parça`;
+export function listPricedTag(p: Provider, price: number): string {
+  return `${tl(price)}/${defFor(p.categoryId).unitQty}`;
 }
 
-export function emptyCatalogCopy(_p: Provider): string | null {
+export function emptyCatalogCopy(p: Provider): string | null {
+  if (defFor(p.categoryId).catalogKey === "packages") return null;
   return null;
 }
 
-export function continueCta(_p: Provider): string {
-  return "Devam · parça ve teslimat";
+export function continueCta(p: Provider): string {
+  return defFor(p.categoryId).id === "camasir" ? "Devam · parça ve teslimat" : "Devam · parça ve teslimat";
 }
 
-export function checkoutBackLabel(_p: Provider): string {
-  return "← Paket";
+export function checkoutBackLabel(p: Provider): string {
+  return defFor(p.categoryId).catalogKey === "packages" ? "← Paket" : "← Paket";
 }
 
-export function selectedFallbackName(_p: Provider): string {
-  return "Seçili paket";
+export function selectedFallbackName(p: Provider): string {
+  return defFor(p.categoryId).catalogKey === "packages" ? "Seçili paket" : "Seçili paket";
 }
 
 export function quoteForProvider(
@@ -95,17 +105,22 @@ export function quoteForProvider(
   },
 ) {
   if (!selected) return ZERO_QUOTE;
+  void args.guests;
+  void args.pick;
   const express = resolveExpress(selected.express, args.slot ?? "");
   return estimateFor(selected, args.pieces, args.pkg, express && selected.express, args.loyaltyRate);
 }
 
-export function placeBlockReason(_p: Provider, _pick: CatalogPick, _allergy: string): string | null {
+export function placeBlockReason(p: Provider, pick: CatalogPick, allergy: string): string | null {
+  if (defFor(p.categoryId).id !== "camasir") return "Bu hizmet alanı şu an kapalı.";
+  void pick;
+  void allergy;
   return null;
 }
 
 export function placeOrderInput(
   p: Provider,
-  _pick: CatalogPick,
+  pick: CatalogPick,
   args: {
     drop: DropMethod;
     dropPointId: string | null;
@@ -118,6 +133,9 @@ export function placeOrderInput(
     express: boolean;
   },
 ): CreateOrderInput {
+  void pick;
+  void args.guests;
+  void args.allergy;
   return {
     providerId: p.id,
     drop: args.drop,
@@ -139,29 +157,34 @@ export type CheckoutMeta = {
   productId?: string;
 };
 
-const LAUNDRY_UNIT: QtyUnit = { id: "parca", label: "Parça", qty: "parça" };
+function laundryUnit(): QtyUnit {
+  const qty = CATEGORIES.camasir.unitQty;
+  return { id: "parca", label: "Parça", qty };
+}
 
-export function checkoutMeta(p: Provider, _pick: CatalogPick): CheckoutMeta {
+export function checkoutMeta(p: Provider, pick: CatalogPick): CheckoutMeta {
+  void pick;
   return {
-    unit: LAUNDRY_UNIT,
+    unit: laundryUnit(),
     bounds: { min: 1, max: Math.max(1, p.remaining) },
     drops: p.drops,
     unitPrice: 0,
-    canPlace: true,
+    canPlace: defFor(p.categoryId).id === "camasir",
   };
 }
 
 export function applyQtyAndDrop(
   p: Provider,
-  _productId: string | null,
+  productId: string | null,
   current: { guests: number; drop: DropMethod; pieces: number },
   clampPieces: (n: number, remaining: number) => number,
 ): { guests: number; drop: DropMethod; pieces: number } {
+  void productId;
   return { ...current, pieces: clampPieces(current.pieces, p.remaining) };
 }
 
 export function catalogOfferCount(p: Provider): number {
-  return p.packages.length;
+  return defFor(p.categoryId).catalogKey === "packages" ? p.packages.length : p.packages.length;
 }
 
 export function isCategory(p: Pick<Provider, "categoryId">, id: string): boolean {

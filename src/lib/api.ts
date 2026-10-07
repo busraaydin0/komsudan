@@ -462,24 +462,6 @@ export async function postReview(
   return data.review;
 }
 
-export type ServiceCategory = {
-  id: string;
-  name: string;
-  icon: string;
-  blurb: string;
-  fulfillmentMode: string;
-  pricingModel: string;
-};
-
-export async function fetchCategories() {
-  const data = unwrap(
-    await readJson<{ data?: { categories: ServiceCategory[] }; categories?: ServiceCategory[] }>(
-      await fetch("/api/categories"),
-    ),
-  );
-  return data.categories ?? [];
-}
-
 export async function patchPreferences(body: {
   intent?: "seek" | "offer" | "both" | null;
   categoryIds?: string[];
