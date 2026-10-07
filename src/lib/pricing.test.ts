@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   COMMISSION,
-  isSameDaySlot,
-  pickSlotForDay,
+  isSameDayPickup,
   quoteLaundry,
   resolveExpress,
 } from "./pricing";
@@ -57,19 +56,10 @@ describe("Boy + ek fiyat", () => {
     expect(express.total).toBeGreaterThan(base.total);
   });
 
-  it("bugün slotu aynı gün sayılır", () => {
-    expect(isSameDaySlot("Bugün 18:00–19:00")).toBe(true);
-    expect(isSameDaySlot("Yarın 18:00–19:00")).toBe(false);
-  });
-
-  it("aynı gün zamı slottan", () => {
-    expect(resolveExpress(true, "Bugün 18:00–19:00")).toBe(true);
-    expect(resolveExpress(true, "Yarın 18:00–19:00")).toBe(false);
-  });
-
-  it("slot tekerleği bugün/yarın", () => {
-    const slots = ["Bugün 18:00–19:00", "Yarın 09:00–10:00"];
-    expect(pickSlotForDay(slots, true, "Yarın 18:00–19:00")).toBe("Bugün 18:00–19:00");
-    expect(pickSlotForDay(slots, false, "Bugün 18:00–19:00")).toBe("Yarın 09:00–10:00");
+  it("aynı gün alım express", () => {
+    const now = new Date("2026-10-08T12:00:00+03:00");
+    expect(isSameDayPickup("2026-10-08", now)).toBe(true);
+    expect(resolveExpress(true, "2026-10-09", now)).toBe(false);
+    expect(resolveExpress(true, "2026-10-08", now)).toBe(true);
   });
 });

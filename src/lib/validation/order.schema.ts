@@ -12,9 +12,17 @@ export const createOrderSchema = z.object({
   packageId: z.enum(["yikama", "katlama", "tam"]).optional(),
   size: z.enum(LAUNDRY_SIZES),
   addons: z.array(addonSchema).optional().default([]),
-  express: z.boolean().optional().default(false),
   drop: z.literal("kapi").optional().default("kapi"),
-  slot: z.string().min(1, "Saat dilimi gerekli."),
+  pickup: z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    windowStart: z.string().regex(/^\d{2}:\d{2}$/),
+    windowEnd: z.string().regex(/^\d{2}:\d{2}$/),
+  }),
+  delivery: z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    windowStart: z.string().regex(/^\d{2}:\d{2}$/),
+    windowEnd: z.string().regex(/^\d{2}:\d{2}$/),
+  }),
   note: z.string().max(500).optional().default(""),
 });
 

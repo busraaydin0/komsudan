@@ -57,8 +57,7 @@ export function quoteForProvider(
     size: LaundrySize;
     addons: OrderAddonLine[];
     pkg: PackageId;
-    express: boolean;
-    slot?: string;
+    pickupDate: string;
   },
 ) {
   if (!selected) return ZERO_QUOTE;
@@ -66,7 +65,7 @@ export function quoteForProvider(
   if (!grid) return ZERO_QUOTE;
   const sizePrice = grid.sizes[args.pkg]?.[args.size];
   if (sizePrice == null) return ZERO_QUOTE;
-  const express = resolveExpress(selected.express, args.slot ?? "");
+  const express = resolveExpress(selected.express, args.pickupDate);
   try {
     const addonUnitPrices: Record<string, number> = {};
     for (const a of args.addons) {
@@ -102,23 +101,23 @@ export function placeBlockReason(p: Provider, machineUnits?: number): string | n
 export function placeOrderInput(
   p: Provider,
   args: {
-    slot: string;
     note: string;
     pkg: PackageId;
     size: LaundrySize;
     addons: OrderAddonLine[];
-    express: boolean;
+    pickup: import("@/lib/types").AppointmentWindow;
+    delivery: import("@/lib/types").AppointmentWindow;
   },
 ): CreateOrderInput {
   return {
     providerId: p.id,
     drop: "kapi",
-    slot: args.slot ?? "",
     note: args.note,
     packageId: args.pkg,
     size: args.size,
     addons: args.addons,
-    express: resolveExpress(p.express, args.slot),
+    pickup: args.pickup,
+    delivery: args.delivery,
   };
 }
 

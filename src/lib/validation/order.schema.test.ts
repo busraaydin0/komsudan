@@ -8,7 +8,8 @@ describe("createOrderSchema", () => {
       packageId: "tam",
       size: "orta",
       addons: [{ addon: "yorgan", variant: "tek", qty: 1 }],
-      slot: "Bugün 10:00–11:00",
+      pickup: { date: "2026-10-08", windowStart: "10:00", windowEnd: "12:00" },
+      delivery: { date: "2026-10-10", windowStart: "14:00", windowEnd: "16:00" },
       total: 999,
     });
     expect(parsed.size).toBe("orta");

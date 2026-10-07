@@ -151,6 +151,9 @@ export type Order = {
   drop: DropMethod;
   dropPointId: string | null;
   slot: string;
+  pickup: AppointmentWindow | null;
+  delivery: AppointmentWindow | null;
+  respondBy: string | null;
   note: string;
   fulfillmentType?: FulfillmentType;
   total: number;
@@ -177,14 +180,20 @@ export type Order = {
   updatedAt?: string;
 };
 
+export type AppointmentWindow = {
+  date: string;
+  windowStart: string;
+  windowEnd: string;
+};
+
 export type CreateOrderInput = {
   providerId: string;
   packageId?: PackageId;
   size: LaundrySize;
   addons?: OrderAddonLine[];
-  express?: boolean;
   drop: DropMethod;
-  slot?: string;
+  pickup: AppointmentWindow;
+  delivery: AppointmentWindow;
   note: string;
 };
 

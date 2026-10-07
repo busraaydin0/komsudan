@@ -50,14 +50,14 @@ export function scheduleLine(input: {
   packageId: PackageId;
   machineUnits: number;
   addons: OrderAddonLine[];
-  slot: string;
+  pickupDate: string;
 }): ScheduleOrderLine {
   const hasHeavyAddon = input.addons.some((a) => a.qty > 0);
   return {
     packageId: input.packageId,
     machineUnits: input.machineUnits,
     hasHeavyAddon,
-    slot: input.slot,
+    pickupDate: input.pickupDate,
   };
 }
 
@@ -131,7 +131,7 @@ export function capacitySummaryForProvider(providerId: string, now = new Date())
       packageId: "katlama",
       machineUnits: 2,
       hasHeavyAddon: false,
-      slot: "Bugün 18:00–19:00",
+      pickupDate: today,
     },
     now,
   );

@@ -29,7 +29,7 @@ describe("computeSchedule", () => {
         packageId: "katlama",
         machineUnits: 2,
         hasHeavyAddon: false,
-        slot: "Bugün 18:00–19:00",
+        pickupDate: "2026-10-08",
       },
       now,
     );
@@ -49,7 +49,7 @@ describe("computeSchedule", () => {
         packageId: "yikama",
         machineUnits: 4,
         hasHeavyAddon: false,
-        slot: "Bugün 18:00–19:00",
+        pickupDate: "2026-10-08",
       },
       now,
     );
@@ -68,7 +68,7 @@ describe("computeSchedule", () => {
         packageId: "katlama",
         machineUnits: 2,
         hasHeavyAddon: false,
-        slot: "Bugün 18:00–19:00",
+        pickupDate: "2026-10-10",
       },
       now,
     );
@@ -85,7 +85,7 @@ describe("computeSchedule", () => {
         packageId: "katlama",
         machineUnits: 2,
         hasHeavyAddon: false,
-        slot: "Bugün 18:00–19:00",
+        pickupDate: "2026-10-08",
       },
       now,
     );
@@ -96,7 +96,7 @@ describe("computeSchedule", () => {
         packageId: "katlama",
         machineUnits: 2,
         hasHeavyAddon: true,
-        slot: "Bugün 18:00–19:00",
+        pickupDate: "2026-10-08",
       },
       now,
     );
@@ -112,7 +112,7 @@ describe("computeSchedule", () => {
         packageId: "katlama",
         machineUnits: 5,
         hasHeavyAddon: false,
-        slot: "Bugün 18:00–19:00",
+        pickupDate: "2026-10-08",
       },
       now,
     );

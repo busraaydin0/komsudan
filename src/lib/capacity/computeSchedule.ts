@@ -4,7 +4,6 @@ import {
   dateAtNoonIstanbul,
   isoDateInIstanbul,
   isoWeekdayFromIsoDate,
-  pickupIsoFromSlot,
 } from "./istanbul";
 
 export type CapacitySettings = {
@@ -23,7 +22,7 @@ export type ScheduleOrderLine = {
   packageId: PackageId;
   machineUnits: number;
   hasHeavyAddon: boolean;
-  slot: string;
+  pickupDate: string;
 };
 
 export type ScheduleAllocation = { date: string; units: number };
@@ -80,8 +79,7 @@ export function computeSchedule(
   if (line.machineUnits < 1) return null;
   if (line.machineUnits > settings.maxUnitsPerOrder) return null;
 
-  let pickupDate = pickupIsoFromSlot(line.slot, now);
-  pickupDate = nextWorkingOnOrAfter(pickupDate, settings.workingDays);
+  let pickupDate = nextWorkingOnOrAfter(line.pickupDate, settings.workingDays);
 
   let unitsLeft = line.machineUnits;
   const allocationMap = new Map<string, number>();

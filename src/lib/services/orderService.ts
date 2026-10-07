@@ -19,7 +19,11 @@ import {
 import { ensureProviderPriceGrid, getAddonPrice } from "@/lib/db/providerPrices";
 import { resolveExpress } from "@/lib/pricing";
 import { quoteForProviderOrder } from "@/lib/pricingServer";
-import { isAllowedOrderSlot } from "@/lib/timeWindow";
+import { getAppointment, insertAppointment, listAppointmentsForOrder } from "@/lib/db/appointments";
+import { listSlots } from "@/lib/db/providers";
+import { computeRespondBy } from "@/lib/scheduling/respondBy";
+import { windowLabel } from "@/lib/scheduling/windows";
+import { assertCalendarWindow } from "@/lib/services/calendarService";
 import { getCategoryForProvider } from "@/lib/db/categories";
 import { strategyFor } from "@/lib/fulfillment";
 import {
@@ -32,6 +36,7 @@ import {
 } from "@/lib/status";
 import type {
   ApiLifecycle,
+  AppointmentWindow,
   CreateOrderInput,
   DropMethod,
   Order,
@@ -126,6 +131,15 @@ function toOrder(row: OrderRow, _viewer?: AuthUser, lean = false): Order {
     drop,
     dropPointId: row.drop_point_id,
     slot: row.slot,
+    pickup: (() => {
+      const a = lean ? null : listAppointmentsForOrder(row.id).find((x) => x.kind === "pickup");
+      return a ? { date: a.date, windowStart: a.window_start, windowEnd: a.window_end } : null;
+    })(),
+    delivery: (() => {
+      const a = lean ? null : listAppointmentsForOrder(row.id).find((x) => x.kind === "delivery");
+      return a ? { date: a.date, windowStart: a.window_start, windowEnd: a.window_end } : null;
+    })(),
+    respondBy: row.respond_by ?? null,
     note: row.note,
     fulfillmentType: "dropoff",
     total: row.total,
@@ -220,19 +234,25 @@ export function createOrder(input: CreateOrderInput, userId: string): Order {
   return createLaundryOrder(input, userId, provider);
 }
 
-function requireSlot(input: CreateOrderInput) {
-  const slot = (input.slot ?? "").trim();
-  if (!slot) throw new ApiError(400, "Saat dilimi gerekli.", "VALIDATION_ERROR");
-  return slot;
-}
-
-function validateDropAndSlot(provider: NonNullable<ReturnType<typeof getProvider>>, input: CreateOrderInput) {
+function validateDrop(provider: NonNullable<ReturnType<typeof getProvider>>, input: CreateOrderInput) {
   if (input.drop !== "kapi" || !provider.drops.includes("kapi")) {
     throw new ApiError(400, "Bu teslimat yöntemi kapalı.", "VALIDATION_ERROR");
   }
+}
 
-  if (!isAllowedOrderSlot(requireSlot(input), provider.slots)) {
-    throw new ApiError(400, "Saat 09:00–19:00 içinde, 15 dakikanın katı olmalı.", "VALIDATION_ERROR");
+function validateWindows(providerId: string, input: CreateOrderInput, minDeliveryDate: string) {
+  const now = new Date();
+  try {
+    assertCalendarWindow(providerId, input.pickup, now);
+    assertCalendarWindow(providerId, input.delivery, now);
+  } catch {
+    throw new ApiError(400, "Seçilen pencere müsait değil.", "VALIDATION_ERROR");
+  }
+  if (input.delivery.date < minDeliveryDate) {
+    throw new ApiError(400, "Teslim penceresi işlem süresinden önce olamaz.", "VALIDATION_ERROR");
+  }
+  if (input.delivery.date < input.pickup.date) {
+    throw new ApiError(400, "Teslim alımdan önce teslim olamaz.", "VALIDATION_ERROR");
   }
 }
 
@@ -249,10 +269,13 @@ function insertPendingOrder(args: {
   drop: DropMethod;
   dropPointId: string | null;
   slot: string;
+  pickup: AppointmentWindow;
+  delivery: AppointmentWindow;
   note: string;
   quote: { total: number; commission: number; machineUnits: number; sizePrice: number };
   userId: string;
   estimatedDeliveryDate: string | null;
+  respondBy: string;
 }) {
   const now = new Date().toISOString();
   const id = `k-${randomUUID().slice(0, 8)}`;
@@ -274,11 +297,12 @@ function insertPendingOrder(args: {
       updated_at: now,
       user_id: args.userId,
       delivery_mode: deliveryMode(),
-      scheduled_window_start: args.slot,
+      scheduled_window_start: `${args.pickup.date}T${args.pickup.windowStart}:00+03:00`,
       lifecycle: "pending",
       size: args.size,
       machine_units: args.quote.machineUnits,
       estimated_delivery_date: args.estimatedDeliveryDate,
+      respond_by: args.respondBy,
       product_id: null,
       product_name: null,
       guest_count: null,
@@ -324,6 +348,22 @@ function insertPendingOrder(args: {
       commission: args.quote.commission,
       at: now,
     });
+    insertAppointment({
+      orderId: id,
+      kind: "pickup",
+      date: args.pickup.date,
+      windowStart: args.pickup.windowStart,
+      windowEnd: args.pickup.windowEnd,
+      at: now,
+    });
+    insertAppointment({
+      orderId: id,
+      kind: "delivery",
+      date: args.delivery.date,
+      windowStart: args.delivery.windowStart,
+      windowEnd: args.delivery.windowEnd,
+      at: now,
+    });
   });
   return id;
 }
@@ -336,15 +376,17 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
   const pack = provider.packages.find((p) => p.id === input.packageId);
   if (!pack) throw new ApiError(400, "Bu paket bu komşuda yok.", "VALIDATION_ERROR");
 
-  const express = resolveExpress(provider.express, requireSlot(input));
-  if (input.express && !provider.express) {
-    throw new ApiError(400, "Bu komşu aynı gün almıyor.", "VALIDATION_ERROR");
-  }
-
-  validateDropAndSlot(provider, input);
+  validateDrop(provider, input);
   ensureProviderPriceGrid(provider.id);
   const addons = normalizeAddons(input.addons);
-  const quote = quoteForProviderOrder(
+  const express = resolveExpress(provider.express, input.pickup.date);
+  const line = scheduleLine({
+    packageId: input.packageId,
+    machineUnits: 0,
+    addons,
+    pickupDate: input.pickup.date,
+  });
+  const quotePreview = quoteForProviderOrder(
     provider.id,
     input.packageId,
     input.size,
@@ -352,18 +394,17 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     express,
     loyaltyRate(deliveredCount(userId)),
   );
-  assertCanServeOrder(provider.id, quote.machineUnits);
-  const slot = requireSlot(input);
-  const line = scheduleLine({
-    packageId: input.packageId,
-    machineUnits: quote.machineUnits,
-    addons,
-    slot,
-  });
+  line.machineUnits = quotePreview.machineUnits;
   const plan = planOrder(provider.id, line);
   if (!plan) {
     throw new ApiError(409, "Bu tarihlerde kapasite uygun değil.", "CAPACITY");
   }
+  validateWindows(provider.id, input, plan.deliveryDate);
+  const quote = quotePreview;
+  assertCanServeOrder(provider.id, quote.machineUnits);
+  const slot = windowLabel(input.pickup.date, input.pickup.windowStart, input.pickup.windowEnd);
+  const createdAt = new Date();
+  const respondBy = computeRespondBy(createdAt, listSlots(provider.id, true));
 
   const id = insertPendingOrder({
     providerId: provider.id,
@@ -374,10 +415,13 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     drop: "kapi",
     dropPointId: null,
     slot,
+    pickup: input.pickup,
+    delivery: input.delivery,
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
     estimatedDeliveryDate: plan.deliveryDate,
+    respondBy,
   });
   const order = getOrder(id)!;
   notifyNewOrder({
@@ -556,7 +600,7 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
       packageId: row.package_id as PackageId,
       machineUnits: row.machine_units,
       addons,
-      slot: row.slot,
+      pickupDate: getAppointment(row.id, "pickup")?.date ?? row.estimated_delivery_date ?? "",
     });
     const now = new Date().toISOString();
     runOrderTx(() => {

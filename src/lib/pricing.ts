@@ -1,3 +1,4 @@
+import { isoDateInIstanbul } from "./capacity/istanbul";
 import { addonKey, machineUnitsFor, type LaundrySize, type OrderAddonLine } from "./laundryModel";
 import { effectiveLoyaltyRate } from "./loyalty";
 import type { PackageId } from "./types";
@@ -15,18 +16,13 @@ export function clampMachineUnits(n: number, maxPerOrder?: number) {
   return Math.min(cap, Math.max(1, Math.round(n)));
 }
 
-/** Pilot slotlar “Bugün 18:00–19:00” / “Yarın …” — gün önekinden aynı gün. */
-export function isSameDaySlot(slot: string) {
-  return slot.trim().toLocaleLowerCase("tr-TR").startsWith("bugün");
+/** Aynı gün alım: express zamı (+25%). */
+export function isSameDayPickup(pickupDate: string, now = new Date()) {
+  return pickupDate === isoDateInIstanbul(now);
 }
 
-/** Aynı gün zamı kutudan değil slottan: bugün seçildiyse +%25, yarınsa yok. */
-export function resolveExpress(providerOffersExpress: boolean, slot: string) {
-  return Boolean(providerOffersExpress && isSameDaySlot(slot));
-}
-
-export function pickSlotForDay(slots: string[], sameDay: boolean, fallback = "") {
-  return slots.find((s) => isSameDaySlot(s) === sameDay) ?? fallback;
+export function resolveExpress(providerOffersExpress: boolean, pickupDate: string, now = new Date()) {
+  return Boolean(providerOffersExpress && isSameDayPickup(pickupDate, now));
 }
 
 export type LaundryQuote = {
