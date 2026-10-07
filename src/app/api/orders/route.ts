@@ -4,11 +4,13 @@ import { requireReadyAccount } from "@/server/auth";
 import { parseBody } from "@/lib/validation/parse";
 import { createOrderSchema } from "@/lib/validation/order.schema";
 import { createOrder, listOrdersFor } from "@/lib/services/orderService";
+import { expireStaleRequests } from "@/lib/services/expireOrdersService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
+    expireStaleRequests();
     const user = await requireAuth(req);
     return ok({ orders: listOrdersFor(user) });
   } catch (e) {

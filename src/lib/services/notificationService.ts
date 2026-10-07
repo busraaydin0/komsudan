@@ -145,6 +145,27 @@ export function notifyStatusChange(input: {
   }
 }
 
+export function notifyRespondReminder(row: OrderRow) {
+  pushTo(row.provider_id, {
+    orderId: row.id,
+    type: "order_respond_reminder",
+    title: "Sipariş yanıt süresi",
+    body: "Bekleyen siparişin yanıt süresinin yarısı doldu. Kabul veya red ver.",
+  });
+}
+
+export function notifyOrderExpired(row: OrderRow, alternativeProviderIds: string[]) {
+  const alts = alternativeProviderIds.length
+    ? ` Aynı pencere için ${alternativeProviderIds.length} komşu daha müsait.`
+    : "";
+  pushTo(row.user_id, {
+    orderId: row.id,
+    type: "order_expired",
+    title: "Yanıt gelmedi",
+    body: `Sağlayıcı süresinde yanıt vermedi; sipariş iptal edildi.${alts}`,
+  });
+}
+
 export function notifyOrderDelayed(row: OrderRow, nextDate: string, reason: string) {
   const label = formatDeliveryDayTr(nextDate);
   pushTo(row.user_id, {
