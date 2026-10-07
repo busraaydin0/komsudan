@@ -8,7 +8,6 @@ export type OrderRow = {
   package_id: string;
   express: number;
   drop_method: string;
-  drop_point_id: string | null;
   slot: string;
   note: string;
   total: number;
@@ -16,26 +15,12 @@ export type OrderRow = {
   status: string;
   created_at: string;
   updated_at: string;
-  pickup_code: string | null;
-  code_attempts: number;
   paid_at: string | null;
   payment_status: string;
   user_id: string | null;
   delivery_mode: string | null;
   scheduled_window_start: string | null;
-  scheduled_window_end: string | null;
   lifecycle: string | null;
-  product_id: string | null;
-  product_name: string | null;
-  guest_count: number | null;
-  allergy_note: string | null;
-  fulfillment_type: string;
-  visit_district: string | null;
-  visit_neighborhood: string | null;
-  visit_address: string | null;
-  address_share_consent: number;
-  dispute_window_hours: number | null;
-  cancel_free_hours: number | null;
   size: LaundrySize | null;
   confirmed_size: LaundrySize | null;
   machine_units: number;
@@ -47,6 +32,7 @@ export type OrderRow = {
   promised_delivery_date: string | null;
   capacity_allocations: string | null;
   delay_count: number;
+  cancel_free_hours: number | null;
   respond_by: string | null;
   respond_reminder_sent: number;
   public_code: string | null;
@@ -61,7 +47,6 @@ export type InsertOrderInput = {
   package_id: string;
   express: number;
   drop_method: string;
-  drop_point_id: string | null;
   slot: string;
   note: string;
   total: number;
@@ -69,7 +54,7 @@ export type InsertOrderInput = {
   status: string;
   created_at: string;
   updated_at: string;
-  user_id: string;
+  user_id: string | null;
   delivery_mode: string;
   scheduled_window_start: string;
   lifecycle: string;
@@ -78,15 +63,6 @@ export type InsertOrderInput = {
   estimated_delivery_date?: string | null;
   respond_by?: string | null;
   public_code?: string | null;
-  product_id?: string | null;
-  product_name?: string | null;
-  guest_count?: number | null;
-  allergy_note?: string | null;
-  fulfillment_type?: string;
-  visit_district?: string | null;
-  visit_neighborhood?: string | null;
-  visit_address?: string | null;
-  address_share_consent?: number;
 };
 
 export function getOrderRow(id: string): OrderRow | undefined {
@@ -128,33 +104,18 @@ export function insertOrderRow(input: InsertOrderInput) {
   db()
     .prepare(
       `INSERT INTO orders (
-        id, provider_id, package_id, express, drop_method, drop_point_id,
-        slot, note, total, commission, status, created_at, updated_at,
-        pickup_code, code_attempts, paid_at, payment_status, user_id,
-        delivery_mode, scheduled_window_start, scheduled_window_end, lifecycle,
-        product_id, product_name, guest_count, allergy_note,
-        fulfillment_type, visit_district, visit_neighborhood, visit_address, address_share_consent,
-        size, machine_units, price_change, estimated_delivery_date, respond_by, public_code
+        id, provider_id, package_id, express, drop_method, slot, note, total, commission,
+        status, created_at, updated_at, payment_status, user_id, delivery_mode,
+        scheduled_window_start, lifecycle, size, machine_units, price_change,
+        estimated_delivery_date, respond_by, public_code
       ) VALUES (
-        @id, @provider_id, @package_id, @express, @drop_method, @drop_point_id,
-        @slot, @note, @total, @commission, @status, @created_at, @updated_at,
-        NULL, 0, NULL, 'authorized', @user_id,
-        @delivery_mode, @scheduled_window_start, NULL, @lifecycle,
-        @product_id, @product_name, @guest_count, @allergy_note,
-        @fulfillment_type, @visit_district, @visit_neighborhood, @visit_address, @address_share_consent,
-        @size, @machine_units, 'none', @estimated_delivery_date, @respond_by, @public_code
+        @id, @provider_id, @package_id, @express, @drop_method, @slot, @note, @total, @commission,
+        @status, @created_at, @updated_at, 'authorized', @user_id, @delivery_mode,
+        @scheduled_window_start, @lifecycle, @size, @machine_units, 'none',
+        @estimated_delivery_date, @respond_by, @public_code
       )`,
     )
     .run({
-      product_id: null,
-      product_name: null,
-      guest_count: null,
-      allergy_note: null,
-      fulfillment_type: "dropoff",
-      visit_district: null,
-      visit_neighborhood: null,
-      visit_address: null,
-      address_share_consent: 0,
       estimated_delivery_date: input.estimated_delivery_date ?? null,
       respond_by: input.respond_by ?? null,
       public_code: input.public_code ?? null,
@@ -195,7 +156,7 @@ export function recordTransition(input: {
   toLifecycle: string;
   actorId: string | null;
   actorRole: string | null;
-  note?: string | null;
+  note: string | null;
   at: string;
 }) {
   db()
@@ -206,7 +167,7 @@ export function recordTransition(input: {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
-      `h-${randomUUID()}`,
+      `h-${randomUUID().slice(0, 12)}`,
       input.orderId,
       input.fromStatus,
       input.toStatus,
@@ -214,7 +175,7 @@ export function recordTransition(input: {
       input.toLifecycle,
       input.actorId,
       input.actorRole,
-      input.note ?? null,
+      input.note,
       input.at,
     );
 }
@@ -237,8 +198,7 @@ export function updateOrderStatus(input: {
   if (input.resetAttempts && input.paymentStatus === "captured") {
     db()
       .prepare(
-        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'captured', paid_at = ?,
-         pickup_code = NULL, code_attempts = 0, updated_at = ? WHERE id = ?`,
+        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'captured', paid_at = ?, updated_at = ? WHERE id = ?`,
       )
       .run(input.status, input.lifecycle, input.paidAt, input.updatedAt, input.id);
     return;
@@ -246,7 +206,7 @@ export function updateOrderStatus(input: {
   if (input.paymentStatus === "voided") {
     db()
       .prepare(
-        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'voided', pickup_code = NULL, updated_at = ? WHERE id = ?`,
+        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'voided', updated_at = ? WHERE id = ?`,
       )
       .run(input.status, input.lifecycle, input.updatedAt, input.id);
     return;
