@@ -70,7 +70,7 @@ function digits(raw: string) {
   return raw.replace(/\D/g, "");
 }
 
-function deliveryMode(_drop: DropMethod): "door" {
+function deliveryMode(): "door" {
   return "door";
 }
 
@@ -111,7 +111,7 @@ function toOrder(row: OrderRow, _viewer?: AuthUser, lean = false): Order {
     payment: pay,
     customerId: row.user_id,
     lifecycle: lifecycleOf(status, row.lifecycle) as Order["lifecycle"],
-    deliveryMode: (row.delivery_mode as "door" | "point" | null) ?? deliveryMode(drop),
+    deliveryMode: (row.delivery_mode as "door" | "point" | null) ?? deliveryMode(),
     estimatedWeight: row.estimated_weight ?? row.pieces,
     pricePerKgSnapshot: row.price_per_kg_snapshot ?? 0,
     estimatedPrice: row.estimated_price ?? row.total,
@@ -246,7 +246,7 @@ function insertPendingOrder(args: {
       price_per_kg_snapshot: args.quote.perPiece,
       estimated_weight: args.pieces,
       estimated_price: args.quote.total,
-      delivery_mode: deliveryMode(args.drop),
+      delivery_mode: deliveryMode(),
       scheduled_window_start: args.slot,
       lifecycle: "pending",
       product_id: null,
