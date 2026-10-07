@@ -2,6 +2,7 @@ import { logger } from "@/lib/logger";
 import type { ApiLifecycle, AppNotification } from "@/lib/types";
 import { ApiError } from "@/server/rules";
 import type { AuthUser } from "@/lib/auth/types";
+import { formatDeliveryDayTr } from "@/lib/capacity/istanbul";
 import { customerHasOpenOrder, getOrderRow, type OrderRow } from "@/lib/db/orders";
 import { pickNudgeCopy, pickOrderNotice } from "@/lib/noticeCopy";
 import {
@@ -142,6 +143,16 @@ export function notifyStatusChange(input: {
       body: copy.body,
     });
   }
+}
+
+export function notifyOrderDelayed(row: OrderRow, nextDate: string, reason: string) {
+  const label = formatDeliveryDayTr(nextDate);
+  pushTo(row.user_id, {
+    orderId: row.id,
+    type: "order_delayed",
+    title: "Teslim tarihi güncellendi",
+    body: `Yeni teslim: ${label}. Gerekçe: ${reason.slice(0, 120)}. İstersen ücretsiz iptal edebilirsin.`,
+  });
 }
 
 export function notifyPickupCodeRotated(row: OrderRow, code: string) {
