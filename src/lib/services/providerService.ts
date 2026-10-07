@@ -283,8 +283,6 @@ function ensureDirectoryEntry(
     rating: 0,
     reviews: 0,
     packages: input.packages,
-    capacity: 24,
-    remaining: 24,
     hasDryer: input.hasDryer,
     dryingType: input.dryingType,
     express: false,
@@ -302,7 +300,6 @@ function ensureDirectoryEntry(
     insertCatalogProvider({
       id: user.id,
       payload: { ...payload },
-      remaining: 24,
       categoryId: input.categoryId,
     });
   } else {

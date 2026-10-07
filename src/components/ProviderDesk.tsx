@@ -26,6 +26,7 @@ import type { Order, OrderStatus, Provider } from "@/lib/types";
 import { PhotoAdd, PhotoStrip } from "@/components/Photos";
 import { LaundryProfile } from "@/components/LaundryProfile";
 import { ProviderPayoutPanel } from "@/components/ProviderPayoutPanel";
+import { ProviderCapacityPanel } from "@/components/ProviderCapacityPanel";
 
 const LABEL: Record<OrderStatus, string> = {
   onay_bekliyor: "Bekliyor",
@@ -191,6 +192,7 @@ export function ProviderDesk({
         )}
 
         <LaundryProfile me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+        <ProviderCapacityPanel onSaved={reloadAll} />
 
         {!providers.some((p) => p.id === account?.id) && (
           <p className="k-rise mt-6 text-sm text-[var(--muted)]">
