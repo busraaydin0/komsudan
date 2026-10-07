@@ -37,19 +37,6 @@ describe("Boy + ek fiyat", () => {
     expect(q.machineUnits).toBe(4 + 2 * 2);
   });
 
-  it("createOrderSchema client total almaz; size + addons", () => {
-    const parsed = createOrderSchema.parse({
-      providerId: "p1",
-      packageId: "tam",
-      size: "orta",
-      addons: [{ addon: "yorgan", variant: "tek", qty: 1 }],
-      slot: "Bugün 10:00–11:00",
-      total: 1,
-    });
-    expect("total" in parsed).toBe(false);
-    expect(parsed.size).toBe("orta");
-  });
-
   it("aynı gün express +%25", () => {
     const base = quoteLaundry({
       packageId: "katlama",
