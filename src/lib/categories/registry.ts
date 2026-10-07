@@ -98,10 +98,9 @@ export function categoryDef(id: CategoryId): CategoryDef {
   return CATEGORIES[id];
 }
 
-/** Çamaşır yıkama/ütü SM. `food` eski çağrıları korur; kayıtta başka alan yok. */
-export function usesFoodSm(packageId: string, food = false): boolean {
-  if (isLaundryPackageId(packageId) || isCategoryId(packageId)) return food;
-  return food;
+/** Çamaşır yıkama/ütü SM. Kayıtta başka alan yok; her zaman false. */
+export function usesFoodSm(_packageId?: string, _food = false): boolean {
+  return false;
 }
 
 export function capacityLabelForPackage(packageId: string): string {

@@ -1,4 +1,4 @@
--- Randevu satırı (eski Tip B). Çamaşır siparişi kullanmasa da tablo durur.
+-- Randevu satırı. Çamaşır siparişi slot string kullanır; tablo ileride takvim için durur.
 
 CREATE TABLE IF NOT EXISTS appointments (
   id TEXT PRIMARY KEY,

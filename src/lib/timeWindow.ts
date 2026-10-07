@@ -1,4 +1,4 @@
-/** Serbest saat: 09:00–19:00, 15 dk adım. Süre kategoriden; client bitiş seçmez. */
+/** Serbest saat: 09:00–19:00, 15 dk adım. Süre varsayılan 60 dk; client bitiş seçmez. */
 
 export const WORK_WINDOW_START_MINUTES = 9 * 60;
 export const WORK_WINDOW_END_MINUTES = 19 * 60;
@@ -6,17 +6,9 @@ export const TIME_STEP_MINUTES = 15;
 export const APPOINTMENT_BUFFER_MINUTES = 30;
 export const DEFAULT_DURATION_MINUTES = 60;
 
-/** Musluk tamiri 60 dk. İleride hourly alt-tipler ayrı sabitlenir. */
-export const CATEGORY_DEFAULT_DURATION_MINUTES: Record<string, number> = {
-  musluk: 60,
-};
-
 export type SlotDay = "bugun" | "yarin";
 
-export function durationMinutesFor(kind?: string | null) {
-  if (kind && kind in CATEGORY_DEFAULT_DURATION_MINUTES) {
-    return CATEGORY_DEFAULT_DURATION_MINUTES[kind];
-  }
+export function durationMinutesFor(_kind?: string | null) {
   return DEFAULT_DURATION_MINUTES;
 }
 

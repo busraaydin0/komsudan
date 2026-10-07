@@ -1,14 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { deliveryStrategy, foodStrategy, homeVisitStrategy, strategyFor } from "./fulfillment";
+import { deliveryStrategy, strategyFor } from "./fulfillment";
 
-describe("fulfillment type-aware SM", () => {
-  it("çamaşır delivery SM kullanır; home_visit ayrı harita, ready false", () => {
+describe("fulfillment", () => {
+  it("çamaşır her zaman delivery SM kullanır", () => {
     expect(strategyFor("delivery", "camasir", "dropoff")).toBe(deliveryStrategy);
-    expect(strategyFor("delivery", "camasir", "home_visit")).toBe(homeVisitStrategy);
-    expect(homeVisitStrategy.ready).toBe(false);
+    expect(strategyFor("home_visit", "camasir", "home_visit")).toBe(deliveryStrategy);
     expect(deliveryStrategy.ready).toBe(true);
-    expect(foodStrategy.ready).toBe(true);
     expect(deliveryStrategy.canTransition("pending", "accepted", "tam")).toBe(true);
-    expect(homeVisitStrategy.canTransition("pending", "accepted", "tam")).toBe(false);
   });
 });

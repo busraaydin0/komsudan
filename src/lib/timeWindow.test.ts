@@ -11,8 +11,8 @@ import {
 } from "./timeWindow";
 
 describe("serbest saat penceresi", () => {
-  it("musluk süresi 60 dk, 15 dk adım, son başlangıç 18:00", () => {
-    expect(durationMinutesFor("musluk")).toBe(60);
+  it("süre 60 dk, 15 dk adım, son başlangıç 18:00", () => {
+    expect(durationMinutesFor()).toBe(60);
     const starts = listStartMinutes(60);
     expect(starts[0]).toBe(9 * 60);
     expect(starts.at(-1)).toBe(18 * 60);

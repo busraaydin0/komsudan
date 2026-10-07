@@ -83,9 +83,7 @@ curl -s -X POST http://localhost:3000/api/auth/otp/verify \
 - **Fiyat ve durum client’tan gelmez.** Tutar sunucuda.
 - Teslim yeri kullanıcıya **Gel al noktası** diye yazılır. API değeri hâlâ `drop: "nokta"`.
 - Saat: 09:00–19:00, 15 dk adım, süre 60 dk. Kaydırmalı tekerlek. `Bugün 10:15–11:15`.
-- **Musluk ayrı kategori değil.** Tamir kartının `home_visit` alt-tipi. `homeVisitStrategy.ready` **false** — eve giden sipariş elle açılmadan kabul edilmez.
-- Tip A (`delivery`): evde/atölyede hazırla, kapı veya gel al. Çamaşır, davet, dikiş… mezar.
-- Tip B (`home_visit`): eve git. Faz 8; randevu `start_at`/`end_at` + çakışma henüz yok.
+- Pilot kategori: **Çamaşır Yıkama**. Eve girilmez; kapı veya gel al noktası.
 
 Ödeme: siparişte authorize / teslimde capture (simülasyon). Bildirim: uygulama içi; gerçek SMS/push yok.
 
@@ -115,9 +113,9 @@ Pilot köprü: parça/birim fiyatı + Türkçe statü (`onay_bekliyor`). Hedefte
 
 ## Faz (1 Eylül 2026)
 
-Bitti: 0–5 çekirdek, **6 ödeme**, **6.5 kategori**, **6.6 keşif**, **7 davet**, diğer Tip A kartlar, dispute/mesaj/pino parçaları.
+Bitti: 0–6 çekirdek (ödeme dahil), 6.5 kategori kaydı (yalnız çamaşır), 6.6 keşif, dispute/mesaj/cüzdan.
 
-**Sırada: Faz 8 home-visit** (3b randevu zamanı + overlap). `ready`’yi rastgele açma.
+PWA şu an çamaşıra daraltıldı; diğer hizmet tipleri koddan çıkarılmış durumda.
 
 Orijinal “7 review / 8 dispute” **Faz 9+**.
 

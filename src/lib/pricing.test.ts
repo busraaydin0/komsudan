@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   COMMISSION,
   estimate,
-  estimateFood,
   estimateFor,
   isSameDaySlot,
   MIN_ORDER,
@@ -44,13 +43,6 @@ describe("Fiyat sunucuda", () => {
     expect(q.commission).toBe(Math.round(q.total * COMMISSION));
   });
 
-  it("estimateFood kişi × kişi başı; çamaşır tabanı 100 girmez", () => {
-    const q = estimateFood(3, 20, 0);
-    expect(q.before).toBe(60);
-    expect(q.total).toBe(60);
-    expect(q.perPiece).toBe(20);
-  });
-
   it("createOrderSchema client total/price alanını yutmaz, yok sayar", () => {
     const parsed = createOrderSchema.parse({
       providerId: "p1",
@@ -67,8 +59,8 @@ describe("Fiyat sunucuda", () => {
 
   it("katalog fiyatı estimate katsayısıyla çarpılır, gönderilen tutarla değil", () => {
     const fromClient = 3;
-    const server = estimateFood(4, 80, 0);
-    expect(server.total).toBe(320);
+    const server = estimateFor(laundry(80), 4, "katlama", false, 0);
+    expect(server.total).toBe(Math.max(MIN_ORDER, 4 * 80));
     expect(server.total).not.toBe(fromClient);
   });
 

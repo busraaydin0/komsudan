@@ -215,16 +215,6 @@ export type CreateOrderInput = {
   dropPointId: string | null;
   slot?: string;
   note: string;
-  productId?: string;
-  guestCount?: number;
-  allergyNote?: string;
-  appointmentDate?: string;
-  appointmentWindowStart?: string;
-  appointmentWindowEnd?: string;
-  visitDistrict?: string;
-  visitNeighborhood?: string;
-  visitAddress?: string;
-  addressShareConsent?: boolean;
 };
 
 export type AppNotification = {

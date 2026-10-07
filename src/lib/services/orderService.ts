@@ -4,16 +4,7 @@ import { estimateFor, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/prici
 import { isAllowedOrderSlot } from "@/lib/timeWindow";
 import { loyaltyRate } from "@/lib/loyalty";
 import { getCategoryForProvider } from "@/lib/db/categories";
-import { strategyFor, isHomeVisitFulfillment } from "@/lib/fulfillment";
-import {
-  homeVisitNext,
-  isHomeVisitStatus,
-  pilotFromHomeVisit,
-  type HomeVisitAction,
-  type HomeVisitActor,
-} from "@/lib/homeVisit";
-import { getAppointmentForOrder, insertAppointment } from "@/lib/db/appointments";
-import { visitAddressForViewer, type VisitAddressViewer } from "@/lib/visitAddress";
+import { strategyFor } from "@/lib/fulfillment";
 import {
   canAddPhotos,
   canCancel,
@@ -68,7 +59,7 @@ import {
 import { authorizePayment, capturePayment, paymentForOrder, voidPayment } from "@/lib/services/paymentService";
 import { holdForOrder } from "@/lib/services/walletService";
 
-export type OrderAction = "accept" | "reject" | "advance" | "deliver" | HomeVisitAction;
+export type OrderAction = "accept" | "reject" | "advance" | "deliver";
 
 function genCode() {
   return randomInt(0, 10 ** PICKUP_CODE_LEN)
@@ -92,30 +83,12 @@ function ensurePickupCode(row: OrderRow) {
   row.pickup_code = code;
 }
 
-function viewerFor(user: AuthUser | undefined, row: OrderRow): VisitAddressViewer {
-  if (!user) return "other";
-  if (user.role === "admin") return "admin";
-  if (user.id === row.provider_id) return "provider";
-  if (user.id === row.user_id) return "customer";
-  return "other";
-}
-
-function toOrder(row: OrderRow, viewer?: AuthUser, lean = false): Order {
+function toOrder(row: OrderRow, _viewer?: AuthUser, lean = false): Order {
   ensurePickupCode(row);
   const drop = row.drop_method as DropMethod;
   const status = row.status as OrderStatus;
   const pay = paymentForOrder(row.id);
   const payStatus = (pay?.status ?? row.payment_status) as PaymentStatus;
-  const fulfillmentType = row.fulfillment_type === "home_visit" ? "home_visit" : "dropoff";
-  const visit = visitAddressForViewer({
-    fulfillmentType,
-    lifecycle: row.lifecycle,
-    viewer: viewerFor(viewer, row),
-    district: row.visit_district,
-    neighborhood: row.visit_neighborhood,
-    address: row.visit_address,
-  });
-  const apt = fulfillmentType === "home_visit" ? getAppointmentForOrder(row.id) : undefined;
   return {
     id: row.id,
     providerId: row.provider_id,
@@ -130,13 +103,11 @@ function toOrder(row: OrderRow, viewer?: AuthUser, lean = false): Order {
     productName: row.product_name,
     guestCount: row.guest_count,
     allergyNote: row.allergy_note,
-    fulfillmentType,
-    visitDistrict: visit.district,
-    visitNeighborhood: visit.neighborhood,
-    visitAddress: visit.address,
-    appointment: apt
-      ? { date: apt.date, windowStart: apt.window_start, windowEnd: apt.window_end }
-      : null,
+    fulfillmentType: "dropoff",
+    visitDistrict: null,
+    visitNeighborhood: null,
+    visitAddress: null,
+    appointment: null,
     total: row.total,
     commission: row.commission,
     status,
@@ -148,7 +119,7 @@ function toOrder(row: OrderRow, viewer?: AuthUser, lean = false): Order {
     paidAt: payStatus === "captured" ? (pay?.updatedAt ?? row.paid_at) : row.paid_at,
     payment: pay,
     customerId: row.user_id,
-    lifecycle: (fulfillmentType === "home_visit" ? row.lifecycle : lifecycleOf(status, row.lifecycle)) as Order["lifecycle"],
+    lifecycle: lifecycleOf(status, row.lifecycle) as Order["lifecycle"],
     deliveryMode: (row.delivery_mode as "door" | "point" | null) ?? deliveryMode(drop),
     estimatedWeight: row.estimated_weight ?? row.pieces,
     pricePerKgSnapshot: row.price_per_kg_snapshot ?? 0,
@@ -262,16 +233,6 @@ function insertPendingOrder(args: {
   note: string;
   quote: { total: number; commission: number; perPiece: number };
   userId: string;
-  productId?: string | null;
-  productName?: string | null;
-  guestCount?: number | null;
-  allergyNote?: string | null;
-  fulfillmentType?: "dropoff" | "home_visit";
-  visitDistrict?: string | null;
-  visitNeighborhood?: string | null;
-  visitAddress?: string | null;
-  addressShareConsent?: boolean;
-  appointment?: { date: string; windowStart: string; windowEnd: string } | null;
 }) {
   const now = new Date().toISOString();
   const id = `k-${randomUUID().slice(0, 8)}`;
@@ -306,25 +267,16 @@ function insertPendingOrder(args: {
       delivery_mode: deliveryMode(args.drop),
       scheduled_window_start: args.slot,
       lifecycle: "pending",
-      product_id: args.productId ?? null,
-      product_name: args.productName ?? null,
-      guest_count: args.guestCount ?? null,
-      allergy_note: args.allergyNote ?? null,
-      fulfillment_type: args.fulfillmentType ?? "dropoff",
-      visit_district: args.visitDistrict ?? null,
-      visit_neighborhood: args.visitNeighborhood ?? null,
-      visit_address: args.visitAddress ?? null,
-      address_share_consent: args.addressShareConsent ? 1 : 0,
+      product_id: null,
+      product_name: null,
+      guest_count: null,
+      allergy_note: null,
+      fulfillment_type: "dropoff",
+      visit_district: null,
+      visit_neighborhood: null,
+      visit_address: null,
+      address_share_consent: 0,
     });
-    if (args.fulfillmentType === "home_visit" && args.appointment) {
-      insertAppointment({
-        orderId: id,
-        date: args.appointment.date,
-        windowStart: args.appointment.windowStart,
-        windowEnd: args.appointment.windowEnd,
-        at: now,
-      });
-    }
     recordTransition({
       orderId: id,
       fromStatus: null,
@@ -352,9 +304,6 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
   }
   if (!input.packageId) {
     throw new ApiError(400, "Paket seç.", "VALIDATION_ERROR");
-  }
-  if (input.productId) {
-    throw new ApiError(400, "Çamaşır siparişinde menü ürünü yok.", "VALIDATION_ERROR");
   }
 
   const pack = provider.packages.find((p) => p.id === input.packageId);
@@ -399,9 +348,9 @@ function currentLifecycle(row: OrderRow): ApiLifecycle {
   return lifecycleOf(row.status as OrderStatus, row.lifecycle);
 }
 
-function assertFulfillmentReady(providerId: string, fulfillmentType?: string) {
+function assertFulfillmentReady(providerId: string) {
   const cat = getCategoryForProvider(providerId);
-  const strat = strategyFor(cat.fulfillment_mode, cat.id, fulfillmentType);
+  const strat = strategyFor(cat.fulfillment_mode, cat.id);
   if (!strat.ready) {
     throw new ApiError(409, "Bu hizmet tipi henüz açık değil.", "CATEGORY_NOT_READY");
   }
@@ -467,9 +416,6 @@ export function applyStatus(
   const row = getOrderRow(id);
   if (!row || !canSeeOrder(user, row)) {
     throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  }
-  if (isHomeVisitFulfillment(row.fulfillment_type)) {
-    throw new ApiError(400, "Bu siparişte durum gönderilmez, aksiyon gönder.", "VALIDATION_ERROR");
   }
   const from = currentLifecycle(row);
   const pack = row.package_id as PackageId;
@@ -546,9 +492,6 @@ export function applyStatus(
 export function applyOrderAction(id: string, action: OrderAction, user: AuthUser, code?: string): Order {
   const row = getOrderRow(id);
   if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  if (isHomeVisitFulfillment(row.fulfillment_type)) {
-    return applyHomeVisitOrderAction(id, action, user);
-  }
   if (!canMutateOrder(user, row)) {
     throw new ApiError(403, "Bu siparişi yalnızca hizmet veren ilerletebilir.", "FORBIDDEN");
   }
@@ -572,7 +515,7 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
     }
     next = "completed";
   } else if (action === "advance") {
-    const n = nextStatus(order.status, order.packageId, Boolean(order.productId));
+    const n = nextStatus(order.status, order.packageId);
     if (!n) throw new ApiError(409, "Daha ileri durum yok.", "INVALID_TRANSITION");
     if (n === "teslim_edildi") {
       throw new ApiError(409, "Teslim için müşterinin kodunu gir.", "INVALID_TRANSITION");
@@ -583,91 +526,6 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
   }
 
   return applyStatus(id, user, next, code);
-}
-
-function homeVisitActorOf(user: AuthUser, row: OrderRow): HomeVisitActor {
-  if (user.role === "admin") return "admin";
-  if (user.id === row.provider_id) return "provider";
-  if (user.id === row.user_id) return "customer";
-  throw new ApiError(403, "Bu siparişe erişemezsin.", "FORBIDDEN");
-}
-
-function resolveHomeVisitAction(action: OrderAction, from: string): HomeVisitAction {
-  if (action === "accept" || action === "confirm") return "confirm";
-  if (action === "reject") return "reject";
-  if (action === "cancel") return "cancel";
-  if (action === "start_travel") return "start_travel";
-  if (action === "start_work") return "start_work";
-  if (action === "complete" || action === "deliver") return "complete";
-  if (action === "timeout") return "timeout";
-  if (action === "force_cancel") return "force_cancel";
-  if (action === "advance") {
-    if (from === "confirmed") return "start_travel";
-    if (from === "on_the_way") return "start_work";
-  }
-  throw new ApiError(400, "Bu sipariş için bu aksiyon yok.", "VALIDATION_ERROR");
-}
-
-function applyHomeVisitOrderAction(id: string, action: OrderAction, user: AuthUser): Order {
-  const row = getOrderRow(id);
-  if (!row || !canSeeOrder(user, row)) {
-    throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  }
-  if (!isHomeVisitStatus(row.lifecycle)) {
-    throw new ApiError(409, "Bu sipariş eve gelen akışta değil.", "INVALID_TRANSITION");
-  }
-  const actor = homeVisitActorOf(user, row);
-  const hvAction = resolveHomeVisitAction(action, row.lifecycle);
-  const next = homeVisitNext(row.lifecycle, hvAction, actor);
-  if (!next) {
-    throw new ApiError(409, "Bu duruma geçilemez.", "INVALID_TRANSITION");
-  }
-
-  const now = new Date().toISOString();
-  const nextPilot = pilotFromHomeVisit(next);
-  const voidPay = next === "rejected" || next === "cancelled";
-  const capture = next === "completed";
-
-  runOrderTx(() => {
-    if (capture) {
-      updateOrderStatus({
-        id,
-        status: nextPilot,
-        lifecycle: next,
-        updatedAt: now,
-        pickupCode: null,
-        resetAttempts: true,
-        paymentStatus: "captured",
-        paidAt: now,
-        finalPrice: row.total,
-      });
-    } else if (voidPay) {
-      updateOrderStatus({
-        id,
-        status: nextPilot,
-        lifecycle: next,
-        updatedAt: now,
-        paymentStatus: "voided",
-      });
-    } else {
-      updateOrderStatus({ id, status: nextPilot, lifecycle: next, updatedAt: now });
-    }
-    recordTransition({
-      orderId: id,
-      fromStatus: row.status,
-      toStatus: nextPilot,
-      fromLifecycle: row.lifecycle,
-      toLifecycle: next,
-      actorId: user.id,
-      actorRole: actor,
-      at: now,
-    });
-    if (voidPay) addRemaining(row.provider_id, row.pieces);
-    if (capture) capturePayment(id, now);
-    if (voidPay) voidPayment(id, now);
-  });
-
-  return toOrder(getOrderRow(id)!, user);
 }
 
 const PHOTO_KINDS: OrderPhotoKind[] = ["dropoff", "pickup", "damage"];

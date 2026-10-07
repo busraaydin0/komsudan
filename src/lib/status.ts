@@ -1,5 +1,4 @@
 import type { OrderPackageId } from "./categories/registry";
-import { usesFoodSm } from "./categories/registry";
 import type { ApiLifecycle, OrderStatus, PackageId } from "./types";
 
 export const LIFECYCLES: ApiLifecycle[] = [
@@ -73,14 +72,7 @@ export function canTransition(from: ApiLifecycle, to: ApiLifecycle, packageId: P
 export function nextStatus(
   current: OrderStatus,
   packageId: OrderPackageId,
-  food = false,
 ): OrderStatus | null {
-  if (usesFoodSm(packageId, food)) {
-    if (current === "onay_bekliyor") return "teslim_alindi";
-    if (current === "teslim_alindi") return "hazir";
-    if (current === "hazir") return "teslim_edildi";
-    return null;
-  }
   if (current === "onay_bekliyor") return "teslim_alindi";
   if (current === "teslim_alindi") return "yikaniyor";
   if (current === "yikaniyor") return packageId === "tam" ? "utuleniyor" : "hazir";
@@ -104,10 +96,7 @@ export function canReview(status: OrderStatus) {
 export const PICKUP_CODE_LEN = 6;
 export const PICKUP_CODE_TRIES = 5;
 
-export function trackSteps(packageId: OrderPackageId, food = false): OrderStatus[] {
-  if (usesFoodSm(packageId, food)) {
-    return ["onay_bekliyor", "teslim_alindi", "hazir", "teslim_edildi"];
-  }
+export function trackSteps(packageId: OrderPackageId): OrderStatus[] {
   if (packageId === "tam") {
     return ["onay_bekliyor", "teslim_alindi", "yikaniyor", "utuleniyor", "hazir", "teslim_edildi"];
   }

@@ -1,4 +1,4 @@
--- Araba yıkama kartı (WashServiceEditor). Ayrı kategori satırı yok; tablo korundu.
+-- Yıkama kartı (WashServiceEditor). Ayrı kategori satırı yok; tablo korundu.
 
 CREATE TABLE IF NOT EXISTS provider_washes (
   id TEXT PRIMARY KEY,
