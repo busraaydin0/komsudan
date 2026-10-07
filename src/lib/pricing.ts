@@ -1,10 +1,19 @@
-import { PACKAGES } from "./data";
+import { addonKey, machineUnitsFor, type LaundrySize, type OrderAddonLine } from "./laundryModel";
+import { getAddonPrice, getSizePrice } from "./db/providerPrices";
 import { effectiveLoyaltyRate } from "./loyalty";
-import type { PackageId, Provider } from "./types";
+import type { PackageId } from "./types";
 
-export const MIN_ORDER = 100;
 export const COMMISSION = 0.1;
 export const EXPRESS_BUMP = 0.25;
+
+/** Kapasite: kalan makine birimi (providers.remaining). */
+export const MACHINE_UNITS_MAX = 80;
+
+export function clampMachineUnits(n: number, remaining?: number) {
+  const cap = remaining && remaining > 0 ? Math.min(MACHINE_UNITS_MAX, remaining) : MACHINE_UNITS_MAX;
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(cap, Math.max(1, Math.round(n)));
+}
 
 /** Pilot slotlar “Bugün 18:00–19:00” / “Yarın …” — gün önekinden aynı gün. */
 export function isSameDaySlot(slot: string) {
@@ -19,48 +28,89 @@ export function resolveExpress(providerOffersExpress: boolean, slot: string) {
 export function pickSlotForDay(slots: string[], sameDay: boolean, fallback = "") {
   return slots.find((s) => isSameDaySlot(s) === sameDay) ?? fallback;
 }
-export const PIECES_MIN = 1;
-export const PIECES_MAX = 80;
 
-export function clampPieces(n: number, remaining?: number) {
-  const cap = remaining && remaining > 0 ? Math.min(PIECES_MAX, remaining) : PIECES_MAX;
-  if (!Number.isFinite(n)) return PIECES_MIN;
-  return Math.min(cap, Math.max(PIECES_MIN, Math.round(n)));
-}
+export type LaundryQuote = {
+  total: number;
+  before: number;
+  loyaltyRate: number;
+  commission: number;
+  providerNet: number;
+  subtotal: number;
+  machineUnits: number;
+  sizePrice: number;
+  addonTotal: number;
+};
 
-export function estimate(pieces: number, packageId: PackageId, express: boolean, loyaltyRate = 0) {
-  const base = PACKAGES.find((p) => p.id === packageId)?.pricePerPiece ?? 0;
-  return quote(pieces, base, express, loyaltyRate);
-}
-
-export function estimateFor(
-  provider: Provider,
-  pieces: number,
-  packageId: PackageId,
-  express: boolean,
-  loyaltyRate = 0,
-) {
-  const base =
-    provider.packages.find((p) => p.id === packageId)?.pricePerPiece ??
-    PACKAGES.find((p) => p.id === packageId)?.pricePerPiece ??
-    0;
-  return quote(pieces, base, express, loyaltyRate);
-}
-
-function quote(pieces: number, base: number, express: boolean, loyaltyRate = 0) {
-  const raw = pieces * base * (express ? 1 + EXPRESS_BUMP : 1);
-  const before = Math.max(MIN_ORDER, Math.round(raw));
-  const rate = effectiveLoyaltyRate(loyaltyRate);
+export function quoteLaundry(input: {
+  packageId: PackageId;
+  size: LaundrySize;
+  addons: OrderAddonLine[];
+  express: boolean;
+  loyaltyRate?: number;
+  sizePrice: number;
+  addonUnitPrices: Record<string, number>;
+}): LaundryQuote {
+  const sizePrice = input.sizePrice;
+  let addonTotal = 0;
+  for (const a of input.addons) {
+    if (a.qty < 1) continue;
+    const key = addonKey(a.addon, a.variant);
+    const unit = input.addonUnitPrices[key];
+    if (unit == null) {
+      throw new Error(`ADDON_PRICE:${key}`);
+    }
+    addonTotal += unit * a.qty;
+  }
+  const subtotal = sizePrice + addonTotal;
+  const bumped = Math.round(subtotal * (input.express ? 1 + EXPRESS_BUMP : 1));
+  const rate = effectiveLoyaltyRate(input.loyaltyRate ?? 0);
+  const before = bumped;
   const total = Math.max(1, Math.round(before * (1 - rate)));
   const commission = Math.round(total * COMMISSION);
+  const machineUnits = machineUnitsFor(input.size, input.addons);
   return {
     total,
     before,
     loyaltyRate: rate,
     commission,
     providerNet: total - commission,
-    perPiece: base,
+    subtotal,
+    machineUnits,
+    sizePrice,
+    addonTotal,
   };
+}
+
+export function quoteForProviderOrder(
+  providerId: string,
+  packageId: PackageId,
+  size: LaundrySize,
+  addons: OrderAddonLine[],
+  express: boolean,
+  loyaltyRate = 0,
+): LaundryQuote {
+  const sizePrice = getSizePrice(providerId, packageId, size);
+  if (sizePrice == null) {
+    throw new Error("SIZE_PRICE");
+  }
+  const addonUnitPrices: Record<string, number> = {};
+  for (const a of addons) {
+    if (a.qty < 1) continue;
+    const key = addonKey(a.addon, a.variant);
+    if (addonUnitPrices[key] != null) continue;
+    const p = getAddonPrice(providerId, a.addon, a.variant);
+    if (p == null) throw new Error(`ADDON_PRICE:${key}`);
+    addonUnitPrices[key] = p;
+  }
+  return quoteLaundry({
+    packageId,
+    size,
+    addons,
+    express,
+    loyaltyRate,
+    sizePrice,
+    addonUnitPrices,
+  });
 }
 
 export function tl(n: number) {
