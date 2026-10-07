@@ -8,7 +8,6 @@ import {
 } from "@/lib/db/orderItems";
 import { ensureProviderPriceGrid, getAddonPrice } from "@/lib/db/providerPrices";
 import {
-  addRemaining,
   getOrderRow,
   runOrderTx,
   updateOrderCancelReason,
@@ -23,6 +22,8 @@ import { quoteForProviderOrder } from "@/lib/pricingServer";
 import { lifecycleOf, pilotFromLifecycle } from "@/lib/status";
 import type { OrderStatus, PackageId } from "@/lib/types";
 import { photosForOrder } from "@/server/photos";
+import { parseAllocations } from "@/lib/db/providerCapacity";
+import { releaseOrderCapacity } from "@/lib/services/capacityService";
 import { authorizePayment, voidPayment } from "@/lib/services/paymentService";
 
 function normalizeAddons(raw: OrderAddonLine[]) {
@@ -148,7 +149,7 @@ export function respondPriceChange(user: AuthUser, orderId: string, action: "app
       note: "size_rejected",
       at: now,
     });
-    addRemaining(row.provider_id, row.machine_units);
+    releaseOrderCapacity(row.provider_id, parseAllocations(row.capacity_allocations));
     voidPayment(orderId, now);
   });
 

@@ -5,11 +5,12 @@ import type { PackageId } from "./types";
 export const COMMISSION = 0.1;
 export const EXPRESS_BUMP = 0.25;
 
-/** Kapasite: kalan makine birimi (providers.remaining). */
+/** Pilot üst sınır (Büyük + ekler); asıl limit sağlayıcı max_units_per_order. */
 export const MACHINE_UNITS_MAX = 80;
 
-export function clampMachineUnits(n: number, remaining?: number) {
-  const cap = remaining && remaining > 0 ? Math.min(MACHINE_UNITS_MAX, remaining) : MACHINE_UNITS_MAX;
+export function clampMachineUnits(n: number, maxPerOrder?: number) {
+  const cap =
+    maxPerOrder && maxPerOrder > 0 ? Math.min(MACHINE_UNITS_MAX, maxPerOrder) : MACHINE_UNITS_MAX;
   if (!Number.isFinite(n)) return 1;
   return Math.min(cap, Math.max(1, Math.round(n)));
 }

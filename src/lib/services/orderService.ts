@@ -1,5 +1,12 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { capacityLabelForPackage } from "@/lib/categories/registry";
+import {
+  assertCanServeOrder,
+  planOrder,
+  releaseOrderCapacity,
+  reserveOrderCapacity,
+  scheduleLine,
+} from "@/lib/services/capacityService";
+import { parseAllocations } from "@/lib/db/providerCapacity";
 import { deliveredCount } from "@/lib/db/auth";
 import { loyaltyRate } from "@/lib/loyalty";
 import { addonKey, type LaundrySize, type OrderAddonLine } from "@/lib/laundryModel";
@@ -10,7 +17,7 @@ import {
   listOrderItems,
 } from "@/lib/db/orderItems";
 import { ensureProviderPriceGrid, getAddonPrice } from "@/lib/db/providerPrices";
-import { clampMachineUnits, resolveExpress } from "@/lib/pricing";
+import { resolveExpress } from "@/lib/pricing";
 import { quoteForProviderOrder } from "@/lib/pricingServer";
 import { isAllowedOrderSlot } from "@/lib/timeWindow";
 import { getCategoryForProvider } from "@/lib/db/categories";
@@ -37,10 +44,8 @@ import type {
 import type { AuthUser } from "@/lib/auth/types";
 import { getProfile } from "@/lib/db/providers";
 import {
-  addRemaining,
   bumpCodeAttempts,
   getOrderRow,
-  getRemaining,
   insertOrderRow,
   listHistoryRows,
   listOrderRowsAll,
@@ -50,6 +55,7 @@ import {
   rotatePickupCode,
   runOrderTx,
   setPickupCode,
+  updateOrderCapacityCommit,
   updateOrderStatus,
   type OrderRow,
 } from "@/lib/db/orders";
@@ -139,6 +145,9 @@ function toOrder(row: OrderRow, _viewer?: AuthUser, lean = false): Order {
     colorGroups: row.color_groups,
     pickupConfirmedAt: row.pickup_confirmed_at,
     cancelReason: row.cancel_reason,
+    estimatedDeliveryDate: row.estimated_delivery_date ?? null,
+    promisedDeliveryDate: row.promised_delivery_date ?? null,
+    delayCount: row.delay_count ?? 0,
     updatedAt: row.updated_at,
   };
 }
@@ -243,18 +252,12 @@ function insertPendingOrder(args: {
   note: string;
   quote: { total: number; commission: number; machineUnits: number; sizePrice: number };
   userId: string;
+  estimatedDeliveryDate: string | null;
 }) {
   const now = new Date().toISOString();
   const id = `k-${randomUUID().slice(0, 8)}`;
-  const capacityLabel = capacityLabelForPackage(args.packageId);
   runOrderTx(() => {
-    const remaining = getRemaining(args.providerId);
-    if (remaining == null) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
-    if (remaining < args.quote.machineUnits) {
-      throw new ApiError(409, `Bugün yalnızca ${remaining} ${capacityLabel} var.`, "CAPACITY");
-    }
     holdForOrder(args.userId, id, args.quote.total);
-    addRemaining(args.providerId, -args.quote.machineUnits);
     insertOrderRow({
       id,
       provider_id: args.providerId,
@@ -275,6 +278,7 @@ function insertPendingOrder(args: {
       lifecycle: "pending",
       size: args.size,
       machine_units: args.quote.machineUnits,
+      estimated_delivery_date: args.estimatedDeliveryDate,
       product_id: null,
       product_name: null,
       guest_count: null,
@@ -348,10 +352,17 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     express,
     loyaltyRate(deliveredCount(userId)),
   );
-  const remaining = getRemaining(provider.id);
-  const units = clampMachineUnits(quote.machineUnits, remaining ?? undefined);
-  if (units !== quote.machineUnits) {
-    throw new ApiError(409, "Kapasite bu boy ve ekler için yeterli değil.", "CAPACITY");
+  assertCanServeOrder(provider.id, quote.machineUnits);
+  const slot = requireSlot(input);
+  const line = scheduleLine({
+    packageId: input.packageId,
+    machineUnits: quote.machineUnits,
+    addons,
+    slot,
+  });
+  const plan = planOrder(provider.id, line);
+  if (!plan) {
+    throw new ApiError(409, "Bu tarihlerde kapasite uygun değil.", "CAPACITY");
   }
 
   const id = insertPendingOrder({
@@ -362,10 +373,11 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     express,
     drop: "kapi",
     dropPointId: null,
-    slot: requireSlot(input),
+    slot,
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
+    estimatedDeliveryDate: plan.deliveryDate,
   });
   const order = getOrder(id)!;
   notifyNewOrder({
@@ -506,7 +518,9 @@ export function applyStatus(
       note: note?.trim().slice(0, 200) || null,
       at: now,
     });
-    if (voidPay) addRemaining(row.provider_id, row.machine_units);
+    if (voidPay) {
+      releaseOrderCapacity(row.provider_id, parseAllocations(row.capacity_allocations));
+    }
     if (capture) capturePayment(id, now);
     if (voidPay) voidPayment(id, now);
   });
@@ -536,6 +550,24 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
     if (order.status !== "onay_bekliyor") {
       throw new ApiError(409, "Bu sipariş kabul edilemez.", "INVALID_TRANSITION");
     }
+    const items = listOrderItems(id);
+    const addons = addonsFromItems(items);
+    const line = scheduleLine({
+      packageId: row.package_id as PackageId,
+      machineUnits: row.machine_units,
+      addons,
+      slot: row.slot,
+    });
+    const now = new Date().toISOString();
+    runOrderTx(() => {
+      const { schedule, allocations } = reserveOrderCapacity(row.provider_id, line);
+      updateOrderCapacityCommit({
+        id,
+        promisedDeliveryDate: schedule.deliveryDate,
+        allocationsJson: JSON.stringify(allocations),
+        updatedAt: now,
+      });
+    });
     next = "accepted";
   } else if (action === "reject") {
     if (!canCancel(order.status)) {
