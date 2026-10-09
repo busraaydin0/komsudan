@@ -37,7 +37,7 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
   const [form, setForm] = useState<CapacityForm>({
     halfUnitsPerDay: 6,
     workingDays: [1, 2, 3, 4, 5, 6],
-    maxUnitsPerOrder: 4,
+    maxUnitsPerOrder: 10,
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -78,7 +78,7 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
     <div className="k-rise mt-6 rounded-3xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]">
       <p className="text-[11px] font-medium tracking-[0.14em] text-[var(--teal)] uppercase">Makine kapasitesi</p>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        Günlük yarım-makine birimi. Orta boy = 2 birim, büyük = 4 birim.
+        Günlük yarım-makine birimi. Orta = 2, büyük = 4, 5 makine = 10 birim.
       </p>
       <label className="mt-4 block text-sm">
         Günlük makine (≈ yarım-makine × 2)
@@ -114,15 +114,22 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
         })}
       </div>
       <label className="mt-4 block text-sm">
-        Tek sipariş üst sınırı (birim, max 4 = Büyük)
+        Tek sipariş üst sınırı
         <select
           value={form.maxUnitsPerOrder}
           onChange={(e) => setForm((f) => ({ ...f, maxUnitsPerOrder: Number(e.target.value) }))}
           className="mt-1 w-full rounded-xl bg-[var(--paper)] px-3 py-2 ring-1 ring-[var(--line)]"
         >
-          {[1, 2, 4].map((n) => (
+          {[
+            { n: 1, label: "½ makine · Küçük" },
+            { n: 2, label: "1 makine · Orta" },
+            { n: 4, label: "2 makine · Büyük" },
+            { n: 6, label: "3 makine" },
+            { n: 8, label: "4 makine" },
+            { n: 10, label: "5 makine" },
+          ].map(({ n, label }) => (
             <option key={n} value={n}>
-              {n} birim
+              {label}
             </option>
           ))}
         </select>

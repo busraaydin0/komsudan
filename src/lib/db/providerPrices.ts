@@ -5,6 +5,9 @@ import {
   assertPlatformSizePrice,
   DEFAULT_ADDON_PRICES,
   defaultSizePricesFromLegacy,
+  isExtraMachineSize,
+  scaledSizePrice,
+  STORED_LAUNDRY_SIZES,
   type AddonKind,
   type AddonVariant,
   type LaundrySize,
@@ -57,7 +60,15 @@ export function getSizePrice(providerId: string, packageId: PackageId, size: Lau
        WHERE provider_id = ? AND package_id = ? AND size = ?`,
     )
     .get(providerId, packageId, size) as { price: number } | undefined;
-  return row?.price ?? null;
+  if (row) return row.price;
+  if (!isExtraMachineSize(size)) return null;
+  const orta = db()
+    .prepare(
+      `SELECT price FROM provider_prices
+       WHERE provider_id = ? AND package_id = ? AND size = 'orta'`,
+    )
+    .get(providerId, packageId) as { price: number } | undefined;
+  return orta ? scaledSizePrice(orta.price, size) : null;
 }
 
 export function getAddonPrice(
@@ -116,7 +127,7 @@ export function ensureProviderPriceGrid(providerId: string) {
       LAUNDRY_PACKAGES.find((p) => p.id === packId)?.pricePerPiece ||
       12;
     const defaults = defaultSizePricesFromLegacy(packId, legacy);
-    for (const size of ["kucuk", "orta", "buyuk"] as LaundrySize[]) {
+    for (const size of STORED_LAUNDRY_SIZES) {
       if (existing.some((e) => e.size === size)) continue;
       upsertProviderSizePrice({
         provider_id: providerId,

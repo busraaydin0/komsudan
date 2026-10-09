@@ -1,4 +1,4 @@
-import { addonKey } from "@/lib/laundryModel";
+import { addonKey, EXTRA_MACHINE_SIZES, scaledSizePrice, type LaundrySize } from "@/lib/laundryModel";
 import { db } from "@/lib/db/client";
 import { toProvider } from "@/lib/db/catalog";
 import {
@@ -43,7 +43,16 @@ function laundryPricesFromRows(
   const sizes: LaundryPriceGrid["sizes"] = {};
   for (const pack of p.packages) {
     const rows = sizeRows.filter((r) => r.package_id === pack.id);
-    sizes[pack.id] = Object.fromEntries(rows.map((r) => [r.size, r.price]));
+    const stored = Object.fromEntries(rows.map((r) => [r.size, r.price])) as Partial<
+      Record<LaundrySize, number>
+    >;
+    const orta = stored.orta;
+    if (orta != null) {
+      for (const extra of EXTRA_MACHINE_SIZES) {
+        if (stored[extra] == null) stored[extra] = scaledSizePrice(orta, extra);
+      }
+    }
+    sizes[pack.id] = stored;
   }
   const addons: Record<string, number> = {};
   for (const row of addonRows) {

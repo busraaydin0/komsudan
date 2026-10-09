@@ -1,14 +1,31 @@
 import type { LaundryPackageId } from "./laundry/packages";
 import type { PackageId } from "./types";
 
-/** Yarım-makine birimi (tam sayı). Küçük ≈ ½ makine, Orta ≈ 1, Büyük ≈ 2 makine. */
-export const LAUNDRY_SIZES = ["kucuk", "orta", "buyuk"] as const;
+/** Yarım-makine birimi (tam sayı). Küçük ≈ ½, Orta ≈ 1, Büyük ≈ 2; 3–5 makine orta × adet. */
+export const STORED_LAUNDRY_SIZES = ["kucuk", "orta", "buyuk"] as const;
+export const EXTRA_MACHINE_SIZES = ["makine3", "makine4", "makine5"] as const;
+export const LAUNDRY_SIZES = [...STORED_LAUNDRY_SIZES, ...EXTRA_MACHINE_SIZES] as const;
+export type StoredLaundrySize = (typeof STORED_LAUNDRY_SIZES)[number];
+export type ExtraMachineSize = (typeof EXTRA_MACHINE_SIZES)[number];
 export type LaundrySize = (typeof LAUNDRY_SIZES)[number];
+
+/** 5 makine = 10 yarım-makine birimi. Tek sipariş tavanı. */
+export const MAX_ORDER_MACHINES = 5;
+export const MAX_UNITS_PER_ORDER = MAX_ORDER_MACHINES * 2;
+
+export const EXTRA_MACHINE_COUNT: Record<ExtraMachineSize, number> = {
+  makine3: 3,
+  makine4: 4,
+  makine5: 5,
+};
 
 export const SIZE_MACHINE_UNITS: Record<LaundrySize, number> = {
   kucuk: 1,
   orta: 2,
   buyuk: 4,
+  makine3: 6,
+  makine4: 8,
+  makine5: 10,
 };
 
 export const ADDON_KINDS = ["yorgan", "battaniye"] as const;
@@ -32,7 +49,38 @@ export const SIZE_LABELS: Record<LaundrySize, { title: string; hint: string }> =
   kucuk: { title: "Küçük", hint: "≈ yarım makine" },
   orta: { title: "Orta", hint: "≈ 1 makine" },
   buyuk: { title: "Büyük", hint: "≈ 2 makine" },
+  makine3: { title: "3 makine", hint: "Orta boy × 3" },
+  makine4: { title: "4 makine", hint: "Orta boy × 4" },
+  makine5: { title: "5 makine", hint: "Orta boy × 5" },
 };
+
+export function isExtraMachineSize(size: string): size is ExtraMachineSize {
+  return (EXTRA_MACHINE_SIZES as readonly string[]).includes(size);
+}
+
+export function extraMachineCount(size: LaundrySize): number | null {
+  return isExtraMachineSize(size) ? EXTRA_MACHINE_COUNT[size] : null;
+}
+
+/** 3–5 makine: sağlayıcı orta boy fiyatı × makine sayısı. */
+export function scaledSizePrice(ortaPrice: number, size: LaundrySize): number {
+  const n = extraMachineCount(size);
+  if (!n) return ortaPrice;
+  return Math.round(ortaPrice * n);
+}
+
+export function resolveSizePrice(
+  size: LaundrySize,
+  stored: Partial<Record<LaundrySize, number>> | undefined,
+): number | null {
+  const direct = stored?.[size];
+  if (direct != null) return direct;
+  const n = extraMachineCount(size);
+  if (!n) return null;
+  const orta = stored?.orta;
+  if (orta == null) return null;
+  return scaledSizePrice(orta, size);
+}
 
 export function addonKey(addon: AddonKind, variant: AddonVariant) {
   return `${addon}_${variant}` as `${AddonKind}_${AddonVariant}`;
@@ -62,10 +110,9 @@ export function exceedsOrderedSize(ordered: LaundrySize, confirmed: LaundrySize)
   return sizeRank(confirmed) > sizeRank(ordered);
 }
 
-/** Platform fiyat aralığı (TRY, D-033). Sağlayıcı dışına çıkamaz. */
-export const PLATFORM_SIZE_PRICE: Record<
+const STORED_PLATFORM_SIZE_PRICE: Record<
   PackageId,
-  Record<LaundrySize, { min: number; max: number }>
+  Record<StoredLaundrySize, { min: number; max: number }>
 > = {
   yikama: {
     kucuk: { min: 60, max: 220 },
@@ -81,6 +128,35 @@ export const PLATFORM_SIZE_PRICE: Record<
     kucuk: { min: 110, max: 380 },
     orta: { min: 160, max: 520 },
     buyuk: { min: 240, max: 780 },
+  },
+};
+
+function extraPlatformBand(orta: { min: number; max: number }, n: number) {
+  return { min: orta.min * n, max: orta.max * n };
+}
+
+/** Platform fiyat aralığı (TRY, D-033). Sağlayıcı dışına çıkamaz. */
+export const PLATFORM_SIZE_PRICE: Record<
+  PackageId,
+  Record<LaundrySize, { min: number; max: number }>
+> = {
+  yikama: {
+    ...STORED_PLATFORM_SIZE_PRICE.yikama,
+    makine3: extraPlatformBand(STORED_PLATFORM_SIZE_PRICE.yikama.orta, 3),
+    makine4: extraPlatformBand(STORED_PLATFORM_SIZE_PRICE.yikama.orta, 4),
+    makine5: extraPlatformBand(STORED_PLATFORM_SIZE_PRICE.yikama.orta, 5),
+  },
+  katlama: {
+    ...STORED_PLATFORM_SIZE_PRICE.katlama,
+    makine3: extraPlatformBand(STORED_PLATFORM_SIZE_PRICE.katlama.orta, 3),
+    makine4: extraPlatformBand(STORED_PLATFORM_SIZE_PRICE.katlama.orta, 4),
+    makine5: extraPlatformBand(STORED_PLATFORM_SIZE_PRICE.katlama.orta, 5),
+  },
+  tam: {
+    ...STORED_PLATFORM_SIZE_PRICE.tam,
+    makine3: extraPlatformBand(STORED_PLATFORM_SIZE_PRICE.tam.orta, 3),
+    makine4: extraPlatformBand(STORED_PLATFORM_SIZE_PRICE.tam.orta, 4),
+    makine5: extraPlatformBand(STORED_PLATFORM_SIZE_PRICE.tam.orta, 5),
   },
 };
 

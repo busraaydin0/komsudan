@@ -24,6 +24,19 @@ describe("Boy + ek fiyat", () => {
     expect(q.commission).toBe(Math.round(245 * COMMISSION));
   });
 
+  it("3 makine 6 birim; fiyat orta × 3 siparişte sizePrice olarak gelir", () => {
+    const q = quoteLaundry({
+      packageId: "tam",
+      size: "makine3",
+      addons: [],
+      express: false,
+      sizePrice: 480,
+      addonUnitPrices: {},
+    });
+    expect(q.machineUnits).toBe(6);
+    expect(q.total).toBe(480);
+  });
+
   it("büyük boy makine birimi 4; ekler +2 birim/adet", () => {
     const q = quoteLaundry({
       packageId: "yikama",

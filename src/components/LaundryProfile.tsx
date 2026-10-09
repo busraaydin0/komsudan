@@ -151,7 +151,7 @@ export function LaundryProfile({
               <span className="mt-0.5 block text-xs text-[var(--muted)]">{pack.blurb}</span>
               {on && (
                 <label className="mt-2 flex items-center gap-2 text-xs text-[var(--muted)]">
-                  ₺/orta boy
+                  ₺/orta boy · 3–5 makine = orta × adet
                   <input
                     inputMode="numeric"
                     value={prices[pack.id]}

@@ -27,6 +27,7 @@ function useVisiblePolling(reload: () => void | Promise<void>, intervalMs: numbe
   }, [reload, intervalMs]);
 }
 import { readJson, unwrapEnvelope } from "@/lib/http/client";
+import type { LaundrySize } from "./laundryModel";
 import type { Account, AppNotification, CreateOrderInput, MessageInboxThread, Order, OrderConversation, OrderMessage, Provider, Review, WalletActivity, WalletSnapshot, WorkPhoto } from "./types";
 
 export type Catalog = {
@@ -226,7 +227,7 @@ export async function postOrder(input: CreateOrderInput) {
 export async function postPickupConfirm(
   orderId: string,
   body: {
-    confirmedSize: "kucuk" | "orta" | "buyuk";
+    confirmedSize: LaundrySize;
     addons: { addon: "yorgan" | "battaniye"; variant: "tek" | "cift"; qty: number }[];
     colorGroups: number;
   },

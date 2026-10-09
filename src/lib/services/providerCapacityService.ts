@@ -5,6 +5,7 @@ import {
 } from "@/lib/db/providerCapacity";
 import type { AuthUser } from "@/lib/auth/types";
 import { ApiError } from "@/lib/errors";
+import { MAX_UNITS_PER_ORDER } from "@/lib/laundryModel";
 
 export function getMyCapacitySettings(user: AuthUser) {
   const row = getCapacitySettings(user.id);
@@ -13,7 +14,7 @@ export function getMyCapacitySettings(user: AuthUser) {
       configured: false as const,
       halfUnitsPerDay: 6,
       workingDays: [1, 2, 3, 4, 5, 6],
-      maxUnitsPerOrder: 4,
+      maxUnitsPerOrder: MAX_UNITS_PER_ORDER,
     };
   }
   return {
@@ -34,8 +35,8 @@ export function saveMyCapacitySettings(
   if (input.halfUnitsPerDay < 2 || input.halfUnitsPerDay > 24) {
     throw new ApiError(400, "Günlük makine kapasitesi 1–12 makine aralığında.", "VALIDATION_ERROR");
   }
-  if (input.maxUnitsPerOrder < 1 || input.maxUnitsPerOrder > 4) {
-    throw new ApiError(400, "Tek sipariş üst sınırı en fazla Büyük (4 birim).", "VALIDATION_ERROR");
+  if (input.maxUnitsPerOrder < 1 || input.maxUnitsPerOrder > MAX_UNITS_PER_ORDER) {
+    throw new ApiError(400, "Tek sipariş üst sınırı en fazla 5 makine (10 birim).", "VALIDATION_ERROR");
   }
   upsertCapacitySettings({
     providerId: user.id,

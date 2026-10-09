@@ -24,14 +24,14 @@ const SEED_PHONES: Record<string, string> = {
 };
 
 const SEED_CAPACITY: Record<string, { half: number; maxOrder: number; days?: number[] }> = {
-  elif: { half: 8, maxOrder: 4 },
-  ayse: { half: 6, maxOrder: 4 },
-  merve: { half: 4, maxOrder: 4 },
-  zeynep: { half: 10, maxOrder: 4 },
+  elif: { half: 8, maxOrder: 10 },
+  ayse: { half: 6, maxOrder: 10 },
+  merve: { half: 4, maxOrder: 10 },
+  zeynep: { half: 10, maxOrder: 10 },
   gulsen: { half: 4, maxOrder: 2 },
-  selin: { half: 6, maxOrder: 4 },
-  burak: { half: 5, maxOrder: 4 },
-  leyla: { half: 7, maxOrder: 4 },
+  selin: { half: 6, maxOrder: 10 },
+  burak: { half: 5, maxOrder: 10 },
+  leyla: { half: 7, maxOrder: 10 },
 };
 
 function seedProviderDirectory() {
@@ -104,7 +104,7 @@ export function seedCatalog(database: Database.Database) {
         id: p.id,
         payload: JSON.stringify({ ...p, drops: ["kapi"] }),
       });
-      const cap = SEED_CAPACITY[p.id] ?? { half: 6, maxOrder: 4 };
+      const cap = SEED_CAPACITY[p.id] ?? { half: 6, maxOrder: 10 };
       upsertCapacitySettings({
         providerId: p.id,
         halfUnitsPerDay: cap.half,

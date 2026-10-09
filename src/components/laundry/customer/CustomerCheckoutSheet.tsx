@@ -83,9 +83,9 @@ export function CustomerCheckoutSheet({
       </button>
       <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl">Boy</h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        Makine yükünü seç. Renk ayrımı standart; ek ücret yok.
+        Küçük / orta / büyük veya 3–5 makine. Renk ayrımı standart; ek ücret yok.
       </p>
-      <div className="mt-3 grid gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         {LAUNDRY_SIZES.map((s) => (
           <button
             key={s}

@@ -1,7 +1,7 @@
 /** Müşteri PWA metinleri ve teklif hesabı (çamaşır). */
 
 import type { LaundrySize, OrderAddonLine } from "@/lib/laundryModel";
-import { addonKey } from "@/lib/laundryModel";
+import { addonKey, resolveSizePrice } from "@/lib/laundryModel";
 import { quoteLaundry, resolveExpress, tl } from "@/lib/pricing";
 import type { CreateOrderInput, PackageId, Provider } from "@/lib/types";
 
@@ -60,7 +60,7 @@ export function quoteForProvider(
   if (!selected) return ZERO_QUOTE;
   const grid = selected.laundryPrices;
   if (!grid) return ZERO_QUOTE;
-  const sizePrice = grid.sizes[args.pkg]?.[args.size];
+  const sizePrice = resolveSizePrice(args.size, grid.sizes[args.pkg]);
   if (sizePrice == null) return ZERO_QUOTE;
   const express = resolveExpress(selected.express, args.pickupDate);
   try {
