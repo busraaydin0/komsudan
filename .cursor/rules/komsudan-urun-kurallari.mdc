@@ -31,7 +31,7 @@ Bu bir bitirme projesidir. Jüri sorusuna dayanmalı, basit ve test edilebilir k
 - Adım bitince: ne değişti (dosya listesi), `npm test` ve `npm run lint` sonucu, açık kalan soru. Sonra dur ve onay bekle.
 - Emin olmadığın iş kuralında tahmin etme; sor.
 - Push etme. Commit mesajı Türkçe, **neden** odaklı.
-- Migration: yeni numaralı dosya (`0003_...`; mevcut: `0001_schema`, `0002_larger_order_sizes`). Var olan migration'ı **düzenleme**.
+- Migration: yeni numaralı dosya; son numarayı `ls db/migrations` ile kontrol et. Var olan migration'ı düzenleme.
 - `docs/mimari.md` kodla uyumlu referanstır; mimari değişince güncelle.
 
 ## Teknik kurallar

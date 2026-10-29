@@ -7,7 +7,7 @@ alwaysApply: true
 
 PWA ve keşif **yalnız Çamaşır Yıkama**. Sabitler `src/lib/laundry/` (paket, boy, ek); kategori tablosu/registry yok. Faz atlama. Çamaşır dışı alan ekleme.
 
-- Teslim: kapı veya gel al noktası. Eve kimse girmez.
+- Teslim: MVP dışı, yalnız kapı. Eve kimse girmez.
 - Paket: `yikama` / `katlama` / `tam`. Tutar sunucuda.
 
 ## Sıra

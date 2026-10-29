@@ -21,7 +21,7 @@ Kaynak belge. Uygulama sırasında özet kurallarla çelişirse bu hedef geçerl
 
 ```
 src/app/api/auth/otp/request|verify  refresh  me
-src/app/api/providers  [id]  [id]/packages  me/profile|availability|drop-points
+src/app/api/providers  [id]  [id]/packages  me/profile|availability|drop-points  (LEGACY/MVP dışı)
 src/app/api/orders  [id]  [id]/status|photos|review
 src/app/api/payments/webhook  notifications
 src/lib/db/client.ts migrate.ts
@@ -40,16 +40,16 @@ scripts/seed.ts
 - `otp_codes`: code_hash, attempts, expires_at.
 - `refresh_tokens`: token_hash, expires_at, revoked_at.
 - `provider_profiles`: lat/lng, has_dryer, verification_status, commission_rate 0.10, rating_avg/count, completed_orders.
-- `service_packages`: price_per_kg, min_order_amount, express_*.
-- `drop_points`, `availability_slots` (day_of_week 0=Pazar, door|point|both).
-- `orders`: status pending…disputed, delivery_mode, scheduled_window_*, estimated/actual weight, **price_per_kg_snapshot**, estimated/final_price.
+- `service_packages`: price_per_kg (LEGACY/MVP dışı), min_order_amount, express_*.
+- `drop_points` (LEGACY/MVP dışı), `availability_slots` (day_of_week 0=Pazar, door|point|both — LEGACY/MVP dışı).
+- `orders`: status pending…disputed, delivery_mode, scheduled_window_*, estimated/actual weight (LEGACY/MVP dışı tartım), **price_per_kg_snapshot** (LEGACY/MVP dışı), estimated/final_price.
 - `order_status_history`, `order_photos` (dropoff|pickup|damage), `payments` (authorized|captured|refunded|failed + provider_reference), `reviews` (order unique, 1–5), `disputes`, `notifications`.
 
 İndeks: orders customer/provider/status, provider_profiles(lat,lng).
 
 ## State machine
 
-pending→accepted→dropped_off→washing→ironing→ready→completed; pending→rejected; accepted/dropped_off→cancelled; completed→disputed. Client status'una güvenme. Rol kısıtı service'te.
+pending→accepted→dropped_off→washing→ironing→ready→completed; pending→rejected; accepted/dropped_off→cancelled; completed→disputed. Spec eşlemesi: `docs/URUN_REFERANS_v0.3.md` §3. Client status'una güvenme. Rol kısıtı service'te.
 
 ## API envelope
 

@@ -63,10 +63,10 @@ const ALLOWED_TRANSITIONS: Record<ApiLifecycle, ApiLifecycle[]> = {
 ## Teslim
 
 - `completed` öncesi en az bir `delivery` fotoğrafı zorunlu.
-- Evde yokken kapıya/komşuya bırakma yasak (UI metni).
+- Evde yokken kapıya/komşuya bırakma yasak (UI metni). **ÖNERİ, onay yok, uygulanmaz.**
 - `delivery_override_requests`: foto + gerekçe; `admin_hold`, `dispute_window_end`; pilotta otomatik kapanma yok.
 
 ## Fiyat ve ödeme
 
 Tutar backend'de boy + ek tablolarından hesaplanır. Client tutarına güvenme.
-MVP: create'te authorize, `completed`'te capture, iptalde void/refund. Komisyon backend'de; hizmet verene haftalık manuel. iyzico Marketplace v2.
+MVP: create'te authorize, `completed`'te capture, iptalde void/refund. Komisyon backend'de; hizmet verene haftalık manuel. MVP'de simüle, gerçek ödeme gelecek çalışma.

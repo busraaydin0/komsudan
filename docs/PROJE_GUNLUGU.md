@@ -6,6 +6,12 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-10-29 – Adım 1 / 1b: Dokümanlar repoya alındı, eski kurallar hizalandı
+- daf14ed push edildi (ürün referansı, günlük, Cursor kuralı).
+- Eski .cursor kuralları v0.3 ile hizalandı (gel al, kg/tartım, iyzico, push kuralı).
+- docs/mimari.md ile durum eşlemesi tutarsızlıkları açık (admin_pending, ready=RETURNING, PICKUP=dropped_off); commit edilmemiş dosyalar incelemede.
+- Sonraki adım: commit edilmemiş dosyaların kararı, sonra Adım 2 (cüzdan kademeleri).
+
 ## 2026-10-29 – Adım 0 (DÜZELTİLMİŞ): Gap analizi `chore/laundry-only` dalına göre
 
 **Düzeltme:** İlk analiz `main` dalına bakılarak yapılmıştı (çok kategorili, eski model). Gerçek çalışma dalı `chore/laundry-only`: yalnız çamaşır, 324 dosya değişmiş (~32 bin satır silinmiş), migration'lar `0001_schema` + `0002_larger_order_sizes`, 27 test dosyası. İlk matris geçersiz.
