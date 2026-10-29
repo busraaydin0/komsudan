@@ -10,7 +10,8 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 - Kullanılabilir (`balance`) / rezerv (`reserved`) / bekleyen (`pending`). Teslimde net kazanç bekleyene yazılır, 24 sa sonra kullanılabilir.
 - **K-007 (ONAYLI):** bekleme 24 sa. Sabit: `PENDING_EARNING_WAIT_MS` (`src/lib/walletMethods.ts`).
 - Migration `0004_wallet_tiers.sql`; `wallet_pending_earnings`. Authorize ödemeler geriye dönük `reserved` doldurulur, `balance` dokunulmaz.
-- Kalan: acil iadesi için hazır (Adım 3). Commit yok, onay bekleniyor.
+- Kalan: acil iadesi için hazır (Adım 3).
+- Komisyon cüzdana yazılmaz, payments.commission'da; Adım 4 aylık özeti oradan okur. Demo: WALLET_PENDING_WAIT_MS.
 
 ## 2026-10-29 – Adım 1c: Eski kategori temizliği ve doküman hizalama
 - Migration 0003_laundry_legacy_category_cleanup: çamaşır dışı tablo ve kayıtlar KALICI silinir (service_categories, drop_points, ürün/hizmet kartları, çamaşır dışı sipariş ve bağlı mesaj/ödeme/review). Eski veritabanı yedeklenmeden çalıştırılmamalı.

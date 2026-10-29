@@ -25,7 +25,7 @@ import {
   INSUFFICIENT_BALANCE_MESSAGE,
   INSUFFICIENT_PAYOUT_MESSAGE,
   PAYOUT_METHODS,
-  PENDING_EARNING_WAIT_MS,
+  pendingEarningWaitMs,
   TOPUP_METHODS,
   type PayoutMethodId,
   type TopupMethodId,
@@ -168,7 +168,7 @@ export function creditOnCapture(providerId: string, orderId: string, net: number
   if (hasEarnForOrder(orderId) || getPendingEarningForOrder(orderId)) return;
   const when = nowIso(at);
   ensureWalletRow(providerId, when);
-  const availableAt = new Date(Date.parse(when) + PENDING_EARNING_WAIT_MS).toISOString();
+  const availableAt = new Date(Date.parse(when) + pendingEarningWaitMs()).toISOString();
   db().transaction(() => {
     if (hasEarnForOrder(orderId) || getPendingEarningForOrder(orderId)) return;
     if (addPending(providerId, net, when) === 0) return;

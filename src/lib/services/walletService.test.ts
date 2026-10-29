@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { insertOrderRow } from "@/lib/db/orders";
 import { getWalletRow } from "@/lib/db/wallets";
 import { ApiError } from "@/lib/errors";
-import { PENDING_EARNING_WAIT_MS } from "@/lib/walletMethods";
+import { PENDING_EARNING_WAIT_MS, pendingEarningWaitMs } from "@/lib/walletMethods";
 import { requestOtp, verifyOtp } from "./authService";
 import {
   canPay,
@@ -191,5 +191,40 @@ describe("cüzdan kademeleri", () => {
     stubOrder("k-tier-cons2");
     holdForOrder(userId, "k-tier-cons2", 50);
     expect(getWallet(userId).total).toBe(300);
+  });
+});
+
+describe("demo bekleyen süre", () => {
+  const prevWait = process.env.WALLET_PENDING_WAIT_MS;
+  const prevEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    if (prevWait === undefined) delete process.env.WALLET_PENDING_WAIT_MS;
+    else process.env.WALLET_PENDING_WAIT_MS = prevWait;
+    process.env.NODE_ENV = prevEnv;
+  });
+
+  it("WALLET_PENDING_WAIT_MS saniye; production'da yok sayılır", () => {
+    process.env.NODE_ENV = "test";
+    process.env.WALLET_PENDING_WAIT_MS = "60";
+    expect(pendingEarningWaitMs()).toBe(60_000);
+    process.env.NODE_ENV = "production";
+    expect(pendingEarningWaitMs()).toBe(PENDING_EARNING_WAIT_MS);
+  });
+
+  it("60 sn sonra pending→balance", async () => {
+    process.env.NODE_ENV = "test";
+    process.env.WALLET_PENDING_WAIT_MS = "60";
+    const userId = await userFrom("5550000891");
+    stubOrder("k-demo-wait");
+    const at = "2026-10-29T12:00:00.000Z";
+    creditOnCapture(userId, "k-demo-wait", 90, at);
+    expect(getWallet(userId, 0, at).pending).toBe(90);
+    const soon = new Date(Date.parse(at) + 30_000).toISOString();
+    expect(getWallet(userId, 0, soon).pending).toBe(90);
+    const ripe = new Date(Date.parse(at) + 61_000).toISOString();
+    const w = getWallet(userId, 0, ripe);
+    expect(w.pending).toBe(0);
+    expect(w.balance).toBe(90);
   });
 });

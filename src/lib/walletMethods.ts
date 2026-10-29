@@ -24,3 +24,13 @@ export const INSUFFICIENT_PAYOUT_MESSAGE =
 
 /** Hizmet veren kazancının bekleyen → kullanılabilir süresi (K-007). */
 export const PENDING_EARNING_WAIT_MS = 24 * 60 * 60 * 1000;
+
+/** Prod’da her zaman 24 sa. Demo’da `WALLET_PENDING_WAIT_MS` saniye cinsinden kısaltabilir. */
+export function pendingEarningWaitMs(): number {
+  if (process.env.NODE_ENV === "production") return PENDING_EARNING_WAIT_MS;
+  const raw = process.env.WALLET_PENDING_WAIT_MS?.trim();
+  if (!raw) return PENDING_EARNING_WAIT_MS;
+  const sec = Number(raw);
+  if (!Number.isFinite(sec) || sec < 1) return PENDING_EARNING_WAIT_MS;
+  return Math.round(sec) * 1000;
+}
