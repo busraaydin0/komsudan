@@ -25,6 +25,7 @@ import { photosForOrder } from "@/lib/services/photoService";
 import { parseAllocations } from "@/lib/db/providerCapacity";
 import { releaseOrderCapacity } from "@/lib/services/capacityService";
 import { authorizePayment, voidPayment } from "@/lib/services/paymentService";
+import { adjustHoldForOrder } from "@/lib/services/walletService";
 
 function normalizeAddons(raw: OrderAddonLine[]) {
   return raw.filter((a) => a.qty > 0);
@@ -103,6 +104,9 @@ export function confirmPickupAtDoor(
         commission: quote.commission,
         at: now,
       });
+    }
+    if (row.user_id) {
+      adjustHoldForOrder(row.user_id, orderId, quote.total, now);
     }
   });
 

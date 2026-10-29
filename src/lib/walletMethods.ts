@@ -21,3 +21,6 @@ export type PayoutMethodId = (typeof PAYOUT_METHODS)[number]["id"];
 
 export const INSUFFICIENT_PAYOUT_MESSAGE =
   "Çekim alınmadı. Bakiyen yetersiz; ya tüm çekilebilir tutarı çek ya da daha az yaz.";
+
+/** Hizmet veren kazancının bekleyen → kullanılabilir süresi (K-007). */
+export const PENDING_EARNING_WAIT_MS = 24 * 60 * 60 * 1000;

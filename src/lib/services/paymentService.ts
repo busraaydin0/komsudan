@@ -6,11 +6,12 @@ import {
   getPaymentByReference,
   insertPayment,
   listPaymentsByOrderIds,
+  updatePaymentAmounts,
   updatePaymentStatus,
   type PaymentRow,
 } from "@/lib/db/payments";
 import { getOrderRow } from "@/lib/db/orders";
-import { creditOnCapture, releaseHold } from "@/lib/services/walletService";
+import { captureHold, creditOnCapture, releaseHold } from "@/lib/services/walletService";
 
 export type { AppPayment };
 
@@ -52,8 +53,13 @@ export function authorizePayment(input: {
   commission: number;
   at: string;
 }) {
-  if (getPaymentByOrderId(input.orderId)) {
-    throw new ApiError(409, "Bu siparişte ödeme zaten var.", "PAYMENT_EXISTS");
+  const existing = getPaymentByOrderId(input.orderId);
+  if (existing) {
+    if (existing.status !== "authorized") {
+      throw new ApiError(409, "Bu siparişte ödeme zaten var.", "PAYMENT_EXISTS");
+    }
+    updatePaymentAmounts(input.orderId, input.amount, input.commission, input.at);
+    return paymentForOrder(input.orderId)!;
   }
   return toPublic(
     insertPayment({
@@ -77,8 +83,9 @@ export function capturePayment(orderId: string, at: string) {
   updatePaymentStatus(orderId, "captured", at);
   const order = getOrderRow(orderId);
   if (order) {
+    if (order.user_id) captureHold(order.user_id, orderId, row.amount, at);
     const net = Math.max(0, row.amount - row.commission);
-    creditOnCapture(order.provider_id, orderId, net);
+    creditOnCapture(order.provider_id, orderId, net, at);
   }
   return paymentForOrder(orderId)!;
 }
@@ -92,7 +99,7 @@ export function voidPayment(orderId: string, at: string) {
   }
   updatePaymentStatus(orderId, "voided", at);
   const order = getOrderRow(orderId);
-  if (order?.user_id) releaseHold(order.user_id, orderId, row.amount);
+  if (order?.user_id) releaseHold(order.user_id, orderId, row.amount, at);
   return paymentForOrder(orderId)!;
 }
 

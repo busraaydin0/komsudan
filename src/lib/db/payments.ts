@@ -66,3 +66,13 @@ export function updatePaymentStatus(orderId: string, status: string, at: string)
     .run(status, at, orderId);
   return result.changes;
 }
+
+export function updatePaymentAmounts(orderId: string, amount: number, commission: number, at: string) {
+  const result = db()
+    .prepare(
+      `UPDATE payments SET amount = ?, commission = ?, updated_at = ?
+       WHERE order_id = ? AND status = 'authorized'`,
+    )
+    .run(amount, commission, at, orderId);
+  return result.changes;
+}

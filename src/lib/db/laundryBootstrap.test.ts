@@ -22,6 +22,7 @@ describe("çamaşır DB ayağa kalkışı", () => {
       "0001_schema.sql",
       "0002_larger_order_sizes.sql",
       "0003_laundry_legacy_category_cleanup.sql",
+      "0004_wallet_tiers.sql",
     ]);
 
     const providers = d.prepare("SELECT id FROM providers ORDER BY id").all() as { id: string }[];

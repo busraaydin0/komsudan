@@ -195,6 +195,10 @@ export type AppNotification = {
 
 export type WalletSnapshot = {
   balance: number;
+  reserved?: number;
+  pending?: number;
+  total?: number;
+  nextReleaseAt?: string | null;
   canPay: 0 | 1;
   canWithdraw?: 0 | 1;
   methods: { id: string; label: string; hint: string }[];

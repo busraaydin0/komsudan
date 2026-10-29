@@ -62,7 +62,7 @@ Kaynak: MVP Tanım Dokümanı v0.3 ve Karar Kaydı v0.3 (`docs/kaynak/`). Çeli�
 5. Bekleme süresi sonunda **kullanılabilir** olur; yeni siparişte kullanılır ya da çekim talebi açılır.
 - Tek hesap, tek cüzdan (hem müşteri hem hizmet veren).
 - Komisyon tabanı müşterinin ödediği toplam (acil ücreti dahil); teslim kodunda alınır, iptal/redde alınmaz (BR-033).
-- **ÖNERİ:** bekleme 24 sa; yüklemede minimum yok; çekim haftalık admin onaylı; "kartla öde → yükle ve rezerve al" birleşik görünüm.
+- Bekleme **24 sa (ONAYLI)**. **ÖNERİ:** yüklemede minimum yok; çekim haftalık admin onaylı; "kartla öde → yükle ve rezerve al" birleşik görünüm.
 - Gerçek fon tutma lisans gerektirir (R-013/Q-009): projede simüle, raporda "gelecek çalışma".
 
 ## 7. Acil teslim (ONAYLI)

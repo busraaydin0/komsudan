@@ -26,14 +26,15 @@ Cevap zarfı: `{ "data": … }` veya `{ "error": { "code", "message" } }`.
 
 ## Veri modeli (özet)
 
-Migration zinciri: `db/migrations/0001_….sql` (şema), `0002` (kapasite düzeltmesi), `0003` (eski çok-kategori tablo/kayıt temizliği). İlk açılışta migrate + seed (`src/lib/db/seed.ts`, `seedCatalogData.ts`).
+Migration zinciri: `db/migrations/0001_….sql` (şema), `0002` (kapasite düzeltmesi), `0003` (eski çok-kategori tablo/kayıt temizliği), `0004` (cüzdan kademeleri). İlk açılışta migrate + seed (`src/lib/db/seed.ts`, `seedCatalogData.ts`).
 
 - **users** — telefon, rol, onboarding, tercihler (`preferred_category_ids` pilot için `["camasir"]`).
 - **providers** — `id` + JSON `payload` (liste kartı); **provider_profiles**, **service_packages**, **provider_prices**, **provider_addon_prices**, kapasite günleri.
 - **orders** — durum, boy, makine birimi, fiyat, ödeme durumu, handoff alanları.
 - **order_items** — boy + ek satırları.
 - **appointments** — alım/teslim pencereleri.
-- **payments**, **wallets**, **wallet_ledger** — simüle authorize/capture + bakiye tutanağı.
+- **payments**, **wallets**, **wallet_ledger**, **wallet_pending_earnings** — simüle authorize/capture + kademeli bakiye.
+  `wallets.balance` kullanılabilir, `reserved` sipariş rezervi, `pending` teslim sonrası bekleyen kazanç. Hold: balance→reserved; iptal: reserved→balance; teslimde müşteri reserved düşer, hizmet veren `pending` + net (%10 komisyon düşülmüş). 24 saat sonra `pending`→`balance` (`wallet_pending_earnings.available_at`). Her hareket `wallet_ledger`.
 - **reviews**, **disputes**, **messages**, **notifications**, **order_photos**.
 
 SQLite: WAL, `foreign_keys=ON`, migrate/seed yalnızca process ilk açılışında.
