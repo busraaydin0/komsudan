@@ -1,0 +1,47 @@
+---
+description: Komşudan v0.3 ürün ilkesi, kapsam ve çalışma disiplini (her oturumda geçerli)
+alwaysApply: true
+---
+
+# Komşudan – Ürün ve Çalışma Kuralları (v0.3)
+
+Bu bir bitirme projesidir. Jüri sorusuna dayanmalı, basit ve test edilebilir kalmalı.
+
+## Kaynak ve öncelik
+- Ürün kuralları: `docs/URUN_REFERANS_v0.3.md`. Orijinal dokümanlar: `docs/kaynak/`.
+- Çakışmada sıra: **ONAYLI karar > URUN_REFERANS_v0.3 > eski `.cursor/rules/*`**.
+  Eski kurallar (`siparis-state-machine`, `backend-hedef`, `backend-yol-haritasi`, `genisleme`) v0.3 ile çelişirse v0.3 geçerlidir; çelişkiyi sessizce uygulama, kullanıcıya bildir.
+- Etiketi **ÖNERİ** olan maddeler onay gelmeden **uygulanmaz**.
+- Günlük: `docs/PROJE_GUNLUGU.md`. Her adım sonunda yeni kayıt en üste eklenir (tarih, yapılan, karar, açık soru, sonraki adım).
+
+## Ürün ilkesi
+- Müşteri tarafı sade: yalnızca **paket + boy + ekler**. Karmaşıklık kapıda (hizmet veren) ve sistemde çözülür.
+- Kg, tartım, parça puanı, renk dağılımı müşteriye sorulmaz.
+- Sistem hizmet vereni **atamaz**; müşteri seçer.
+- Teslim **gününü sistem** hesaplar, saat penceresini müşteri seçer.
+
+## Kapsam
+- Yalnızca **çamaşır**. Diğer kategoriler `chore/laundry-only` dalında koddan kaldırıldı; geri getirme.
+- Çalışma dalı: `chore/laundry-only`. Çamaşır paketleri: `yikama`, `katlama`, `tam`.
+- Durum adları kodda İngilizce; spec adlarıyla eşleme `docs/URUN_REFERANS_v0.3.md` §3'te. **Yeniden adlandırma yapma**, yeni durum ekleme.
+- MVP dışı: gel al noktası, QR/torba, tartım, sadakat, gerçek ödeme, halı/kuru temizleme, home-visit.
+
+## Çalışma disiplini
+- **Tek seferde tek adım.** Verilen adımın kapsamı dışına çıkma, faz atlama, "bu arada şunu da düzelteyim" yapma.
+- Adım bitince: ne değişti (dosya listesi), `npm test` ve `npm run lint` sonucu, açık kalan soru. Sonra dur ve onay bekle.
+- Emin olmadığın iş kuralında tahmin etme; sor.
+- Push etme. Commit mesajı Türkçe, **neden** odaklı.
+- Migration: yeni numaralı dosya (`0003_...`; mevcut: `0001_schema`, `0002_larger_order_sizes`). Var olan migration'ı **düzenleme**.
+- `docs/mimari.md` kodla uyumlu referanstır; mimari değişince güncelle.
+
+## Teknik kurallar
+- Next.js kod yazmadan önce `node_modules/next/dist/docs/` içinden ilgili kılavuzu oku (AGENTS.md).
+- Katmanlar: route (HTTP/auth/zod) → `src/lib/services/` (iş kuralı) → `src/lib/db/` (SQL). Route'ta SQL ve iş kuralı yok.
+- Fiyat, durum, kod, kapasite, tarih **client'tan alınmaz**; sunucuda hesaplanır.
+- Durum geçişi yalnızca state machine + rol ile; geçersiz geçiş `INVALID_TRANSITION`.
+- Alım/teslim kodu: tek kullanımlık, deneme limitli, teslim kodu yalnız `RETURNING`'de aktif.
+- Para: mevcut sayısal birimi koru, her bakiye hareketi `wallet_ledger`'a yazılır, sessiz değişiklik yok.
+- Cevap zarfı: `{ "data": {} }` veya `{ "error": { "code", "message" } }`.
+- Her iş kuralı (kapasite, teslim tarihi, rezerv, komisyon, durum geçişi, otomatik red) için **Vitest testi** yaz.
+- `data/*.db`, `data/uploads/`, `.env` asla commit edilmez.
+- Arayüz Türkçe.
