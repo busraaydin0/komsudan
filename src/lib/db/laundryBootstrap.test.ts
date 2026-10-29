@@ -18,7 +18,11 @@ describe("çamaşır DB ayağa kalkışı", () => {
     const migrations = d
       .prepare("SELECT id FROM schema_migrations ORDER BY id")
       .all() as { id: string }[];
-    expect(migrations.map((r) => r.id)).toEqual(["0001_schema.sql", "0002_larger_order_sizes.sql"]);
+    expect(migrations.map((r) => r.id)).toEqual([
+      "0001_schema.sql",
+      "0002_larger_order_sizes.sql",
+      "0003_laundry_legacy_category_cleanup.sql",
+    ]);
 
     const providers = d.prepare("SELECT id FROM providers ORDER BY id").all() as { id: string }[];
     expect(providers.map((p) => p.id)).toEqual([
