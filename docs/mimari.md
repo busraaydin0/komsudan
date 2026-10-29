@@ -26,7 +26,7 @@ Cevap zarfı: `{ "data": … }` veya `{ "error": { "code", "message" } }`.
 
 ## Veri modeli (özet)
 
-Tek migration: `db/migrations/0001_schema.sql`. İlk açılışta migrate + seed (`src/lib/db/seed.ts`, `seedCatalogData.ts`).
+Migration zinciri: `db/migrations/0001_….sql` (şema), `0002` (kapasite düzeltmesi), `0003` (eski çok-kategori tablo/kayıt temizliği). İlk açılışta migrate + seed (`src/lib/db/seed.ts`, `seedCatalogData.ts`).
 
 - **users** — telefon, rol, onboarding, tercihler (`preferred_category_ids` pilot için `["camasir"]`).
 - **providers** — `id` + JSON `payload` (liste kartı); **provider_profiles**, **service_packages**, **provider_prices**, **provider_addon_prices**, kapasite günleri.
@@ -42,7 +42,11 @@ SQLite: WAL, `foreign_keys=ON`, migrate/seed yalnızca process ilk açılışın
 
 Kaynak: `src/lib/status.ts`, geçişler `canTransition` + `src/lib/services/orderService.ts` (`applyStatus`).
 
-Durumlar (İngilizce id, UI Türkçe): `pending` → `accepted` → `dropped_off` / `washing` → `ironing` → `ready` → `completed`; terminal: `rejected`, `cancelled`, `disputed`, `admin_pending`.
+Durumlar (İngilizce id, UI Türkçe; spec eşlemesi `docs/URUN_REFERANS_v0.3.md` §3): `pending` → `accepted` → `dropped_off` (PICKUP) → `washing` → `ironing` → `ready` → `completed`; yan: `rejected`, `cancelled`, `disputed`.
+
+`ready` hem READY hem RETURNING’dir; teslim kodu bu aşamada aktif.
+
+`admin_pending`: kodsuz teslim için ek durum, yeni yaşam döngüsü değil, terminal değil (`ready` → `admin_pending` → `completed` | `disputed`; süper admin kararına kadar bekleme).
 
 Paket `tam` için ütü adımı (`ironing`) takip çizgisinde görünür.
 

@@ -6,6 +6,14 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-10-29 – Adım 1c: Eski kategori temizliği ve doküman hizalama
+- Migration 0003_laundry_legacy_category_cleanup: çamaşır dışı tablo ve kayıtlar KALICI silinir (service_categories, drop_points, ürün/hizmet kartları, çamaşır dışı sipariş ve bağlı mesaj/ödeme/review). Eski veritabanı yedeklenmeden çalıştırılmamalı.
+- legacyCategoryCleanup.test.ts ve laundryBootstrap.test.ts güncellendi: 28 dosya, 86 test geçti.
+- Lint: 0 hata, 2 uyarı (CustomerApp.tsx:129 `home`, MapCanvas.tsx:129 `mode`) → Adım 6 temizlik.
+- .gitignore: /data/ eklendi. mimari.md durum eşlemesi URUN_REFERANS §3 ile hizalandı.
+- Adım 1 KAPANDI. Sonraki: Adım 2 (cüzdan kademeleri).
+- Açık: teslim/sunum tarihi.
+
 ## 2026-10-29 – Adım 1 / 1b: Dokümanlar repoya alındı, eski kurallar hizalandı
 - daf14ed push edildi (ürün referansı, günlük, Cursor kuralı).
 - Eski .cursor kuralları v0.3 ile hizalandı (gel al, kg/tartım, iyzico, push kuralı).
