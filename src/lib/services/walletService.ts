@@ -111,15 +111,13 @@ export function holdForOrder(userId: string, orderId: string, amount: number, at
   const when = nowIso(at);
   ensureWalletRow(userId, when);
   releaseMaturedEarnings(userId, when);
-  const ok = db().transaction(() => {
+  db().transaction(() => {
     const gate = holdFromBalance(userId, amount, when);
-    if (gate === 0) return false;
+    if (gate === 0) {
+      throw new ApiError(402, INSUFFICIENT_BALANCE_MESSAGE, "INSUFFICIENT_BALANCE");
+    }
     insertLedger({ userId, amount: -amount, kind: "hold", orderId, at: when });
-    return true;
   })();
-  if (!ok) {
-    throw new ApiError(402, INSUFFICIENT_BALANCE_MESSAGE, "INSUFFICIENT_BALANCE");
-  }
 }
 
 export function releaseHold(userId: string, orderId: string, amount: number, at?: string) {
@@ -136,19 +134,36 @@ export function releaseHold(userId: string, orderId: string, amount: number, at?
   })();
 }
 
-/** Teslimde müşteri rezervi harcanır; bakiyeye dönmez. */
-export function captureHold(userId: string, orderId: string, amount: number, at?: string) {
-  if (amount <= 0) return;
-  if (hasCaptureForOrder(orderId)) return;
+/**
+ * Teslimde müşteri rezervi harcanır; bakiyeye dönmez.
+ * Hold yoksa 0 (kart/simüle — rezerv oynatılmaz).
+ * Hold varken remaining !== amount ise hata: kısmi tahsil sessizce geçilmez.
+ */
+export function captureHold(userId: string, orderId: string, amount: number, at?: string): number {
+  if (amount <= 0) return 0;
+  if (hasCaptureForOrder(orderId)) return amount;
+  if (!hasHoldForOrder(orderId)) return 0;
   const when = nowIso(at);
   ensureWalletRow(userId, when);
   const remaining = remainingReservedForOrder(orderId);
-  const take = Math.min(amount, remaining);
-  if (take <= 0) return;
+  if (remaining !== amount) {
+    throw new ApiError(
+      409,
+      "Rezerv tutarı ödeme ile uyuşmuyor. Tahsil edilmedi.",
+      "HOLD_CAPTURE_MISMATCH",
+    );
+  }
   db().transaction(() => {
-    if (consumeReserved(userId, take, when) === 0) return;
-    insertLedger({ userId, amount: -take, kind: "capture", orderId, at: when });
+    if (consumeReserved(userId, amount, when) === 0) {
+      throw new ApiError(
+        409,
+        "Rezerv tutarı ödeme ile uyuşmuyor. Tahsil edilmedi.",
+        "HOLD_CAPTURE_MISMATCH",
+      );
+    }
+    insertLedger({ userId, amount: -amount, kind: "capture", orderId, at: when });
   })();
+  return amount;
 }
 
 /** Kapıda tutar değişince rezervi yeni tutara çek. Eksikte INSUFFICIENT_BALANCE. */

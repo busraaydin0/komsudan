@@ -10,8 +10,15 @@ import {
   updatePaymentStatus,
   type PaymentRow,
 } from "@/lib/db/payments";
+import { db } from "@/lib/db/client";
 import { getOrderRow } from "@/lib/db/orders";
-import { captureHold, creditOnCapture, releaseHold } from "@/lib/services/walletService";
+import { hasHoldForOrder } from "@/lib/db/wallets";
+import {
+  adjustHoldForOrder,
+  captureHold,
+  creditOnCapture,
+  releaseHold,
+} from "@/lib/services/walletService";
 
 export type { AppPayment };
 
@@ -73,6 +80,21 @@ export function authorizePayment(input: {
   );
 }
 
+/** Ödeme tutarı ve cüzdan rezervi aynı transaction'da; INSUFFICIENT_BALANCE ödeme tutarını geri alır. */
+export function authorizePaymentAndHold(input: {
+  orderId: string;
+  amount: number;
+  commission: number;
+  at: string;
+  userId?: string | null;
+}) {
+  return db().transaction(() => {
+    const payment = authorizePayment(input);
+    if (input.userId) adjustHoldForOrder(input.userId, input.orderId, input.amount, input.at);
+    return payment;
+  })();
+}
+
 export function capturePayment(orderId: string, at: string) {
   const row = getPaymentByOrderId(orderId);
   if (!row) throw new ApiError(409, "Ödeme kaydı yok.", "PAYMENT_MISSING");
@@ -80,14 +102,21 @@ export function capturePayment(orderId: string, at: string) {
   if (row.status !== "authorized") {
     throw new ApiError(409, "Bu ödeme tahsil edilemez.", "PAYMENT_STATE");
   }
-  updatePaymentStatus(orderId, "captured", at);
-  const order = getOrderRow(orderId);
-  if (order) {
-    if (order.user_id) captureHold(order.user_id, orderId, row.amount, at);
-    const net = Math.max(0, row.amount - row.commission);
-    creditOnCapture(order.provider_id, orderId, net, at);
-  }
-  return paymentForOrder(orderId)!;
+  return db().transaction(() => {
+    const order = getOrderRow(orderId);
+    let collected = row.amount;
+    if (order?.user_id) {
+      const taken = captureHold(order.user_id, orderId, row.amount, at);
+      // Hold varken taken === amount (aksi halde captureHold atar). Hold yoksa kart/simüle: cüzdan düşmez.
+      if (hasHoldForOrder(orderId) && taken > 0) collected = taken;
+    }
+    // Gerekçe: kısmi tahsilde payment.amount ve komisyon yalan söylemesin diye
+    // hold varken remaining !== amount hata. Hold yoksa kazanç payment.amount - commission.
+    const net = Math.max(0, collected - row.commission);
+    updatePaymentStatus(orderId, "captured", at);
+    if (order) creditOnCapture(order.provider_id, orderId, net, at);
+    return paymentForOrder(orderId)!;
+  })();
 }
 
 export function voidPayment(orderId: string, at: string) {

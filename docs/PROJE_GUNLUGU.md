@@ -6,6 +6,11 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-10-30 – Adım 2c: Para tutarlılığı
+- Kapıda `authorizePayment` + `adjustHoldForOrder` tek transaction (`authorizePaymentAndHold`). INSUFFICIENT_BALANCE ödeme tutarını eski haline döndürür.
+- Capture: hold varken reserved ≠ payment.amount ise `HOLD_CAPTURE_MISMATCH` (kısmi tahsil yok). Kazanç `payment.amount - commission`.
+- Bilinen sınırlar: cüzdan hold'u olmayan (kart/simüle) siparişlerde cüzdan düşümü yok; eski DB'de capture ledger'ı olmayan tamamlanmış siparişler reserved'e dokunmaz.
+
 ## 2026-10-29 – Adım 2: Cüzdan kademeleri
 - Kullanılabilir (`balance`) / rezerv (`reserved`) / bekleyen (`pending`). Teslimde net kazanç bekleyene yazılır, 24 sa sonra kullanılabilir.
 - **K-007 (ONAYLI):** bekleme 24 sa. Sabit: `PENDING_EARNING_WAIT_MS` (`src/lib/walletMethods.ts`).
