@@ -13,6 +13,7 @@ describe("createOrderSchema", () => {
       total: 999,
     });
     expect(parsed.size).toBe("orta");
+    expect(parsed.express).toBe(false);
     expect("total" in parsed).toBe(false);
   });
 

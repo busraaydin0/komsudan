@@ -49,7 +49,7 @@ describe("Boy + ek fiyat", () => {
     expect(q.machineUnits).toBe(4 + 2 * 2);
   });
 
-  it("aynı gün express +%25", () => {
+  it("acil quote ×1.4 ve komisyon o toplamdan", () => {
     const base = quoteLaundry({
       packageId: "katlama",
       size: "kucuk",
@@ -66,13 +66,24 @@ describe("Boy + ek fiyat", () => {
       sizePrice: 100,
       addonUnitPrices: {},
     });
-    expect(express.total).toBeGreaterThan(base.total);
+    expect(base.total).toBe(100);
+    expect(express.total).toBe(140);
+    expect(express.commission).toBe(Math.round(140 * COMMISSION));
   });
 
-  it("aynı gün alım express", () => {
+  it("express=false iken bugün alım olsa da zam yok", () => {
     const now = new Date("2026-10-08T12:00:00+03:00");
     expect(isSameDayPickup("2026-10-08", now)).toBe(true);
-    expect(resolveExpress(true, "2026-10-09", now)).toBe(false);
-    expect(resolveExpress(true, "2026-10-08", now)).toBe(true);
+    expect(resolveExpress(false)).toBe(false);
+    expect(resolveExpress(true)).toBe(true);
+    const q = quoteLaundry({
+      packageId: "katlama",
+      size: "kucuk",
+      addons: [],
+      express: false,
+      sizePrice: 100,
+      addonUnitPrices: {},
+    });
+    expect(q.total).toBe(100);
   });
 });

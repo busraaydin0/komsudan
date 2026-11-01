@@ -118,4 +118,40 @@ describe("computeSchedule", () => {
     );
     expect(r).toBeNull();
   });
+
+  it("acil +24 sa; paket ve yorgan ezilir, güne yayılmaz", () => {
+    const now = new Date("2026-10-08T10:00:00+03:00");
+    const r = computeSchedule(
+      settings,
+      emptyUsage("2026-10-08", 14),
+      {
+        packageId: "tam",
+        machineUnits: 2,
+        hasHeavyAddon: true,
+        pickupDate: "2026-10-08",
+        express: true,
+        pickupWindowStart: "10:00",
+      },
+      now,
+    );
+    expect(r!.deliveryDate).toBe("2026-10-09");
+    expect(r!.allocations).toEqual([{ date: "2026-10-08", units: 2 }]);
+
+    const full = emptyUsage("2026-10-08", 14);
+    full[0]!.usedUnits = 3;
+    const noFit = computeSchedule(
+      settings,
+      full,
+      {
+        packageId: "katlama",
+        machineUnits: 2,
+        hasHeavyAddon: false,
+        pickupDate: "2026-10-08",
+        express: true,
+        pickupWindowStart: "10:00",
+      },
+      now,
+    );
+    expect(noFit).toBeNull();
+  });
 });

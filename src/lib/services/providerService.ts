@@ -170,6 +170,7 @@ export function patchMyProfile(
         name: meta.title,
         price_per_kg: pack.pricePerPiece,
         min_order_amount: 0,
+        // Fiyat katalog express + EXPRESS_BUMP; bu alanlar fiyatı etkilemez (K-008).
         express_available: express ? 1 : 0,
         express_surcharge_pct: express ? EXPRESS_BUMP : 0,
         is_active: 1,
@@ -349,7 +350,7 @@ export function ensureLaundryOffer(
       name: meta.title,
       price_per_kg: pack.pricePerPiece,
       min_order_amount: 0,
-      express_available: 0,
+      express_available: 0, // fiyatı etkilemez (K-008)
       express_surcharge_pct: 0,
       is_active: 1,
     });

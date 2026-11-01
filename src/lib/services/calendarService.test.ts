@@ -30,4 +30,13 @@ describe("provider calendar", () => {
     expect(tooSoon?.selectable).toBe(false);
     expect(ok?.selectable).toBe(true);
   });
+
+  it("acil bugün penceresi ≥1 saat eşiği", () => {
+    const now = new Date("2026-10-07T11:00:00+03:00");
+    const windows = buildProviderCalendar("elif", now, true).filter((w) => w.date === "2026-10-07");
+    const oneHour = windows.find((w) => w.start === "12:00");
+    const later = windows.find((w) => w.start === "14:00");
+    expect(oneHour?.selectable).toBe(true);
+    expect(later?.selectable).toBe(true);
+  });
 });

@@ -6,6 +6,10 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-01 – Adım 3a: Acil teslim (fiyat, 24 sa, 15 dk, liste, ≥1 sa)
+- **K-008:** müşteri anahtarı; zam yalnız `express=true` (`EXPRESS_BUMP=0.40`); 24 sa = alım başlangıcı+24 sa (paket/yorgan ezilir); `respond_by` 15 dk; takvim `?express=1` (≥1 sa); BR-021 katalog `express` + bugünün kalan birimi; acilsiz aynı gün ≥2 sa kalır; `delayOrder` acilde hata.
+- Migration yok. 3b (kontenjan, 18:00, iade+risk) ve ÖNERİ 30 dk red uygulanmadı.
+
 ## 2026-10-30 – Adım 2c: Para tutarlılığı
 - Kapıda `authorizePayment` + `adjustHoldForOrder` tek transaction (`authorizePaymentAndHold`). INSUFFICIENT_BALANCE ödeme tutarını eski haline döndürür.
 - Capture: hold varken reserved ≠ payment.amount ise `HOLD_CAPTURE_MISMATCH` (kısmi tahsil yok). Kazanç `payment.amount - commission`.

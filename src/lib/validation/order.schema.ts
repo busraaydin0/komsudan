@@ -24,6 +24,7 @@ export const createOrderSchema = z.object({
     windowEnd: z.string().regex(/^\d{2}:\d{2}$/),
   }),
   note: z.string().max(500).optional().default(""),
+  express: z.boolean().optional().default(false),
 });
 
 export const patchOrderSchema = z.object({

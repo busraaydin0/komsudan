@@ -23,7 +23,17 @@ export type ScheduleOrderLine = {
   machineUnits: number;
   hasHeavyAddon: boolean;
   pickupDate: string;
+  express?: boolean;
+  pickupWindowStart?: string;
 };
+
+export const EXPRESS_HOURS = 24;
+
+/** Acil teslim günü: alım penceresi başlangıcı + 24 sa (K-008). */
+export function expressDeliveryDate(pickupDate: string, windowStart = "12:00"): string {
+  const start = new Date(`${pickupDate}T${windowStart}:00+03:00`);
+  return isoDateInIstanbul(new Date(start.getTime() + EXPRESS_HOURS * 3_600_000));
+}
 
 export type ScheduleAllocation = { date: string; units: number };
 
@@ -79,6 +89,20 @@ export function computeSchedule(
   void _now;
   if (line.machineUnits < 1) return null;
   if (line.machineUnits > settings.maxUnitsPerOrder) return null;
+
+  if (line.express) {
+    const pickupDate = line.pickupDate;
+    const day = usageFor(daysUsage, pickupDate, settings);
+    const free = Math.max(0, day.maxUnits - day.usedUnits);
+    if (line.machineUnits > free) return null;
+    const deliveryDate = expressDeliveryDate(pickupDate, line.pickupWindowStart);
+    return {
+      pickupDate,
+      washDates: [pickupDate],
+      deliveryDate,
+      allocations: [{ date: pickupDate, units: line.machineUnits }],
+    };
+  }
 
   const pickupDate = nextWorkingOnOrAfter(line.pickupDate, settings.workingDays);
 

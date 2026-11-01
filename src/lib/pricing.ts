@@ -3,15 +3,15 @@ import { addonKey, machineUnitsFor, type LaundrySize, type OrderAddonLine } from
 import type { PackageId } from "./types";
 
 export const COMMISSION = 0.1;
-export const EXPRESS_BUMP = 0.25;
+export const EXPRESS_BUMP = 0.4;
 
-/** Aynı gün alım: express zamı (+25%). */
 export function isSameDayPickup(pickupDate: string, now = new Date()) {
   return pickupDate === isoDateInIstanbul(now);
 }
 
-export function resolveExpress(providerOffersExpress: boolean, pickupDate: string, now = new Date()) {
-  return Boolean(providerOffersExpress && isSameDayPickup(pickupDate, now));
+/** Zam yalnız sipariş `express=true` iken. Aynı gün otomatik zam yok (K-008). */
+export function resolveExpress(requested: boolean) {
+  return Boolean(requested);
 }
 
 export type LaundryQuote = {

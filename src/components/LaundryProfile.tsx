@@ -195,7 +195,7 @@ export function LaundryProfile({
             express ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
           }`}
         >
-          Aynı gün
+          Acil teslim
         </button>
         <span className="k-chip rounded-full px-3 py-1.5 text-sm ring-1 bg-[var(--teal)] text-white ring-[var(--teal)]">
           Kapı teslim

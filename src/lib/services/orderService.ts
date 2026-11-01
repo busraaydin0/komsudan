@@ -8,12 +8,13 @@ import {
 import {
   assertCanServeOrder,
   planOrder,
+  remainingUnitsOnDate,
   releaseOrderCapacity,
   reserveOrderCapacity,
   scheduleLine,
 } from "@/lib/services/capacityService";
 import { parseAllocations } from "@/lib/db/providerCapacity";
-import { addonKey, type LaundrySize, type OrderAddonLine } from "@/lib/laundryModel";
+import { addonKey, machineUnitsFor, type LaundrySize, type OrderAddonLine } from "@/lib/laundryModel";
 import { assertReadyForDroppedOff } from "@/lib/pickupRules";
 import {
   addonsFromItems,
@@ -21,12 +22,12 @@ import {
   listOrderItems,
 } from "@/lib/db/orderItems";
 import { ensureProviderPriceGrid, getAddonPrice } from "@/lib/db/providerPrices";
-import { resolveExpress } from "@/lib/pricing";
 import { quoteForProviderOrder } from "@/lib/pricingServer";
 import { getAppointment, insertAppointment, listAppointmentsForOrder } from "@/lib/db/appointments";
 import { listSlots } from "@/lib/db/providers";
 import { computeRespondBy } from "@/lib/scheduling/respondBy";
-import { windowLabel } from "@/lib/scheduling/windows";
+import { pickupInstantIso, windowLabel } from "@/lib/scheduling/windows";
+import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
 import { assertCalendarWindow } from "@/lib/services/calendarService";
 import { laundryDeliveryStrategy } from "@/lib/fulfillment";
 import {
@@ -232,11 +233,16 @@ function validateDrop(provider: NonNullable<ReturnType<typeof getProvider>>, inp
   }
 }
 
-function validateWindows(providerId: string, input: CreateOrderInput, minDeliveryDate: string) {
+function validateWindows(
+  providerId: string,
+  input: CreateOrderInput,
+  minDeliveryDate: string,
+  express = false,
+) {
   const now = new Date();
   try {
-    assertCalendarWindow(providerId, input.pickup, now);
-    assertCalendarWindow(providerId, input.delivery, now);
+    assertCalendarWindow(providerId, input.pickup, now, express);
+    assertCalendarWindow(providerId, input.delivery, now, express);
   } catch {
     throw new ApiError(400, "Seçilen pencere müsait değil.", "VALIDATION_ERROR");
   }
@@ -359,12 +365,32 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
   validateDrop(provider, input);
   ensureProviderPriceGrid(provider.id);
   const addons = normalizeAddons(input.addons);
-  const express = resolveExpress(provider.express, input.pickup.date);
+  const express = Boolean(input.express);
+  const now = new Date();
+  const units = machineUnitsFor(input.size, addons);
+  if (express) {
+    if (!provider.express) {
+      throw new ApiError(400, "Bu hizmet veren acil teslim sunmuyor.", "EXPRESS_NOT_OFFERED");
+    }
+    if (input.pickup.date !== isoDateInIstanbul(now)) {
+      throw new ApiError(400, "Acil teslim yalnız bugün alım için seçilebilir.", "EXPRESS_NOT_TODAY");
+    }
+    const start = pickupInstantIso(input.pickup.date, input.pickup.windowStart);
+    if (start.getTime() < now.getTime() + 60 * 60 * 1000) {
+      throw new ApiError(400, "Acil alım için pencere başlangıcına en az 1 saat kalmalı.", "EXPRESS_LEAD_TIME");
+    }
+    const free = remainingUnitsOnDate(provider.id, input.pickup.date);
+    if (units > free) {
+      throw new ApiError(409, "Bugünün kalan kapasitesi bu acil sipariş için yetmiyor.", "CAPACITY");
+    }
+  }
   const line = scheduleLine({
     packageId: input.packageId,
     machineUnits: 0,
     addons,
     pickupDate: input.pickup.date,
+    express,
+    pickupWindowStart: input.pickup.windowStart,
   });
   const quotePreview = quoteForProviderOrder(
     provider.id,
@@ -378,12 +404,12 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
   if (!plan) {
     throw new ApiError(409, "Bu tarihlerde kapasite uygun değil.", "CAPACITY");
   }
-  validateWindows(provider.id, input, plan.deliveryDate);
+  validateWindows(provider.id, input, plan.deliveryDate, express);
   const quote = quotePreview;
   assertCanServeOrder(provider.id, quote.machineUnits);
   const slot = windowLabel(input.pickup.date, input.pickup.windowStart, input.pickup.windowEnd);
-  const createdAt = new Date();
-  const respondBy = computeRespondBy(createdAt, listSlots(provider.id, true));
+  const createdAt = now;
+  const respondBy = computeRespondBy(createdAt, listSlots(provider.id, true), express);
 
   const id = insertPendingOrder({
     providerId: provider.id,
@@ -548,11 +574,14 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
     }
     const items = listOrderItems(id);
     const addons = addonsFromItems(items);
+    const pickupAppt = getAppointment(row.id, "pickup");
     const line = scheduleLine({
       packageId: row.package_id as PackageId,
       machineUnits: row.machine_units,
       addons,
-      pickupDate: getAppointment(row.id, "pickup")?.date ?? row.estimated_delivery_date ?? "",
+      pickupDate: pickupAppt?.date ?? row.estimated_delivery_date ?? "",
+      express: Boolean(row.express),
+      pickupWindowStart: pickupAppt?.window_start,
     });
     const now = new Date().toISOString();
     runOrderTx(() => {

@@ -2,7 +2,7 @@
 
 import type { LaundrySize, OrderAddonLine } from "@/lib/laundryModel";
 import { addonKey, resolveSizePrice } from "@/lib/laundryModel";
-import { quoteLaundry, resolveExpress, tl } from "@/lib/pricing";
+import { quoteLaundry, tl } from "@/lib/pricing";
 import type { CreateOrderInput, PackageId, Provider } from "@/lib/types";
 
 export const ZERO_QUOTE = {
@@ -55,6 +55,7 @@ export function quoteForProvider(
     addons: OrderAddonLine[];
     pkg: PackageId;
     pickupDate: string;
+    express?: boolean;
   },
 ) {
   if (!selected) return ZERO_QUOTE;
@@ -62,7 +63,8 @@ export function quoteForProvider(
   if (!grid) return ZERO_QUOTE;
   const sizePrice = resolveSizePrice(args.size, grid.sizes[args.pkg]);
   if (sizePrice == null) return ZERO_QUOTE;
-  const express = resolveExpress(selected.express, args.pickupDate);
+  void args.pickupDate;
+  const express = Boolean(args.express && selected.express);
   try {
     const addonUnitPrices: Record<string, number> = {};
     for (const a of args.addons) {
@@ -76,13 +78,19 @@ export function quoteForProvider(
       packageId: args.pkg,
       size: args.size,
       addons: args.addons,
-      express: express && selected.express,
+      express,
       sizePrice,
       addonUnitPrices,
     });
   } catch {
     return ZERO_QUOTE;
   }
+}
+
+export function canListForExpress(p: Provider, machineUnits: number): boolean {
+  if (!p.express) return false;
+  if (!p.capacity?.configured) return false;
+  return (p.capacity.todayFreeUnits ?? 0) >= machineUnits;
 }
 
 export function placeBlockReason(p: Provider, machineUnits?: number): string | null {
@@ -102,6 +110,7 @@ export function placeOrderInput(
     addons: OrderAddonLine[];
     pickup: import("@/lib/types").AppointmentWindow;
     delivery: import("@/lib/types").AppointmentWindow;
+    express?: boolean;
   },
 ): CreateOrderInput {
   return {
@@ -113,6 +122,7 @@ export function placeOrderInput(
     addons: args.addons,
     pickup: args.pickup,
     delivery: args.delivery,
+    express: Boolean(args.express),
   };
 }
 

@@ -53,6 +53,8 @@ export function scheduleLine(input: {
   machineUnits: number;
   addons: OrderAddonLine[];
   pickupDate: string;
+  express?: boolean;
+  pickupWindowStart?: string;
 }): ScheduleOrderLine {
   const hasHeavyAddon = input.addons.some((a) => a.qty > 0);
   return {
@@ -60,7 +62,18 @@ export function scheduleLine(input: {
     machineUnits: input.machineUnits,
     hasHeavyAddon,
     pickupDate: input.pickupDate,
+    express: input.express,
+    pickupWindowStart: input.pickupWindowStart,
   };
+}
+
+export function remainingUnitsOnDate(providerId: string, date: string): number {
+  const row = getCapacitySettings(providerId);
+  if (!row) return 0;
+  const settings = settingsFromRow(row);
+  const usage = loadDayUsage(providerId, date, 1, settings)[0];
+  if (!usage) return 0;
+  return Math.max(0, usage.maxUnits - usage.usedUnits);
 }
 
 export function planOrder(
@@ -162,6 +175,7 @@ function capacitySummaryFromSettings(
     earliestDeliveryLabel: probe ? formatDeliveryDayTr(probe.deliveryDate) : null,
     weekLoad: week.map((w) => ({ date: w.date, freeRatio: w.freeRatio, usedRatio: w.usedRatio })),
     weekTone: weekTone(freeRatios),
+    todayFreeUnits: Math.max(0, (usage7[0]?.maxUnits ?? 0) - (usage7[0]?.usedUnits ?? 0)),
   };
 }
 
@@ -183,6 +197,7 @@ export function capacitySummariesForProviders(
     earliestDeliveryLabel: null,
     weekLoad: [],
     weekTone: "full",
+    todayFreeUnits: 0,
   };
   for (const id of providerIds) {
     const row = settingsById.get(id);

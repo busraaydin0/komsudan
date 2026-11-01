@@ -20,6 +20,9 @@ export function delayOrder(user: AuthUser, orderId: string, reason: string, exte
   if (!isOrderStatus(row.status) || !canDelayStatus(row.status)) {
     throw new ApiError(409, "Bu aşamada erteleme yok.", "INVALID_TRANSITION");
   }
+  if (row.express) {
+    throw new ApiError(409, "Acil siparişte teslim ertelenemez.", "EXPRESS_NO_DELAY");
+  }
   const note = reason.trim();
   if (note.length < 3) {
     throw new ApiError(400, "Erteleme gerekçesi zorunlu.", "VALIDATION_ERROR");

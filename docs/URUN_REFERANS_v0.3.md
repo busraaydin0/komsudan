@@ -71,6 +71,12 @@ Kaynak: MVP Tanım Dokümanı v0.3 ve Karar Kaydı v0.3 (`docs/kaynak/`). Çeli�
 - Acil kontenjan: hizmet veren günlük kapasiteden ayırabilir (varsayılan 0); kullanılmayan, önceki gün 18:00'de normal kapasiteye döner (BR-025).
 - 24 saat kaçarsa acil ücret iade edilir, risk skoru etkilenir (BR-024).
 
+**K-008 (ONAYLI, Adım 3a):**
+- Müşteri sipariş ekranında "Acil teslim" anahtarı. Açıkken liste: katalog `express=true` ve bugünün kalan kapasitesi yeten verenler (BR-021 kaynağı katalog `express`).
+- `createOrderSchema.express`; sunucu doğrular: veren acil açık, alım bugün (İstanbul), pencere ≥1 sa, birimler bugüne sığar. Zam yalnız `express=true` siparişte (`EXPRESS_BUMP=0.40`); komisyon zamlı toplamdan %10. Paket `express_available` / `express_surcharge_pct` fiyatı etkilemez.
+- 24 sa = alım penceresi başlangıcı + 24 sa; paket 48/72 ve yorgan +24 ezilir, güne yayma yok. Acilsiz aynı gün alım kalır (≥2 sa). Acilde `respond_by` 15 dk (hatırlatma yarıda). `delayOrder` acilde yasak.
+- **3b bekliyor (ÖNERİ değil, henüz uygulanmadı):** acil kontenjan varsayılan 0, 18:00 dönüşü (BR-025), 24 sa kaçınca iade + risk (BR-024). ÖNERİ acil red 30 dk uygulanmaz.
+
 ## 8. Roller
 - Müşteri / Hizmet veren: tek hesap, çift rol.
 - **Süper Admin:** tüm alanlar, ödeme, payout.

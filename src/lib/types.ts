@@ -105,6 +105,7 @@ export type ProviderCapacitySummary = {
   earliestDeliveryLabel: string | null;
   weekLoad: { date: string; freeRatio: number; usedRatio: number }[];
   weekTone: "ok" | "low" | "full";
+  todayFreeUnits: number;
 };
 
 export type PaymentStatus = "authorized" | "captured" | "voided";
@@ -180,6 +181,7 @@ export type CreateOrderInput = {
   pickup: AppointmentWindow;
   delivery: AppointmentWindow;
   note: string;
+  express?: boolean;
 };
 
 export type AppNotification = {

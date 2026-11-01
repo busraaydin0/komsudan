@@ -15,12 +15,16 @@ export function AppointmentCalendar({
   providerId,
   title,
   minDate,
+  maxDate,
+  express,
   value,
   onPick,
 }: {
   providerId: string;
   title: string;
   minDate?: string;
+  maxDate?: string;
+  express?: boolean;
   value: AppointmentWindow | null;
   onPick: (w: AppointmentWindow) => void;
 }) {
@@ -31,7 +35,8 @@ export function AppointmentCalendar({
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/providers/${encodeURIComponent(providerId)}/calendar`);
+        const qs = express ? "?express=1" : "";
+        const res = await fetch(`/api/providers/${encodeURIComponent(providerId)}/calendar${qs}`);
         const data = (await res.json()) as { windows?: CalWindow[] };
         if (!cancelled) setWindows(data.windows ?? []);
       } finally {
@@ -41,9 +46,11 @@ export function AppointmentCalendar({
     return () => {
       cancelled = true;
     };
-  }, [providerId]);
+  }, [providerId, express]);
 
-  const days = [...new Set(windows.map((w) => w.date))].filter((d) => !minDate || d >= minDate);
+  const days = [...new Set(windows.map((w) => w.date))].filter(
+    (d) => (!minDate || d >= minDate) && (!maxDate || d <= maxDate),
+  );
 
   if (!ready) return <p className="text-xs text-[var(--muted)]">Takvim yükleniyor…</p>;
 

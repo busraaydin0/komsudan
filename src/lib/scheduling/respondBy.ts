@@ -3,6 +3,7 @@ import type { SlotRow } from "@/lib/db/providers";
 import { hmmToMinutes } from "@/lib/timeWindow";
 
 const RESPOND_MS = 45 * 60 * 1000;
+const EXPRESS_RESPOND_MS = 15 * 60 * 1000;
 
 function minutesNowIstanbul(now: Date): number {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -56,9 +57,10 @@ export function firstWorkingInstant(from: Date, slots: SlotRow[]): Date {
   return from;
 }
 
-export function computeRespondBy(createdAt: Date, slots: SlotRow[]): string {
+export function computeRespondBy(createdAt: Date, slots: SlotRow[], express = false): string {
   const start = firstWorkingInstant(createdAt, slots);
-  return new Date(start.getTime() + RESPOND_MS).toISOString();
+  const wait = express ? EXPRESS_RESPOND_MS : RESPOND_MS;
+  return new Date(start.getTime() + wait).toISOString();
 }
 
 export function respondReminderAt(createdAt: Date, respondByIso: string): string {

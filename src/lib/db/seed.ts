@@ -57,6 +57,7 @@ function seedProviderDirectory() {
         name: pack.title,
         price_per_kg: pack.pricePerPiece,
         min_order_amount: 0,
+        // express_available / express_surcharge_pct fiyatı etkilemez (K-008).
         express_available: p.express ? 1 : 0,
         express_surcharge_pct: p.express ? EXPRESS_BUMP : 0,
       });

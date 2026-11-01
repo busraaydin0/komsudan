@@ -21,6 +21,12 @@ describe("respondBy", () => {
     expect(by).toBe(new Date("2026-10-07T10:45:00+03:00").toISOString());
   });
 
+  it("acilde çalışma saatinde +15 dk", () => {
+    const created = new Date("2026-10-07T10:00:00+03:00");
+    const by = computeRespondBy(created, slots, true);
+    expect(by).toBe(new Date("2026-10-07T10:15:00+03:00").toISOString());
+  });
+
   it("çalışma dışında ilk slot başlangıcında sayaç başlar", () => {
     const created = new Date("2026-10-07T20:00:00+03:00");
     const start = firstWorkingInstant(created, slots);

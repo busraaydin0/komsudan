@@ -58,7 +58,8 @@ Paket `tam` için ütü adımı (`ironing`) takip çizgisinde görünür.
 | Deploy | Kalıcı `next start`; Vercel/serverless yok (SQLite tek dosya). |
 | Ölçek | İleride Turso/Postgres; SQL yalnız `src/lib/db/`. |
 | Kategori | Sabit çamaşır; `/api/categories` ve `service_categories` tablosu yok. |
-| Fiyat | Sunucuda `provider_prices` + `quoteLaundry`; istemci tutar göndermez. |
+| Fiyat | Sunucuda `provider_prices` + `quoteLaundry`; istemci tutar göndermez. Acil zam `EXPRESS_BUMP` (0.40) yalnız `orders.express`; paket `express_surcharge_pct` fiyatı etkilemez. |
+| Acil (3a) | Müşteri anahtarı; katalog `express`; alım bugün; teslim alım+24 sa; cevap 15 dk; takvim `express` query. Kontenjan/18:00/iade 3b. |
 | Keşif | Harita + `/api/catalog`; onboarding rol/konum/offer. |
 | OTP | Geliştirmede `demoCode`; prod’da gerçek SMS henüz yok. |
 | TypeScript | `strict: true`; `any` / `@ts-ignore` yok (knip + `npm run check`). |

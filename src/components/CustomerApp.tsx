@@ -4,11 +4,12 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PILOT_AREA } from "@/lib/laundry/pilot";
 import { kmBetween } from "@/lib/geo";
-import { type LaundrySize, type OrderAddonLine } from "@/lib/laundryModel";
-import { resolveExpress } from "@/lib/pricing";
+import { machineUnitsFor, type LaundrySize, type OrderAddonLine } from "@/lib/laundryModel";
 import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
+import { expressDeliveryDate } from "@/lib/capacity/computeSchedule";
 import { postOrder, fetchWallet, useCatalog, useOrders } from "@/lib/api";
 import {
+  canListForExpress,
   helloBlurb,
   placeBlockReason,
   placeOrderInput,
@@ -74,6 +75,7 @@ export function CustomerApp({
   const [scheduleStep, setScheduleStep] = useState<"pickup" | "delivery">("pickup");
   const [note, setNote] = useState("");
   const [dryerOnly, setDryerOnly] = useState(false);
+  const [expressWanted, setExpressWanted] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [listTall, setListTall] = useState(false);
   const listDrag = useRef<{ y: number } | null>(null);
@@ -84,23 +86,26 @@ export function CustomerApp({
   const home =
     homeLat != null && homeLng != null ? { lat: homeLat, lng: homeLng } : null;
   const origin = user ?? home ?? PILOT_AREA.center;
+  const units = machineUnitsFor(size, addons);
   const ranked = useMemo(() => {
     return providers
       .filter((p) => (dryerOnly ? p.hasDryer : true))
+      .filter((p) => (expressWanted ? canListForExpress(p, units) : true))
       .map((p) => ({ p, km: kmBetween(origin, p.loc) }))
       .sort((a, b) => a.km - b.km);
-  }, [origin, dryerOnly, providers]);
+  }, [origin, dryerOnly, expressWanted, providers, units]);
   const available = ranked.filter(({ p }) => p.capacity?.configured && p.capacity.weekTone !== "full").length;
 
-  const selected = selectedId ? providers.find((p) => p.id === selectedId) : undefined;
+  const selected = selectedId ? ranked.find(({ p }) => p.id === selectedId)?.p : undefined;
   const active = orders.find((o) => o.id === activeId) ?? orders[0];
   const pickupDate = pickup?.date ?? isoDateInIstanbul(new Date());
-  const express = resolveExpress(Boolean(selected?.express), pickupDate);
+  const express = Boolean(expressWanted && selected?.express);
   const quote = quoteForProvider(selected, {
     size,
     addons,
     pkg,
     pickupDate,
+    express,
   });
   const payGate: 0 | 1 | null =
     walletBalance == null ? null : walletBalance >= quote.total ? 1 : 0;
@@ -219,6 +224,7 @@ export function CustomerApp({
           addons,
           pickup,
           delivery,
+          express,
         }),
       );
       await Promise.all([reloadOrders(), reloadCatalog()]);
@@ -240,7 +246,7 @@ export function CustomerApp({
         selectedId={selectedId}
         user={user}
         meAvatar={meAvatar}
-        providers={providers}
+        providers={ranked.map(({ p }) => p)}
         visible={mapActive}
         onSelect={openProvider}
       />
@@ -297,6 +303,32 @@ export function CustomerApp({
             }`}
           >
             Kurutucu var
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setExpressWanted((v) => {
+                const next = !v;
+                if (next && selectedId) {
+                  const hit = providers.find((p) => p.id === selectedId);
+                  if (!hit || !canListForExpress(hit, units)) {
+                    setSelectedId(null);
+                    setSheet("list");
+                  }
+                }
+                return next;
+              });
+              setPickup(null);
+              setDelivery(null);
+              setScheduleStep("pickup");
+            }}
+            className={`k-chip rounded-full px-3 py-1.5 text-xs ring-1 backdrop-blur ${
+              expressWanted
+                ? "bg-[var(--teal)] text-white ring-[var(--teal)]"
+                : "k-glass ring-[var(--line)]"
+            }`}
+          >
+            Acil teslim
           </button>
         </div>
         {far && (
@@ -420,6 +452,16 @@ export function CustomerApp({
                 addons={addons}
                 onAddons={setAddons}
                 express={express}
+                onExpress={(v) => {
+                  setExpressWanted(v);
+                  setPickup(null);
+                  setDelivery(null);
+                  setScheduleStep("pickup");
+                  if (v && selected && !canListForExpress(selected, units)) {
+                    setSelectedId(null);
+                    setSheet("list");
+                  }
+                }}
                 scheduleStep={scheduleStep}
                 onScheduleStep={setScheduleStep}
                 pickup={pickup}
@@ -430,7 +472,12 @@ export function CustomerApp({
                 }}
                 delivery={delivery}
                 onDelivery={setDelivery}
-                minDeliveryDate={pickup?.date}
+                minDeliveryDate={
+                  express && pickup
+                    ? expressDeliveryDate(pickup.date, pickup.windowStart)
+                    : pickup?.date
+                }
+                maxPickupDate={express ? isoDateInIstanbul(new Date()) : undefined}
                 note={note}
                 onNote={setNote}
                 quote={quote}

@@ -16,6 +16,7 @@ export type CalendarWindow = {
 };
 
 const TODAY_LEAD_MS = 2 * 3_600_000;
+const EXPRESS_TODAY_LEAD_MS = 1 * 3_600_000;
 
 function dayStatus(providerId: string, date: string, settings: ReturnType<typeof settingsFromRow>) {
   const usage = loadDayUsage(providerId, date, 1, settings)[0];
@@ -24,12 +25,17 @@ function dayStatus(providerId: string, date: string, settings: ReturnType<typeof
   return loadToneFromFreeRatio(free);
 }
 
-export function buildProviderCalendar(providerId: string, now = new Date()): CalendarWindow[] {
+export function buildProviderCalendar(
+  providerId: string,
+  now = new Date(),
+  express = false,
+): CalendarWindow[] {
   const settingsRow = getCapacitySettings(providerId);
   const settings = settingsRow ? settingsFromRow(settingsRow) : null;
   const slots = listSlots(providerId, true);
   const today = isoDateInIstanbul(now);
   const out: CalendarWindow[] = [];
+  const leadMs = express ? EXPRESS_TODAY_LEAD_MS : TODAY_LEAD_MS;
 
   for (let i = 0; i < 7; i++) {
     const date = addCalendarDaysIso(today, i);
@@ -42,7 +48,7 @@ export function buildProviderCalendar(providerId: string, now = new Date()): Cal
         const startInstant = pickupInstantIso(date, w.start);
         const selectable =
           status !== "full" &&
-          (date !== today || startInstant.getTime() >= now.getTime() + TODAY_LEAD_MS);
+          (date !== today || startInstant.getTime() >= now.getTime() + leadMs);
         out.push({
           date,
           start: w.start,
@@ -61,8 +67,9 @@ export function assertCalendarWindow(
   providerId: string,
   window: { date: string; windowStart: string; windowEnd: string },
   now = new Date(),
+  express = false,
 ) {
-  const hit = buildProviderCalendar(providerId, now).find(
+  const hit = buildProviderCalendar(providerId, now, express).find(
     (w) => w.date === window.date && w.start === window.windowStart && w.end === window.windowEnd,
   );
   if (!hit) {

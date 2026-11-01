@@ -26,7 +26,9 @@ export type PackageRow = {
   name: string;
   price_per_kg: number;
   min_order_amount: number;
+  /** Fiyatı etkilemez (K-008); katalog `express` kullanılır. */
   express_available: number;
+  /** Fiyatı etkilemez (K-008); zam `EXPRESS_BUMP` sabitinden. */
   express_surcharge_pct: number;
   is_active: number;
 };

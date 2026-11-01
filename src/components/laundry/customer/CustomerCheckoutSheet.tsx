@@ -27,6 +27,7 @@ export function CustomerCheckoutSheet({
   addons,
   onAddons,
   express,
+  onExpress,
   scheduleStep,
   onScheduleStep,
   pickup,
@@ -34,6 +35,7 @@ export function CustomerCheckoutSheet({
   delivery,
   onDelivery,
   minDeliveryDate,
+  maxPickupDate,
   note,
   onNote,
   quote,
@@ -50,6 +52,7 @@ export function CustomerCheckoutSheet({
   addons: OrderAddonLine[];
   onAddons: (a: OrderAddonLine[]) => void;
   express: boolean;
+  onExpress: (v: boolean) => void;
   scheduleStep: "pickup" | "delivery";
   onScheduleStep: (s: "pickup" | "delivery") => void;
   pickup: AppointmentWindow | null;
@@ -57,6 +60,7 @@ export function CustomerCheckoutSheet({
   delivery: AppointmentWindow | null;
   onDelivery: (w: AppointmentWindow) => void;
   minDeliveryDate?: string;
+  maxPickupDate?: string;
   note: string;
   onNote: (s: string) => void;
   quote: {
@@ -139,8 +143,19 @@ export function CustomerCheckoutSheet({
       {placeBlockReason(p, quote.machineUnits) ? (
         <p className="mt-2 text-xs text-[var(--clay)]">{placeBlockReason(p, quote.machineUnits)}</p>
       ) : null}
+      <button
+        type="button"
+        onClick={() => onExpress(!express)}
+        className={`k-chip mt-4 rounded-full px-3 py-1.5 text-xs ring-1 ${
+          express ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
+        }`}
+      >
+        Acil teslim
+      </button>
       {express ? (
-        <p className="mt-4 text-xs text-[var(--muted)]">Bugün alım: aynı gün express (+%25) uygulanır.</p>
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          Bugün alım · 24 saat teslim · 15 dk cevap · +%40
+        </p>
       ) : null}
       <p className="mt-2 text-sm text-[var(--muted)]">Kapıda bırak · hazır olunca yine kapında al.</p>
       <div className="mt-3 flex gap-2">
@@ -164,6 +179,8 @@ export function CustomerCheckoutSheet({
         <AppointmentCalendar
           providerId={p.id}
           title="Alım penceresi (2 saat)"
+          maxDate={maxPickupDate}
+          express={express}
           value={pickup}
           onPick={onPickup}
         />
@@ -172,6 +189,7 @@ export function CustomerCheckoutSheet({
           providerId={p.id}
           title="Teslim penceresi"
           minDate={minDeliveryDate}
+          express={express}
           value={delivery}
           onPick={onDelivery}
         />
