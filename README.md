@@ -71,7 +71,7 @@ npm run dev
 - Kategori registry yok; ürün sabitleri `src/lib/laundry/`.
 - OTP geliştirmede yanıtta `demoCode`.
 
-Seed hizmet veren telefonları: `src/lib/db/seed.ts` (ör. Elif `5321100001`).
+Seed telefonları (`src/lib/db/seed.ts`): hizmet verenler ör. Elif `5321100001`; Hizmet Admini `5321100099`.
 
 ## Deploy
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
 import { addCalendarDaysIso } from "@/lib/capacity/istanbul";
 import { insertOrderItem } from "@/lib/db/orderItems";
@@ -64,7 +64,12 @@ describe("acil teslim (Adım 3a)", () => {
     }
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("kapasiteye sığmayan acil → hata", async () => {
+    vi.useFakeTimers({ now: new Date("2026-06-15T10:00:00+03:00") });
     const user = await customer("5550000922");
     const today = isoDateInIstanbul(new Date());
     upsertCapacitySettings({

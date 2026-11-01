@@ -224,7 +224,7 @@ export type Account = {
   name: string;
   identityVerified: boolean;
   passkeyEnabled: boolean;
-  role: "customer" | "provider" | "admin";
+  role: "customer" | "provider" | "admin" | "service_admin";
   avatarUrl?: string | null;
   preferredCategoryIds: string[];
   preferredIntent: PreferredIntent | null;

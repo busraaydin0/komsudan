@@ -41,7 +41,10 @@ export function toAuthUser(row: UserRow): AuthUser {
     phone: row.phone,
     name,
     fullName: name,
-    role: row.role === "provider" || row.role === "admin" ? row.role : "customer",
+    role:
+      row.role === "provider" || row.role === "admin" || row.role === "service_admin"
+        ? row.role
+        : "customer",
     identityVerified: Boolean(row.identity_verified),
     passkeyEnabled: Boolean(row.passkey_id),
     avatarUrl: row.avatar_url || null,

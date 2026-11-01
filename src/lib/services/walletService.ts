@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/errors";
+import { assertWalletWriteAllowed } from "@/lib/auth/staff";
 import { db } from "@/lib/db/client";
 import {
   addBalance,
@@ -96,6 +97,7 @@ export function listWalletActivity(userId: string) {
 }
 
 export function topupWallet(userId: string, method: TopupMethodId, amount: number, at?: string) {
+  assertWalletWriteAllowed(userId);
   const when = nowIso(at);
   ensureWalletRow(userId, when);
   db().transaction(() => {
@@ -199,6 +201,7 @@ export function creditOnCapture(providerId: string, orderId: string, net: number
 }
 
 export function withdrawWallet(userId: string, method: PayoutMethodId, amount: number, at?: string) {
+  assertWalletWriteAllowed(userId);
   const when = nowIso(at);
   ensureWalletRow(userId, when);
   releaseMaturedEarnings(userId, when);

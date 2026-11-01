@@ -12,6 +12,7 @@ import { workPhotosForProvider } from "@/lib/services/photoService";
 import { ratingBreakdown, reviewsForProvider } from "@/lib/services/reviewService";
 import { listRatingAggregates, roundRating } from "@/lib/db/reviews";
 import { listAvatarUrls } from "@/lib/db/providers";
+import { listSuspendedProviderIds } from "@/lib/db/admin";
 import { capacitySummariesForProviders } from "@/lib/services/capacityService";
 
 type PriceBundle = {
@@ -123,7 +124,8 @@ export function providersLive(): Provider[] {
   const ratings = new Map(listRatingAggregates().map((r) => [r.provider_id, { sum: r.sum, count: r.count }]));
   const capacities = capacitySummariesForProviders(ids);
   const ctx = { prices, ratings, capacities };
+  const suspended = new Set(listSuspendedProviderIds());
   return providers
     .map((p) => hydrate(p, avatars, false, ctx))
-    .filter((p) => p.capacity?.configured);
+    .filter((p) => p.capacity?.configured && !suspended.has(p.id));
 }

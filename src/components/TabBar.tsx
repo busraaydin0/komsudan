@@ -2,9 +2,9 @@
 
 import { useInbox, useNotifications } from "@/lib/api";
 
-export type AppTab = "harita" | "siparis" | "mesaj" | "hizmet" | "hesap";
+export type AppTab = "harita" | "siparis" | "mesaj" | "hizmet" | "yonetim" | "hesap";
 
-const ITEMS: { id: AppTab; label: string }[] = [
+const BASE_ITEMS: { id: AppTab; label: string }[] = [
   { id: "harita", label: "Harita" },
   { id: "siparis", label: "Sipariş" },
   { id: "mesaj", label: "Mesaj" },
@@ -12,17 +12,32 @@ const ITEMS: { id: AppTab; label: string }[] = [
   { id: "hesap", label: "Hesap" },
 ];
 
-export function TabBar({ tab, onTab }: { tab: AppTab; onTab: (t: AppTab) => void }) {
+export function TabBar({
+  tab,
+  onTab,
+  showAdmin = false,
+}: {
+  tab: AppTab;
+  onTab: (t: AppTab) => void;
+  showAdmin?: boolean;
+}) {
   const { unread } = useNotifications();
   const { unreadTotal } = useInbox();
+  const items = showAdmin
+    ? [
+        ...BASE_ITEMS.slice(0, 4),
+        { id: "yonetim" as const, label: "Yönetim" },
+        BASE_ITEMS[4]!,
+      ]
+    : BASE_ITEMS;
 
   return (
     <nav
       className="k-tabbar absolute inset-x-0 bottom-0 z-40 mx-auto max-w-lg border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--card)_92%,transparent)] backdrop-blur-md"
       aria-label="Ana menü"
     >
-      <ul className="grid grid-cols-5">
-        {ITEMS.map((item) => {
+      <ul className={showAdmin ? "grid grid-cols-6" : "grid grid-cols-5"}>
+        {items.map((item) => {
           const on = tab === item.id;
           const badge =
             item.id === "mesaj" ? unreadTotal > 0 : item.id === "hesap" ? unread > 0 : false;
@@ -95,6 +110,13 @@ function TabIcon({ id, on }: { id: AppTab; on: boolean }) {
         <rect x="4" y="8" width="16" height="11" rx="2" stroke={stroke} strokeWidth="1.8" />
         <path d="M8 8V6.5A4 4 0 0 1 16 6.5V8" stroke={stroke} strokeWidth="1.8" />
         <path d="M4 13h16" stroke={stroke} strokeWidth="1.8" />
+      </svg>
+    );
+  }
+  if (id === "yonetim") {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M4 7h16M4 12h16M4 17h10" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     );
   }

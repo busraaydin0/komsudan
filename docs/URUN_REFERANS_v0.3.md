@@ -83,6 +83,12 @@ Kaynak: MVP Tanım Dokümanı v0.3 ve Karar Kaydı v0.3 (`docs/kaynak/`). Çeli�
 - **Hizmet Admini:** kendi hizmet alanı; hizmet veren başvuru/doğrulama/askıya alma, sipariş ve vakalar, aylık profil, pilot KPI. Pilotta ikisi aynı kişi olabilir.
 - Aylık hizmet veren profili: sipariş sayısı, tamamlanan/iptal, cevapsız, gecikme, puan, şikayet, gelir ve komisyon, ortalama doluluk.
 
+**K-009 (ONAYLI, Adım 4):**
+- Rol `service_admin` (Hizmet Admini). `super_admin` her şeyi yapar; `service_admin` yalnız yönetim: veren listesi, aylık profil, askıya alma/açma, pilot KPI. Ödeme / payout / cüzdan yazma yalnız `super_admin`.
+- Askı: `suspended` + `suspended_at` + reason. Askıdaki veren keşif/listede yok, yeni sipariş sunucuda reddedilir; açık siparişler etkilenmez. Açma geri alır. Her işlem `admin_audit`.
+- Aylık profil ve KPI seçilen ay, İstanbul saati; mevcut tablolardan hesaplanır (yeni sayaç yok).
+- Uyarı rozeti: cevapsız veya gecikme DEMO eşiğini aşarsa "dikkat". Eşik spec'te yok (BR-029); **otomatik askıya alma yok (ÖNERİ / uygulanmadı)**.
+
 ## 9. Pilot ve ölçüm
 - Ankara / Çukurambar, 4 hafta, 5 hizmet veren, davetli kullanıcı. Sadakat kapalı.
 - KPI: tekrar sipariş ≥%20, memnuniyet, iptal, cevapsızlık, söz verilen–gerçek teslim farkı, gerçek makine kapasitesi / boy katsayısı kalibrasyonu.

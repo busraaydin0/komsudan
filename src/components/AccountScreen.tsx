@@ -91,7 +91,7 @@ export function AccountScreen({
   const { notifications, unread, reload: reloadInbox } = useNotifications();
   const [inboxBusy, setInboxBusy] = useState(false);
 
-  const locked = account.role === "provider" || account.role === "admin";
+  const locked = account.role === "provider" || account.role === "admin" || account.role === "service_admin";
 
   const refreshPerms = useCallback(async () => {
     const [g, n, c] = await Promise.all([locationState(), notificationState(), cameraState()]);

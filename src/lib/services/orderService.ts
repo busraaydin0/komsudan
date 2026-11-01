@@ -223,6 +223,10 @@ export function listOrdersFor(user: AuthUser, limit = 100, offset = 0): Order[] 
 export function createOrder(input: CreateOrderInput, userId: string): Order {
   const provider = getProvider(input.providerId);
   if (!provider) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
+  const profile = getProfile(input.providerId);
+  if (profile?.suspended) {
+    throw new ApiError(409, "Bu hizmet veren askıda; yeni sipariş alınamaz.", "PROVIDER_SUSPENDED");
+  }
   assertFulfillmentReady();
   return createLaundryOrder(input, userId, provider);
 }

@@ -23,6 +23,7 @@ describe("çamaşır DB ayağa kalkışı", () => {
       "0002_larger_order_sizes.sql",
       "0003_laundry_legacy_category_cleanup.sql",
       "0004_wallet_tiers.sql",
+      "0005_service_admin.sql",
     ]);
 
     const providers = d.prepare("SELECT id FROM providers ORDER BY id").all() as { id: string }[];
@@ -45,6 +46,7 @@ describe("çamaşır DB ayağa kalkışı", () => {
       .all() as { name: string }[];
     expect(tables.map((t) => t.name)).toContain("appointments");
     expect(tables.map((t) => t.name)).toContain("handoff_codes");
+    expect(tables.map((t) => t.name)).toContain("admin_audit");
     expect(tables.map((t) => t.name)).not.toContain("order_events");
     expect(tables.map((t) => t.name)).not.toContain("drop_points");
     expect(tables.map((t) => t.name)).not.toContain("service_categories");

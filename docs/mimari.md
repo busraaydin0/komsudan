@@ -26,9 +26,9 @@ Cevap zarfı: `{ "data": … }` veya `{ "error": { "code", "message" } }`.
 
 ## Veri modeli (özet)
 
-Migration zinciri: `db/migrations/0001_….sql` (şema), `0002` (kapasite düzeltmesi), `0003` (eski çok-kategori tablo/kayıt temizliği), `0004` (cüzdan kademeleri). İlk açılışta migrate + seed (`src/lib/db/seed.ts`, `seedCatalogData.ts`).
+Migration zinciri: `db/migrations/0001_….sql` (şema), `0002` (kapasite düzeltmesi), `0003` (eski çok-kategori tablo/kayıt temizliği), `0004` (cüzdan kademeleri), `0005` (Hizmet Admini / askı / audit). İlk açılışta migrate + seed (`src/lib/db/seed.ts`, `seedCatalogData.ts`).
 
-- **users** — telefon, rol, onboarding, tercihler (`preferred_category_ids` pilot için `["camasir"]`).
+- **users** — telefon, rol (`customer` / `provider` / `admin` / `service_admin`), `super_admin` bayrağı, onboarding, tercihler (`preferred_category_ids` pilot için `["camasir"]`).
 - **providers** — `id` + JSON `payload` (liste kartı); **provider_profiles**, **service_packages**, **provider_prices**, **provider_addon_prices**, kapasite günleri.
 - **orders** — durum, boy, makine birimi, fiyat, ödeme durumu, handoff alanları.
 - **order_items** — boy + ek satırları.
@@ -36,6 +36,8 @@ Migration zinciri: `db/migrations/0001_….sql` (şema), `0002` (kapasite düzel
 - **payments**, **wallets**, **wallet_ledger**, **wallet_pending_earnings** — simüle authorize/capture + kademeli bakiye.
   `wallets.balance` kullanılabilir, `reserved` sipariş rezervi, `pending` teslim sonrası bekleyen kazanç. Hold: balance→reserved; iptal: reserved→balance; teslimde müşteri reserved düşer, hizmet veren `pending` + net (%10 komisyon düşülmüş). 24 saat sonra `pending`→`balance` (`wallet_pending_earnings.available_at`). Her hareket `wallet_ledger`.
 - **reviews**, **disputes**, **messages**, **notifications**, **order_photos**.
+- **provider_profiles.suspended / suspended_at / suspended_reason** — Hizmet Admini askısı (keşif dışı, yeni sipariş yok).
+- **admin_audit** — askı/açma (kim, ne, neden, ne zaman).
 
 SQLite: WAL, `foreign_keys=ON`, migrate/seed yalnızca process ilk açılışında.
 
@@ -61,6 +63,8 @@ Paket `tam` için ütü adımı (`ironing`) takip çizgisinde görünür.
 | Fiyat | Sunucuda `provider_prices` + `quoteLaundry`; istemci tutar göndermez. Acil zam `EXPRESS_BUMP` (0.40) yalnız `orders.express`; paket `express_surcharge_pct` fiyatı etkilemez. |
 | Acil (3a) | Müşteri anahtarı; katalog `express`; alım bugün; teslim alım+24 sa; cevap 15 dk; takvim `express` query. Kontenjan/18:00/iade 3b. |
 | Keşif | Harita + `/api/catalog`; onboarding rol/konum/offer. |
+| Roller | `customer` / `provider` / `admin` / `service_admin`. `admin` mevcut bypass’ı korur; `service_admin` provider rotasını geçemez. Cüzdan yazma: `service_admin` 403 (süper admin bayrağı yoksa). |
+| Yönetim | `GET /api/admin/providers`, `GET /api/admin/providers/[id]/monthly?month=`, `GET /api/admin/kpi?month=`, `POST /api/admin/providers/[id]/suspend`. Yetki `requireStaffAdmin`. |
 | OTP | Geliştirmede `demoCode`; prod’da gerçek SMS henüz yok. |
 | TypeScript | `strict: true`; `any` / `@ts-ignore` yok (knip + `npm run check`). |
 

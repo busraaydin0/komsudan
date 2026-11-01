@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { db } from "./client";
 
-export type UserRole = "customer" | "provider" | "admin";
+export type UserRole = "customer" | "provider" | "admin" | "service_admin";
 
 export type UserRow = {
   id: string;

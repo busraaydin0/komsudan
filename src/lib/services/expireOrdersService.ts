@@ -69,7 +69,11 @@ function expireOne(orderId: string, now: string) {
 
 function findAlternativeProviders(date: string, start: string, end: string, excludeId: string) {
   const ids = db()
-    .prepare(`SELECT id FROM providers WHERE id != ?`)
+    .prepare(
+      `SELECT p.id FROM providers p
+       LEFT JOIN provider_profiles pr ON pr.user_id = p.id
+       WHERE p.id != ? AND COALESCE(pr.suspended, 0) = 0`,
+    )
     .all(excludeId) as { id: string }[];
   return ids
     .filter(({ id }) =>

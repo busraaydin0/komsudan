@@ -11,6 +11,9 @@ import {
   upsertProviderUser,
 } from "./providers";
 import { writeProfileRatingsFromReviews } from "./reviews";
+import { istanbulYearMonth } from "@/lib/capacity/istanbul";
+
+export const DEMO_SERVICE_ADMIN_PHONE = "5321100099";
 
 const SEED_PHONES: Record<string, string> = {
   elif: "5321100001",
@@ -128,4 +131,147 @@ export function seedCatalog(database: Database.Database) {
     writeProfileRatingsFromReviews();
   });
   tx();
+  seedStaffUsers(database);
+  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
+    seedAdminDemoMonth(database);
+  }
+}
+
+function seedStaffUsers(database: Database.Database) {
+  const now = new Date().toISOString();
+  database
+    .prepare(
+      `INSERT INTO users (
+         id, phone, name, full_name, role, identity_verified, passkey_id,
+         onboarding_completed_at, super_admin, created_at, updated_at
+       ) VALUES (
+         'staff-hizmet-admin', @phone, 'Hizmet Admini', 'Hizmet Admini Demo',
+         'service_admin', 1, 'demo-staff-passkey', @now, 0, @now, @now
+       )
+       ON CONFLICT(id) DO UPDATE SET
+         role = 'service_admin',
+         identity_verified = 1,
+         passkey_id = COALESCE(users.passkey_id, excluded.passkey_id)`,
+    )
+    .run({ phone: DEMO_SERVICE_ADMIN_PHONE, now });
+}
+
+/** Geliştirme: mevcut ayda elif/ayşe için örnek profil satırları. Üretimde ve testte çalışmaz. */
+function seedAdminDemoMonth(database: Database.Database) {
+  const exists = database.prepare(`SELECT 1 AS ok FROM orders WHERE id = 'demo-admin-elif-1'`).get();
+  if (exists) return;
+  const month = istanbulYearMonth();
+  const at = `${month}-12T10:00:00.000+03:00`;
+  const doneAt = `${month}-14T18:00:00.000+03:00`;
+  const promised = `${month}-13`;
+  const now = new Date().toISOString();
+
+  for (const [id, phone] of [
+    ["demo-admin-c1", "5321100081"],
+    ["demo-admin-c2", "5321100082"],
+  ] as const) {
+    database
+      .prepare(
+        `INSERT INTO users (id, phone, name, full_name, role, identity_verified, passkey_id, created_at, updated_at)
+         VALUES (?, ?, '', '', 'customer', 1, NULL, ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
+      )
+      .run(id, phone, now, now);
+  }
+
+  const insertOrder = database.prepare(
+    `INSERT INTO orders (
+       id, provider_id, package_id, express, drop_method, slot, note, total, commission,
+       status, created_at, updated_at, payment_status, user_id, delivery_mode,
+       scheduled_window_start, size, machine_units, price_change, promised_delivery_date, cancel_reason
+     ) VALUES (
+       @id, @provider_id, 'katlama', 0, 'kapi', '10:00–12:00', '', @total, @commission,
+       @status, @created_at, @updated_at, @payment_status, @user_id, 'door',
+       @created_at, 'kucuk', 1, 'none', @promised, @cancel_reason
+     )`,
+  );
+
+  insertOrder.run({
+    id: "demo-admin-elif-1",
+    provider_id: "elif",
+    total: 180,
+    commission: 18,
+    status: "completed",
+    created_at: at,
+    updated_at: doneAt,
+    payment_status: "captured",
+    user_id: "demo-admin-c1",
+    promised,
+    cancel_reason: null,
+  });
+  insertOrder.run({
+    id: "demo-admin-elif-2",
+    provider_id: "elif",
+    total: 90,
+    commission: 9,
+    status: "cancelled",
+    created_at: at,
+    updated_at: at,
+    payment_status: "voided",
+    user_id: "demo-admin-c1",
+    promised: null,
+    cancel_reason: "customer",
+  });
+  insertOrder.run({
+    id: "demo-admin-elif-3",
+    provider_id: "elif",
+    total: 120,
+    commission: 12,
+    status: "rejected",
+    created_at: at,
+    updated_at: at,
+    payment_status: "voided",
+    user_id: "demo-admin-c2",
+    promised: null,
+    cancel_reason: "expired",
+  });
+  insertOrder.run({
+    id: "demo-admin-ayse-1",
+    provider_id: "ayse",
+    total: 150,
+    commission: 15,
+    status: "completed",
+    created_at: at,
+    updated_at: `${month}-13T12:00:00.000+03:00`,
+    payment_status: "captured",
+    user_id: "demo-admin-c2",
+    promised,
+    cancel_reason: null,
+  });
+
+  const insertPay = database.prepare(
+    `INSERT INTO payments (id, order_id, amount, commission, status, provider_reference, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'captured', ?, ?, ?)`,
+  );
+  insertPay.run("demo-pay-elif-1", "demo-admin-elif-1", 180, 18, "demo-elif-1", doneAt, doneAt);
+  insertPay.run("demo-pay-ayse-1", "demo-admin-ayse-1", 150, 15, "demo-ayse-1", at, at);
+
+  database
+    .prepare(
+      `INSERT INTO reviews (id, order_id, provider_id, rating, body, author, created_at)
+       VALUES ('demo-rev-elif-1', 'demo-admin-elif-1', 'elif', 5, 'Demo ay puanı', 'Müşteri', ?)
+       ON CONFLICT(id) DO NOTHING`,
+    )
+    .run(at);
+
+  database
+    .prepare(
+      `INSERT INTO disputes (id, order_id, opened_by, opener_role, reason, status, created_at, resolved_at)
+       VALUES ('demo-disp-elif-1', 'demo-admin-elif-1', 'demo-admin-c1', 'customer', 'Demo şikayet', 'open', ?, NULL)
+       ON CONFLICT(id) DO NOTHING`,
+    )
+    .run(at);
+
+  database
+    .prepare(
+      `INSERT INTO provider_capacity_days (provider_id, date, max_units, used_units)
+       VALUES ('elif', ?, 8, 4)
+       ON CONFLICT(provider_id, date) DO UPDATE SET used_units = excluded.used_units`,
+    )
+    .run(`${month}-12`);
 }

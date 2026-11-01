@@ -13,6 +13,9 @@ export type ProfileRow = {
   is_founder: number;
   verification_status: "pending" | "verified" | "rejected";
   status: "active" | "paused";
+  suspended: number;
+  suspended_at: string | null;
+  suspended_reason: string | null;
   commission_rate: number;
   rating_avg: number;
   rating_count: number;
@@ -45,7 +48,8 @@ export type SlotRow = {
 
 const PROFILE_SELECT = `
   p.user_id, u.full_name, p.bio, p.avatar_url, p.lat, p.lng, p.neighborhood,
-  p.has_dryer, p.is_founder, p.verification_status, p.status, p.commission_rate,
+  p.has_dryer, p.is_founder, p.verification_status, p.status,
+  p.suspended, p.suspended_at, p.suspended_reason, p.commission_rate,
   p.rating_avg, p.rating_count, p.completed_orders, p.updated_at
 `;
 
@@ -140,6 +144,7 @@ export function listProfilesInBox(box: { south: number; north: number; west: num
       `SELECT ${PROFILE_SELECT}
        FROM provider_profiles p JOIN users u ON u.id = p.user_id
        WHERE p.status = 'active' AND p.verification_status != 'rejected'
+         AND p.suspended = 0
          AND p.lat BETWEEN @south AND @north
          AND p.lng BETWEEN @west AND @east`,
     )

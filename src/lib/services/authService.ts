@@ -183,7 +183,7 @@ export function assertPasskey(user: AuthUser, credentialId: string): AuthUser {
 }
 
 export function assertDeletable(user: AuthUser) {
-  if (user.role === "provider" || user.role === "admin" || getProfile(user.id)) {
+  if (user.role === "provider" || user.role === "admin" || user.role === "service_admin" || getProfile(user.id)) {
     throw new ApiError(409, "Pilot hizmet veren hesabı silinmez.", "ACCOUNT_LOCKED");
   }
 }

@@ -559,3 +559,85 @@ export async function postMyOffer(body: {
   return data.provider!;
 }
 
+export type AdminProviderItem = {
+  id: string;
+  name: string;
+  neighborhood: string | null;
+  paused: boolean;
+  suspended: boolean;
+  suspendedAt: string | null;
+  suspendedReason: string | null;
+  attention: boolean;
+};
+
+export type AdminMonthlyProfile = {
+  providerId: string;
+  name: string;
+  month: string;
+  orderCount: number;
+  completed: number;
+  cancelled: number;
+  unanswered: number;
+  delayed: number;
+  averageRating: number;
+  disputeCount: number;
+  revenue: number;
+  commission: number;
+  averageOccupancy: number;
+};
+
+export type AdminKpi = {
+  month: string;
+  repeatOrderRate: number;
+  cancelRate: number;
+  unansweredRate: number;
+  avgDeliveryDeltaHours: number;
+  totalOrders: number;
+  totalCommission: number;
+};
+
+export async function fetchAdminProviders(month: string) {
+  const data = unwrapEnvelope(
+    await readJson<{ data?: { providers: AdminProviderItem[] }; providers?: AdminProviderItem[] }>(
+      await fetch(`/api/admin/providers?month=${encodeURIComponent(month)}`),
+    ),
+  );
+  return data.providers ?? [];
+}
+
+export async function fetchAdminMonthly(providerId: string, month: string) {
+  const data = unwrapEnvelope(
+    await readJson<{ data?: { profile: AdminMonthlyProfile }; profile?: AdminMonthlyProfile }>(
+      await fetch(
+        `/api/admin/providers/${encodeURIComponent(providerId)}/monthly?month=${encodeURIComponent(month)}`,
+      ),
+    ),
+  );
+  return data.profile!;
+}
+
+export async function fetchAdminKpi(month: string) {
+  const data = unwrapEnvelope(
+    await readJson<{ data?: { kpi: AdminKpi }; kpi?: AdminKpi }>(
+      await fetch(`/api/admin/kpi?month=${encodeURIComponent(month)}`),
+    ),
+  );
+  return data.kpi!;
+}
+
+export async function postAdminSuspend(providerId: string, body: { suspended: boolean; reason: string }) {
+  const data = unwrapEnvelope(
+    await readJson<{
+      data?: { provider: { id: string; suspended: boolean } };
+      provider?: { id: string; suspended: boolean };
+    }>(
+      await fetch(`/api/admin/providers/${encodeURIComponent(providerId)}/suspend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+  return data.provider!;
+}
+
