@@ -6,6 +6,11 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-05 – Adım 7: main'e birleştirme
+- Eski `main` etiketi: `legacy-multi-category` (`f8d30e0`).
+- PR **#1** merge commit ile birleşti (squash yok): `be5a593`.
+- Birleşme sonrası `main`: `npm ci` yeşil; `npm test` **120/120**; `npm run build` yeşil.
+
 ## 2026-11-05 – Üretim derlemesi ve README
 - `next build` + `next start` (JWT_SECRET ≥32). GET `/` 200; POST OTP (production’da `demoCode` yok); GET `/api/catalog` 8 veren. `demo:reset` production’da exit 1.
 - Temiz clone: `npm ci` + test 120 + lint + build yeşil. better-sqlite3 native derlemesi bu ortamda geçti.
