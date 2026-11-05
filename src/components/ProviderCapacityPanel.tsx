@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readJson, unwrapEnvelope } from "@/lib/http/client";
 
 const DAY_LABELS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
@@ -12,10 +13,14 @@ type CapacityForm = {
 };
 
 async function fetchCapacity(): Promise<CapacityForm> {
-  const res = await fetch("/api/providers/me/capacity", { credentials: "same-origin" });
-  const data = (await res.json()) as { capacity?: CapacityForm & { configured?: boolean }; error?: string };
-  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Kapasite alınamadı.");
-  const c = data.capacity!;
+  const data = unwrapEnvelope(
+    await readJson<{
+      data?: { capacity: CapacityForm & { configured?: boolean } };
+      capacity?: CapacityForm & { configured?: boolean };
+    }>(await fetch("/api/providers/me/capacity", { credentials: "same-origin" })),
+  );
+  const c = data.capacity;
+  if (!c) throw new Error("Kapasite alınamadı.");
   return {
     halfUnitsPerDay: c.halfUnitsPerDay,
     workingDays: c.workingDays,
@@ -25,14 +30,16 @@ async function fetchCapacity(): Promise<CapacityForm> {
 }
 
 async function saveCapacity(body: CapacityForm) {
-  const res = await fetch("/api/providers/me/capacity", {
-    method: "PUT",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = (await res.json()) as { error?: string };
-  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Kaydedilemedi.");
+  unwrapEnvelope(
+    await readJson<{ data?: { capacity: CapacityForm } }>(
+      await fetch("/api/providers/me/capacity", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
 }
 
 export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
