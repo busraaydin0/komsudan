@@ -6,6 +6,11 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-05 – Üretim derlemesi ve README
+- `next build` + `next start` (JWT_SECRET ≥32). GET `/` 200; POST OTP (production’da `demoCode` yok); GET `/api/catalog` 8 veren. `demo:reset` production’da exit 1.
+- Temiz clone: `npm ci` + test 120 + lint + build yeşil. better-sqlite3 native derlemesi bu ortamda geçti.
+- README: ürün özeti, MVP içi/dışı, demo, sınırlar, teknoloji. Faz/çok kategori/gel al yok.
+
 ## 2026-11-05 – Adım 5b: Yönetim sekmesi (tarayıcı raporu)
 - service_admin 4. sekme **Yönetim** (etiket + pano ikonu). Müşteri/veren sırası aynı (4. Hizmet). `tabBarItems.test.ts`.
 
