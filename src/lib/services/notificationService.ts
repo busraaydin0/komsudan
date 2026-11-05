@@ -1,12 +1,13 @@
 import { logger } from "@/lib/logger";
-import type { ApiLifecycle, AppNotification } from "@/lib/types";
-import { ApiError } from "@/server/rules";
+import type { AppNotification } from "@/lib/types";
+import type { OrderStatusId } from "@/lib/status";
+import { ApiError } from "@/lib/errors";
 import type { AuthUser } from "@/lib/auth/types";
+import { formatDeliveryDayTr } from "@/lib/capacity/istanbul";
 import { customerHasOpenOrder, getOrderRow, type OrderRow } from "@/lib/db/orders";
 import { pickNudgeCopy, pickOrderNotice } from "@/lib/noticeCopy";
 import {
   countUnread,
-  deleteNotificationsForUser,
   getNotification,
   insertNotification,
   latestNotificationOfType,
@@ -15,9 +16,6 @@ import {
   markNotificationRead,
   type NotificationRow,
 } from "@/lib/db/notifications";
-
-export { deleteNotificationsForUser };
-export type { AppNotification };
 
 function toPublic(row: NotificationRow): AppNotification {
   return {
@@ -46,13 +44,18 @@ function pushTo(userId: string | null | undefined, input: {
   }
 }
 
-export function notifyNewOrder(row: { id: string; provider_id: string; user_id: string | null; pieces: number }) {
+export function notifyNewOrder(row: {
+  id: string;
+  provider_id: string;
+  user_id: string | null;
+  machineUnits: number;
+}) {
   if (row.provider_id === row.user_id) return;
   const order = getOrderRow(row.id);
   const copy = pickOrderNotice("created", {
     packageId: order?.package_id,
-    pieces: order?.guest_count ?? order?.pieces ?? row.pieces,
-    productName: order?.product_name,
+    machineUnits: order?.machine_units ?? row.machineUnits,
+    productName: null,
     orderId: row.id,
   });
   pushTo(row.provider_id, {
@@ -65,21 +68,19 @@ export function notifyNewOrder(row: { id: string; provider_id: string; user_id: 
 
 export function notifyStatusChange(input: {
   row: OrderRow;
-  from: ApiLifecycle;
-  next: ApiLifecycle;
+  from: OrderStatusId;
+  next: OrderStatusId;
   actorId: string;
-  pickupCode?: string | null;
 }) {
-  const { row, from, next, actorId, pickupCode } = input;
+  const { row, from, next, actorId } = input;
   const customerId = row.user_id;
   const providerId = row.provider_id;
   const other = actorId === customerId ? providerId : customerId;
   const ctx = {
     packageId: row.package_id,
-    pieces: row.guest_count ?? row.pieces,
-    productName: row.product_name,
+    machineUnits: row.machine_units,
+    productName: null,
     orderId: row.id,
-    pickupCode: pickupCode ?? undefined,
   };
 
   if (next === "accepted" || (next === "dropped_off" && from === "pending")) {
@@ -139,19 +140,54 @@ export function notifyStatusChange(input: {
   }
 }
 
-export function notifyPickupCodeRotated(row: OrderRow, code: string) {
-  const copy = pickOrderNotice("pickup", {
-    packageId: row.package_id,
-    pieces: row.guest_count ?? row.pieces,
-    productName: row.product_name,
-    orderId: row.id,
-    pickupCode: code,
-  });
+export function notifyHandoffCodeRotated(row: OrderRow, kind: "pickup" | "return", _code: string) {
+  void _code;
+  const label = kind === "pickup" ? "Alım" : "Teslim";
   pushTo(row.user_id, {
     orderId: row.id,
-    type: "pickup_code",
-    title: copy.title,
-    body: copy.body,
+    type: "handoff_code",
+    title: `${label} kodu yenilendi`,
+    body: `${label} kodun güncellendi. Yeni kodu hizmet verene söyle.`,
+  });
+}
+
+export function notifyDeliveryOverrideOpened(row: OrderRow, disputeWindowEnd: string) {
+  pushTo(row.user_id, {
+    orderId: row.id,
+    type: "delivery_override",
+    title: "Kodsuz teslim bildirimi",
+    body: `Hizmet veren kod olmadan teslim bildirdi. ${new Date(disputeWindowEnd).toLocaleString("tr-TR")} tarihine kadar itiraz edebilirsin.`,
+  });
+}
+
+export function notifyRespondReminder(row: OrderRow) {
+  pushTo(row.provider_id, {
+    orderId: row.id,
+    type: "order_respond_reminder",
+    title: "Sipariş yanıt süresi",
+    body: "Bekleyen siparişin yanıt süresinin yarısı doldu. Kabul veya red ver.",
+  });
+}
+
+export function notifyOrderExpired(row: OrderRow, alternativeProviderIds: string[]) {
+  const alts = alternativeProviderIds.length
+    ? ` Aynı pencere için ${alternativeProviderIds.length} komşu daha müsait.`
+    : "";
+  pushTo(row.user_id, {
+    orderId: row.id,
+    type: "order_expired",
+    title: "Yanıt gelmedi",
+    body: `Sağlayıcı süresinde yanıt vermedi; sipariş iptal edildi.${alts}`,
+  });
+}
+
+export function notifyOrderDelayed(row: OrderRow, nextDate: string, reason: string) {
+  const label = formatDeliveryDayTr(nextDate);
+  pushTo(row.user_id, {
+    orderId: row.id,
+    type: "order_delayed",
+    title: "Teslim tarihi güncellendi",
+    body: `Yeni teslim: ${label}. Gerekçe: ${reason.slice(0, 120)}. İstersen ücretsiz iptal edebilirsin.`,
   });
 }
 
@@ -172,7 +208,7 @@ export function maybeEngagementNudge(user: AuthUser) {
   if (customerHasOpenOrder(user.id)) return;
   const last = latestNotificationOfType(user.id, "nudge");
   if (last && Date.now() - Date.parse(last.created_at) < NUDGE_GAP_MS) return;
-  const copy = pickNudgeCopy(last?.title, user.preferredCategoryIds);
+  const copy = pickNudgeCopy(last?.title);
   pushTo(user.id, {
     type: "nudge",
     title: copy.title,

@@ -1,5 +1,5 @@
-import { fail } from "@/server/http";
-import { readPhoto } from "@/server/photos";
+import { fail } from "@/lib/http/response";
+import { readPhoto } from "@/lib/services/photoService";
 
 export const dynamic = "force-dynamic";
 

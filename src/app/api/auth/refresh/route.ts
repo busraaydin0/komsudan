@@ -1,10 +1,10 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { parseBody, refreshSchema } from "@/lib/validation/auth.schema";
 import { rotateRefresh } from "@/lib/services/authService";
 import { readRefreshToken } from "@/lib/auth/middleware";
 import { setAuthCookies } from "@/lib/auth/cookies";
 import { publicUser } from "@/lib/auth/types";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 

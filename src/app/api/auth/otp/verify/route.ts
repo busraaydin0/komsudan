@@ -1,4 +1,4 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { parseBody, otpVerifySchema } from "@/lib/validation/auth.schema";
 import { verifyOtp } from "@/lib/services/authService";
 import { setAuthCookies } from "@/lib/auth/cookies";

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
+import { insertOrderItem } from "@/lib/db/orderItems";
 import { insertOrderRow } from "@/lib/db/orders";
 import { latestNotificationOfType } from "@/lib/db/notifications";
 import { requestOtp, verifyOtp, loadUser } from "./authService";
@@ -25,24 +26,27 @@ function seedOrder(id: string, userId: string, providerId = "elif") {
     id,
     provider_id: providerId,
     package_id: "yikama",
-    pieces: 6,
     express: 0,
     drop_method: "kapi",
-    drop_point_id: null,
     slot: "Bugün 18:00–19:00",
     note: "",
     total: 180,
     commission: 18,
-    status: "teslim_alindi",
+    status: "accepted",
     created_at: now,
     updated_at: now,
     user_id: userId,
-    price_per_kg_snapshot: 30,
-    estimated_weight: 6,
-    estimated_price: 180,
     delivery_mode: "door",
     scheduled_window_start: now,
-    lifecycle: "accepted",
+    size: "orta",
+    machine_units: 2,
+  });
+  insertOrderItem({
+    order_id: id,
+    kind: "size",
+    variant: "orta",
+    qty: 1,
+    unit_price: 180,
   });
 }
 

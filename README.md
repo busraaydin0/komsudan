@@ -1,135 +1,104 @@
 # Komşudan
 
-Çukurambar (Ankara) komşu hizmet PWA’sı. Pilot: çamaşırı **kapıda** veya **gel al noktasında** bırak; komşu yıkayıp katlar. Eve kimse girmez.
+Çukurambar (Ankara) **çamaşır pazaryeri**. Müşteri paketi, boyu ve ekleri seçer; kapıdan alınır, yıkanır, kapıya teslim edilir. Eve kimse girmez. Hizmet vereni sistem atamaz; müşteri seçer. Teslim **gününü sistem** hesaplar, saat penceresini müşteri seçer.
 
-Klasör adı `katla`, npm paketi `komsudan`. Arayüz Türkçe.
+Klasör adı `katla`, npm paketi `komsudan`. Kod İngilizce, arayüz Türkçe.
 
-Repo: [github.com/busraaydin0/komsudan](https://github.com/busraaydin0/komsudan) · dal `main`
+## Kapsam
 
----
+**MVP içi:** yalnız çamaşır (`yikama` / `katlama` / `tam` + boy + ekler). Kapı alım/teslim. Cüzdan simülasyonu. Acil teslim (zam, 24 sa, 15 dk cevap). Hizmet Admini (KPI, askı).
 
-## Klonlayan ne görür?
+**MVP dışı:** gel al noktası, QR/torba, tartım, sadakat, gerçek ödeme/çekim, halı ve kuru temizleme, eve giriş. Acil 3b (kontenjan, 18:00 dönüşü, iade/risk). Otomatik askı. Kapıda renk grubu onayı.
 
-**Aynı kodu** çalıştırırsın (harita, kategoriler, saat tekerleği, API). **Sahibinin canlı veritabanını değil.**
+Tutar ve sipariş durumu istemciden gelmez; sunucu hesaplar.
 
-Git’te yok (ve olmamalı):
+## Kurulum
 
-- `data/*.db` — senin siparişlerin, gerçek kullanıcıların
-- `data/uploads/`
-- `.env` sırları
-
-İlk `npm run dev` boş SQLite açar (`data/komsudan.db`). Migration + seed: örnek komşular, gel al noktaları, yorumlar. OTP geliştirmede yanıtta `demoCode` döner.
-
----
-
-## Çalıştırma
-
-Node 20+ önerilir. Native derleme için `better-sqlite3` (Xcode / build tools).
+Node 20+. `better-sqlite3` native derler: macOS’ta Xcode CLT; Linux’ta `python3`, `make`, `g++` (Debian: `build-essential`).
 
 ```bash
 git clone https://github.com/busraaydin0/komsudan.git
 cd komsudan
-cp .env.example .env
-# .env içinde JWT_SECRET’i uzun rastgele bir dize yap
-npm install
+git checkout chore/laundry-only
+cp .env.example .env   # JWT_SECRET en az 32 karakter
+npm ci                 # veya npm install
 npm run dev
 ```
 
-Tarayıcı: [http://localhost:3000](http://localhost:3000) — 3000 doluysa Next **3001** açar.
+Tarayıcı: [http://localhost:3000](http://localhost:3000)
 
-Kalıcı sunucu (Vercel/serverless **yok**; SQLite tek dosyaya yazar):
+Üretim: kalıcı `next start` (Vercel/serverless değil; SQLite tek dosya). `JWT_SECRET` zorunlu.
 
 ```bash
 npm run build
-npm run start
+JWT_SECRET=en-az-otuz-iki-karakter-uzun-gizli npm start
 ```
 
-Test: `npm test`
+`NODE_ENV=production` iken `npm run demo:reset` çalışmaz. OTP yanıtında `demoCode` yoktur (`OTP_ECHO=1` ile açılır). Katalog seed’i verenleri kurar; jüri siparişleri ve aylık KPI örnekleri eklenmez.
 
----
+Git’te yok: `data/*.db`, `data/uploads/`, `.env`.
 
-## Uygulama sekmeleri
+## Demo
 
-| URL | Ne |
-|---|---|
-| `/` | Harita, yakındakiler |
-| `/?tab=siparis` | Sipariş |
-| `/?tab=mesaj` | Mesajlar |
-| `/?tab=hizmet` | Hizmet masası (kart + gelen iş) |
-| `/?tab=hesap` | Hesap, bildirim |
-
-`/hizmet` → `/?tab=hizmet`.
-
-Harita: 2D / 3D. Yuvarlak pin = hizmet veren. Kesik kare = gel al noktası.
-
-Giriş: telefon + SMS kodu. Dev’de kod JSON’da `demoCode`. Sipariş için ad, kimlik ve cihaz kilidi (passkey) gerekir. Keşifte “arıyorum / veriyorum” ve alan seçilir.
-
-Seed hizmet veren telefonları (profil `id` = kullanıcı `id`): Elif `5321100001`, Ayşe `5321100002`, … kod: `src/lib/db/seed.ts`.
+Jüri / savunma için 8–10 dakikalık tur. **Production’da `demo:reset` yok.**
 
 ```bash
-curl -s -X POST http://localhost:3000/api/auth/otp/request \
-  -H 'content-type: application/json' \
-  -d '{"phone":"5321100002"}'
-# data.demoCode ile:
-curl -s -X POST http://localhost:3000/api/auth/otp/verify \
-  -H 'content-type: application/json' \
-  -d '{"phone":"5321100002","code":"......"}'
+# .env: WALLET_PENDING_WAIT_MS=60  (bekleyen kazanç 60 sn)
+npm run demo:reset
+npm run dev
 ```
 
----
+`demo:reset` mevcut `data/komsudan.db` dosyasını `data/backups/` altına kopyalar, sonra siler ve seed + örnek siparişleri kurar.
 
-## Ürün notları
+Geliştirmede OTP yanıtında ve giriş ekranında `demoCode` görünür (5 dk).
 
-- **Fiyat ve durum client’tan gelmez.** Tutar sunucuda.
-- Teslim yeri kullanıcıya **Gel al noktası** diye yazılır. API değeri hâlâ `drop: "nokta"`.
-- Saat: 09:00–19:00, 15 dk adım, süre 60 dk. Kaydırmalı tekerlek. `Bugün 10:15–11:15`.
-- **Musluk ayrı kategori değil.** Tamir kartının `home_visit` alt-tipi. `homeVisitStrategy.ready` **false** — eve giden sipariş elle açılmadan kabul edilmez.
-- Tip A (`delivery`): evde/atölyede hazırla, kapı veya gel al. Çamaşır, davet, dikiş… mezar.
-- Tip B (`home_visit`): eve git. Faz 8; randevu `start_at`/`end_at` + çakışma henüz yok.
+| Rol | Telefon | Ne görülür |
+|-----|---------|------------|
+| Müşteri | `5321100090` | Harita, sipariş, cüzdan (~2500 ₺), örnek işler |
+| Hizmet veren (Elif) | `5321100001` | Hizmet masası, gelen işler |
+| Hizmet Admini | `5321100099` | **Yönetim** (4. sekme), KPI, askı |
 
-Ödeme: siparişte authorize / teslimde capture (simülasyon). Bildirim: uygulama içi; gerçek SMS/push yok.
+Kimlik + cihaz kilidi demo hesaplarda işaretli. İzin penceresinde “şimdilik geç”. Keşif yeniden sorulursa “hizmet almak” + Çukurambar.
 
----
+### 8–10 dk senaryo
 
-## Mimari
+1. Müşteri `5321100090` — OTP’yi ekrandan yaz. Harita: Çukurambar iğneleri.
+2. **Acil teslim** aç; karta bas → sipariş sheet (paket, boy, pencere, tutar).
+3. **Sipariş** sekmesi; **Hesap** → cüzdan.
+4. Çıkış. Elif `5321100001` — **Hizmet**: kabul / yıkama / hazır. Hazır teslim kodu müşteride `5678`.
+5. Çıkış. Hizmet Admini `5321100099` — 4. sekme **Yönetim**: KPI, veren listesi, Elif “dikkat”. Askıya al → listeden düşer; açınca döner.
+6. İsteğe bağlı: yeni sipariş → teslim → bekleyen kazanç `WALLET_PENDING_WAIT_MS` sonra bakiye.
 
-Next.js **16.3.2** App Router + React 19 + TypeScript + Tailwind 4 + MapLibre + `better-sqlite3` + zod + jose.
+## Test komutları
 
-PWA şimdi; sonra RN / Flutter aynı **JSON API**’yi yer. Backend’i tek seferde yeniden yazma.
+| Komut | Açıklama |
+|--------|----------|
+| `npm test` | Vitest (120 test) |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | `next typegen` + `tsc --noEmit` |
+| `npm run knip` | Kullanılmayan dosya/export |
+| `npm run check` | lint + typecheck + test + knip |
+| `npm run build` | Üretim derlemesi |
+| `npm run demo:reset` | Temiz demo DB (`NODE_ENV!=production`) |
 
-| Katman | Yer | Kural |
-|---|---|---|
-| HTTP | `src/app/api/**/route.ts` | parse, auth, zod. İş kuralı yok. SQL yok. |
-| Servis | `src/lib/services/` | sipariş, fiyat, sağlayıcı, ödeme |
-| DB | `src/lib/db/` | client, migrate, sorgu |
-| Auth | `src/lib/auth/` | JWT, OTP, `requireAuth` |
-| SQL | `db/migrations/0001_….sql` | numaralı, git’te |
+## Bilinen sınırlar
 
-Cevap zarfı: `{ "data": {} }` veya `{ "error": { "code", "message" } }`.
+- **3b yok:** acil kontenjan, 18:00 dönüşü, iade/risk.
+- Gerçek ödeme ve çekim yok (cüzdan simülasyon).
+- Otomatik askı yok (Hizmet Admini elle askıya alır).
+- Kapıda renk grubu onayı yok.
+- Harita karoları demo anahtarsızsa “API KEY REQUIRED” filigranı gösterebilir.
+- Üretim OTP: `demoCode` alanı yok; `sms` metninde simülasyon kodu hâlâ durur.
 
-Pilot köprü: parça/birim fiyatı + Türkçe statü (`onay_bekliyor`). Hedefte kg + İngilizce lifecycle (`pending`). İkisi birden dönebilir.
+## Teknoloji
 
-**Deploy:** kalıcı `next start`. Ölçek: Turso veya Postgres; SQL yalnız `src/lib/db/`.
+| | |
+|--|--|
+| Uygulama | Next.js 16 App Router (JSON API + PWA), kalıcı `next start` |
+| UI | React 19, Tailwind CSS 4, MapLibre |
+| Veri | better-sqlite3 (`data/komsudan.db`), numaralı `db/migrations/` |
+| Auth | Telefon + OTP, JWT (`jose`) |
+| Doğrulama | Zod; cevap `{ data }` / `{ error }` |
+| Test | Vitest |
 
----
-
-## Faz (1 Eylül 2026)
-
-Bitti: 0–5 çekirdek, **6 ödeme**, **6.5 kategori**, **6.6 keşif**, **7 davet**, diğer Tip A kartlar, dispute/mesaj/pino parçaları.
-
-**Sırada: Faz 8 home-visit** (3b randevu zamanı + overlap). `ready`’yi rastgele açma.
-
-Orijinal “7 review / 8 dispute” **Faz 9+**.
-
----
-
-## Bilerek yapma
-
-- Fiyatı, status’u, teslim kodunu client’tan alma
-- Route’a SQL veya state machine koyma
-- `data/*.db` veya `.env` commit
-- Vercel / serverless
-- Musluk’u yeniden kategori açma
-- Faz atlama
-
-Commit mesajı Türkçe, neden odaklı.
+Katmanlar: route → `src/lib/services/` → `src/lib/db/`. Ayrıntı: [docs/mimari.md](docs/mimari.md).

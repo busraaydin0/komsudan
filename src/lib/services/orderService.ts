@@ -1,187 +1,164 @@
-import { randomInt, randomUUID } from "node:crypto";
-import { capacityLabelForPackage } from "@/lib/categories/registry";
-import { estimateFood, estimateFor, PIECES_MAX, PIECES_MIN, resolveExpress } from "@/lib/pricing";
-import { isAllowedOrderSlot } from "@/lib/timeWindow";
-import { loyaltyRate } from "@/lib/loyalty";
-import { getCategoryForProvider } from "@/lib/db/categories";
-import { getProduct, toPublicProduct } from "@/lib/db/products";
-import { getService, toPublicService } from "@/lib/db/services";
-import { getRepair, toPublicRepair } from "@/lib/db/repairs";
-import { getTech, toPublicTech } from "@/lib/db/tech";
-import { getWash, toPublicWash } from "@/lib/db/washes";
-import { getCourier, toPublicCourier } from "@/lib/db/couriers";
-import { getGarden, toPublicGarden } from "@/lib/db/gardens";
-import { dropsForFood, foodQtyBounds, foodUnitMeta } from "@/lib/food";
-import { dropsForSewing, sewingQtyBounds, sewingUnitMeta } from "@/lib/sewing";
-import { dropsForRepair, repairCanOrder, repairQtyBounds, repairUnitMeta } from "@/lib/repair";
-import { dropsForTech, techCanOrder, techQtyBounds, techUnitMeta } from "@/lib/tech";
-import { dropsForWash, washCanOrder, washQtyBounds } from "@/lib/wash";
-import { courierCanOrder, courierQtyBounds, dropsForCourier } from "@/lib/courier";
-import { dropsForGarden, gardenCanOrder, gardenQtyBounds } from "@/lib/garden";
-import { cargoCanOrder, cargoQtyBounds, dropsForCargo } from "@/lib/cargo";
-import { dropsForPrint, printCanOrder, printQtyBounds } from "@/lib/print";
-import { getPrint, toPublicPrint } from "@/lib/db/prints";
-import { dropsForPreserve, preserveCanOrder, preserveQtyBounds, preserveUnitMeta } from "@/lib/preserve";
-import { getPreserve, toPublicPreserve } from "@/lib/db/preserves";
-import { dropsForCarpet, carpetCanOrder, carpetQtyBounds } from "@/lib/carpet";
-import { getCarpet, toPublicCarpet } from "@/lib/db/carpets";
-import { dropsForLesson, lessonCanOrder, lessonQtyBounds } from "@/lib/lesson";
-import { getLesson, toPublicLesson } from "@/lib/db/lessons";
-import { dropsForTalk, talkCanOrder, talkQtyBounds } from "@/lib/talk";
-import { getTalk, toPublicTalk } from "@/lib/db/talks";
-import { dropsForGrave, graveCanOrder, graveQtyBounds, graveUnitMeta } from "@/lib/grave";
-import { getGrave, toPublicGrave } from "@/lib/db/graves";
-import { getCargo, toPublicCargo } from "@/lib/db/cargos";
-import { strategyFor, homeVisitStrategy, isHomeVisitFulfillment } from "@/lib/fulfillment";
+import { randomUUID } from "node:crypto";
+import { generatePublicCode } from "@/lib/handoff/codegen";
 import {
-  homeVisitNext,
-  isHomeVisitStatus,
-  pilotFromHomeVisit,
-  type HomeVisitAction,
-  type HomeVisitActor,
-} from "@/lib/homeVisit";
-import { getAppointmentForOrder, insertAppointment } from "@/lib/db/appointments";
-import { visitAddressForViewer, type VisitAddressViewer } from "@/lib/visitAddress";
+  issueReturnHandoffCode,
+  verifyHandoffPin,
+  customerHandoffSecrets,
+} from "@/lib/services/handoffService";
+import {
+  assertCanServeOrder,
+  planOrder,
+  remainingUnitsOnDate,
+  releaseOrderCapacity,
+  reserveOrderCapacity,
+  scheduleLine,
+} from "@/lib/services/capacityService";
+import { parseAllocations } from "@/lib/db/providerCapacity";
+import { addonKey, machineUnitsFor, type LaundrySize, type OrderAddonLine } from "@/lib/laundryModel";
+import { assertReadyForDroppedOff } from "@/lib/pickupRules";
+import {
+  addonsFromItems,
+  insertOrderItem,
+  listOrderItems,
+} from "@/lib/db/orderItems";
+import { ensureProviderPriceGrid, getAddonPrice } from "@/lib/db/providerPrices";
+import { quoteForProviderOrder } from "@/lib/pricingServer";
+import { getAppointment, insertAppointment, listAppointmentsForOrder } from "@/lib/db/appointments";
+import { listSlots } from "@/lib/db/providers";
+import { computeRespondBy } from "@/lib/scheduling/respondBy";
+import { pickupInstantIso, windowLabel } from "@/lib/scheduling/windows";
+import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
+import { assertCalendarWindow } from "@/lib/services/calendarService";
+import { laundryDeliveryStrategy } from "@/lib/fulfillment";
 import {
   canAddPhotos,
   canCancel,
-  lifecycleOf,
-  nextStatus,
-  PICKUP_CODE_LEN,
-  PICKUP_CODE_TRIES,
-  pilotFromLifecycle,
+  canTransition,
+  isOrderStatus,
+  nextOperationalStatus,
+  type OrderStatusId,
 } from "@/lib/status";
 import type {
-  ApiLifecycle,
+  AppointmentWindow,
   CreateOrderInput,
   DropMethod,
   Order,
   OrderPhotoKind,
-  OrderStatus,
   OrderStatusEvent,
   PackageId,
   PaymentStatus,
 } from "@/lib/types";
 import type { AuthUser } from "@/lib/auth/types";
-import { deliveredCount } from "@/lib/db/auth";
 import { getProfile } from "@/lib/db/providers";
 import {
-  addRemaining,
-  bumpCodeAttempts,
-  dropPointExists,
   getOrderRow,
-  getRemaining,
   insertOrderRow,
   listHistoryRows,
   listOrderRowsAll,
   listOrderRowsForCustomer,
   listOrderRowsForProvider,
   recordTransition,
-  rotatePickupCode,
   runOrderTx,
-  setPickupCode,
+  updateOrderCapacityCommit,
   updateOrderStatus,
   type OrderRow,
 } from "@/lib/db/orders";
-import { getProvider } from "@/server/catalog";
-import { addPhoto, photosForOrder } from "@/server/photos";
+import { getProvider } from "@/lib/services/catalogService";
+import { addPhoto, photosForOrder } from "@/lib/services/photoService";
 import { reviewForOrder } from "@/lib/services/reviewService";
 import { logger } from "@/lib/logger";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import {
   notifyNewOrder,
-  notifyPickupCodeRotated,
   notifyStatusChange,
 } from "@/lib/services/notificationService";
-import { authorizePayment, capturePayment, paymentForOrder, voidPayment } from "@/lib/services/paymentService";
+import {
+  authorizePayment,
+  capturePayment,
+  paymentForOrder,
+  paymentsForOrders,
+  voidPayment,
+} from "@/lib/services/paymentService";
 import { holdForOrder } from "@/lib/services/walletService";
 
-export type OrderAction = "accept" | "reject" | "advance" | "deliver" | HomeVisitAction;
+export type OrderAction = "accept" | "reject" | "advance" | "deliver";
 
-function genCode() {
-  return randomInt(0, 10 ** PICKUP_CODE_LEN)
-    .toString()
-    .padStart(PICKUP_CODE_LEN, "0");
+function deliveryMode(): "door" {
+  return "door";
 }
 
-function digits(raw: string) {
-  return raw.replace(/\D/g, "");
+function isCustomerViewer(viewer: AuthUser | undefined, row: OrderRow) {
+  if (!viewer) return false;
+  if (viewer.role === "admin") return false;
+  return row.user_id === viewer.id;
 }
 
-function deliveryMode(drop: DropMethod): "door" | "point" {
-  return drop === "kapi" ? "door" : "point";
+function assertDeliveryPhoto(orderId: string) {
+  const photos = photosForOrder(orderId);
+  if (!photos.some((p) => p.kind === "delivery")) {
+    throw new ApiError(400, "Teslim için en az bir teslim fotoğrafı gerekli.", "VALIDATION_ERROR");
+  }
 }
 
-function ensurePickupCode(row: OrderRow) {
-  if (row.status !== "hazir") return;
-  if (row.pickup_code) return;
-  const code = genCode();
-  setPickupCode(row.id, code);
-  row.pickup_code = code;
-}
-
-function viewerFor(user: AuthUser | undefined, row: OrderRow): VisitAddressViewer {
-  if (!user) return "other";
-  if (user.role === "admin") return "admin";
-  if (user.id === row.provider_id) return "provider";
-  if (user.id === row.user_id) return "customer";
-  return "other";
-}
-
-function toOrder(row: OrderRow, viewer?: AuthUser, lean = false): Order {
-  ensurePickupCode(row);
+function toOrder(
+  row: OrderRow,
+  viewer?: AuthUser,
+  lean = false,
+  payCache?: Map<string, ReturnType<typeof paymentForOrder>>,
+): Order {
   const drop = row.drop_method as DropMethod;
-  const status = row.status as OrderStatus;
-  const pay = paymentForOrder(row.id);
+  const status = row.status as OrderStatusId;
+  const pay = payCache?.get(row.id) ?? paymentForOrder(row.id);
   const payStatus = (pay?.status ?? row.payment_status) as PaymentStatus;
-  const fulfillmentType = row.fulfillment_type === "home_visit" ? "home_visit" : "dropoff";
-  const visit = visitAddressForViewer({
-    fulfillmentType,
-    lifecycle: row.lifecycle,
-    viewer: viewerFor(viewer, row),
-    district: row.visit_district,
-    neighborhood: row.visit_neighborhood,
-    address: row.visit_address,
-  });
-  const apt = fulfillmentType === "home_visit" ? getAppointmentForOrder(row.id) : undefined;
+  const items = lean ? [] : listOrderItems(row.id);
+  const addons = addonsFromItems(items);
+  const size = (row.size ?? items.find((i) => i.kind === "size")?.variant) as LaundrySize;
   return {
     id: row.id,
     providerId: row.provider_id,
     packageId: row.package_id as Order["packageId"],
-    pieces: row.pieces,
+    size: size ?? "orta",
+    confirmedSize: row.confirmed_size,
+    addons,
+    machineUnits: row.machine_units,
     express: Boolean(row.express),
     drop,
-    dropPointId: row.drop_point_id,
     slot: row.slot,
+    pickup: (() => {
+      const a = lean ? null : listAppointmentsForOrder(row.id).find((x) => x.kind === "pickup");
+      return a ? { date: a.date, windowStart: a.window_start, windowEnd: a.window_end } : null;
+    })(),
+    delivery: (() => {
+      const a = lean ? null : listAppointmentsForOrder(row.id).find((x) => x.kind === "delivery");
+      return a ? { date: a.date, windowStart: a.window_start, windowEnd: a.window_end } : null;
+    })(),
+    respondBy: row.respond_by ?? null,
     note: row.note,
-    productId: row.product_id,
-    productName: row.product_name,
-    guestCount: row.guest_count,
-    allergyNote: row.allergy_note,
-    fulfillmentType,
-    visitDistrict: visit.district,
-    visitNeighborhood: visit.neighborhood,
-    visitAddress: visit.address,
-    appointment: apt
-      ? { date: apt.date, windowStart: apt.window_start, windowEnd: apt.window_end }
-      : null,
+    fulfillmentType: "dropoff",
     total: row.total,
     commission: row.commission,
     status,
     createdAt: row.created_at,
     photos: lean ? [] : photosForOrder(row.id),
     review: lean ? null : reviewForOrder(row.id),
-    pickupCode: status === "hazir" ? row.pickup_code : null,
+    publicCode: row.public_code ?? null,
+    pickupHandoffCode: isCustomerViewer(viewer, row) ? customerHandoffSecrets(row).pickupHandoffCode : null,
+    returnHandoffCode: isCustomerViewer(viewer, row) ? customerHandoffSecrets(row).returnHandoffCode : null,
+    pickupSummaryApprovedAt: row.pickup_summary_approved_at ?? null,
+    adminHold: Boolean(row.admin_hold),
+    disputeWindowEnd: row.dispute_window_end ?? null,
     paymentStatus: payStatus,
     paidAt: payStatus === "captured" ? (pay?.updatedAt ?? row.paid_at) : row.paid_at,
     payment: pay,
     customerId: row.user_id,
-    lifecycle: (fulfillmentType === "home_visit" ? row.lifecycle : lifecycleOf(status, row.lifecycle)) as Order["lifecycle"],
-    deliveryMode: (row.delivery_mode as "door" | "point" | null) ?? deliveryMode(drop),
-    estimatedWeight: row.estimated_weight ?? row.pieces,
-    pricePerKgSnapshot: row.price_per_kg_snapshot ?? 0,
-    estimatedPrice: row.estimated_price ?? row.total,
-    finalPrice: row.final_price,
+    deliveryMode: (row.delivery_mode as "door" | "point" | null) ?? deliveryMode(),
+    priceChange: row.price_change ?? "none",
+    colorGroups: row.color_groups,
+    pickupConfirmedAt: row.pickup_confirmed_at,
+    cancelReason: row.cancel_reason,
+    estimatedDeliveryDate: row.estimated_delivery_date ?? null,
+    promisedDeliveryDate: row.promised_delivery_date ?? null,
+    delayCount: row.delay_count ?? 0,
     updatedAt: row.updated_at,
   };
 }
@@ -189,12 +166,16 @@ function toOrder(row: OrderRow, viewer?: AuthUser, lean = false): Order {
 /** Şimdilik: giriş yapan herkes tüm siparişleri listelesin / açsın (pilot). */
 const PILOT_SEE_ALL_ORDERS = true;
 
-export function canSeeOrder(user: AuthUser, row: OrderRow) {
-  if (PILOT_SEE_ALL_ORDERS) return true;
+export function isOrderParty(user: AuthUser, row: OrderRow) {
   if (user.role === "admin") return true;
   if (row.user_id === user.id) return true;
   if (row.provider_id === user.id) return true;
   return false;
+}
+
+export function canSeeOrder(user: AuthUser, row: OrderRow) {
+  if (PILOT_SEE_ALL_ORDERS) return true;
+  return isOrderParty(user, row);
 }
 
 /** Şimdilik kapalı: PWA masasında siparişi gören (müşteri dahil) kabul/ilerletsin. */
@@ -207,9 +188,9 @@ function canMutateOrder(user: AuthUser, row: OrderRow) {
   return user.role === "provider" && row.provider_id === user.id;
 }
 
-export function getOrder(id: string): Order | undefined {
+export function getOrder(id: string, viewer?: AuthUser): Order | undefined {
   const row = getOrderRow(id);
-  return row ? toOrder(row) : undefined;
+  return row ? toOrder(row, viewer) : undefined;
 }
 
 export function getOrderFor(user: AuthUser, id: string): Order {
@@ -220,17 +201,18 @@ export function getOrderFor(user: AuthUser, id: string): Order {
   return toOrder(row, user);
 }
 
-export function listOrdersFor(user: AuthUser): Order[] {
+export function listOrdersFor(user: AuthUser, limit = 100, offset = 0): Order[] {
   const asProvider = user.role === "provider" || Boolean(getProfile(user.id));
   const rows =
     user.role === "admin" || PILOT_SEE_ALL_ORDERS
-      ? listOrderRowsAll()
+      ? listOrderRowsAll(limit, offset)
       : asProvider
-        ? listOrderRowsForProvider(user.id)
-        : listOrderRowsForCustomer(user.id);
+        ? listOrderRowsForProvider(user.id, limit, offset)
+        : listOrderRowsForCustomer(user.id, limit, offset);
+  const payCache = paymentsForOrders(rows.map((r) => r.id));
   return rows.flatMap((row) => {
     try {
-      return [toOrder(row, user, true)];
+      return [toOrder(row, user, true, payCache)];
     } catch (e) {
       logger.error({ err: e, orderId: row.id }, "Sipariş satırı okunamadı.");
       return [];
@@ -241,133 +223,112 @@ export function listOrdersFor(user: AuthUser): Order[] {
 export function createOrder(input: CreateOrderInput, userId: string): Order {
   const provider = getProvider(input.providerId);
   if (!provider) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
-  const cat = getCategoryForProvider(provider.id);
-  assertFulfillmentReady(provider.id);
-
-  if (cat.id === "davet") return createDavetOrder(input, userId, provider);
-  if (cat.id === "dikis") return createDikisOrder(input, userId, provider);
-  if (cat.id === "tamir") return createTamirOrder(input, userId, provider);
-  if (cat.id === "teknoloji") return createTeknolojiOrder(input, userId, provider);
-  if (cat.id === "araba") return createArabaOrder(input, userId, provider);
-  if (cat.id === "kurye") return createKuryeOrder(input, userId, provider);
-  if (cat.id === "bahce") return createBahceOrder(input, userId, provider);
-  if (cat.id === "kargo") return createKargoOrder(input, userId, provider);
-  if (cat.id === "cikti") return createCiktiOrder(input, userId, provider);
-  if (cat.id === "kislik") return createKislikOrder(input, userId, provider);
-  if (cat.id === "hali") return createHaliOrder(input, userId, provider);
-  if (cat.id === "odev") return createOdevOrder(input, userId, provider);
-  if (cat.id === "dil") return createDilOrder(input, userId, provider);
-  if (cat.id === "mezar") return createMezarOrder(input, userId, provider);
+  const profile = getProfile(input.providerId);
+  if (profile?.suspended) {
+    throw new ApiError(409, "Bu hizmet veren askıda; yeni sipariş alınamaz.", "PROVIDER_SUSPENDED");
+  }
+  assertFulfillmentReady();
   return createLaundryOrder(input, userId, provider);
 }
 
-function requireSlot(input: CreateOrderInput) {
-  const slot = (input.slot ?? "").trim();
-  if (!slot) throw new ApiError(400, "Saat dilimi gerekli.", "VALIDATION_ERROR");
-  return slot;
-}
-
-function validateDropAndSlot(provider: NonNullable<ReturnType<typeof getProvider>>, input: CreateOrderInput) {
-  if (!provider.drops.includes(input.drop)) {
+function validateDrop(provider: NonNullable<ReturnType<typeof getProvider>>, input: CreateOrderInput) {
+  if (input.drop !== "kapi" || !provider.drops.includes("kapi")) {
     throw new ApiError(400, "Bu teslimat yöntemi kapalı.", "VALIDATION_ERROR");
   }
+}
 
-  let dropPointId: string | null = null;
-  if (input.drop === "nokta") {
-    if (!input.dropPointId || !dropPointExists(input.dropPointId)) {
-      throw new ApiError(400, "Gel al noktası seç.", "VALIDATION_ERROR");
-    }
-    dropPointId = input.dropPointId;
+function validateWindows(
+  providerId: string,
+  input: CreateOrderInput,
+  minDeliveryDate: string,
+  express = false,
+) {
+  const now = new Date();
+  try {
+    assertCalendarWindow(providerId, input.pickup, now, express);
+    assertCalendarWindow(providerId, input.delivery, now, express);
+  } catch {
+    throw new ApiError(400, "Seçilen pencere müsait değil.", "VALIDATION_ERROR");
   }
+  if (input.delivery.date < minDeliveryDate) {
+    throw new ApiError(400, "Teslim penceresi işlem süresinden önce olamaz.", "VALIDATION_ERROR");
+  }
+  if (input.delivery.date < input.pickup.date) {
+    throw new ApiError(400, "Teslim alımdan önce teslim olamaz.", "VALIDATION_ERROR");
+  }
+}
 
-  if (!isAllowedOrderSlot(requireSlot(input), provider.slots)) {
-    throw new ApiError(400, "Saat 09:00–19:00 içinde, 15 dakikanın katı olmalı.", "VALIDATION_ERROR");
-  }
-  return dropPointId;
+function normalizeAddons(raw?: OrderAddonLine[]) {
+  return (raw ?? []).filter((a) => a.qty > 0);
 }
 
 function insertPendingOrder(args: {
   providerId: string;
   packageId: string;
-  pieces: number;
+  size: LaundrySize;
+  addons: OrderAddonLine[];
   express: boolean;
   drop: DropMethod;
-  dropPointId: string | null;
   slot: string;
+  pickup: AppointmentWindow;
+  delivery: AppointmentWindow;
   note: string;
-  quote: { total: number; commission: number; perPiece: number };
+  quote: { total: number; commission: number; machineUnits: number; sizePrice: number };
   userId: string;
-  productId?: string | null;
-  productName?: string | null;
-  guestCount?: number | null;
-  allergyNote?: string | null;
-  fulfillmentType?: "dropoff" | "home_visit";
-  visitDistrict?: string | null;
-  visitNeighborhood?: string | null;
-  visitAddress?: string | null;
-  addressShareConsent?: boolean;
-  appointment?: { date: string; windowStart: string; windowEnd: string } | null;
+  estimatedDeliveryDate: string | null;
+  respondBy: string;
 }) {
   const now = new Date().toISOString();
   const id = `k-${randomUUID().slice(0, 8)}`;
-  const capacityLabel = capacityLabelForPackage(args.packageId);
   runOrderTx(() => {
-    const remaining = getRemaining(args.providerId);
-    if (remaining == null) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
-    if (remaining < args.pieces) {
-      throw new ApiError(409, `Bugün yalnızca ${remaining} ${capacityLabel} var.`, "CAPACITY");
-    }
-    holdForOrder(args.userId, id, args.quote.total);
-    addRemaining(args.providerId, -args.pieces);
     insertOrderRow({
       id,
       provider_id: args.providerId,
       package_id: args.packageId,
-      pieces: args.pieces,
       express: args.express ? 1 : 0,
       drop_method: args.drop,
-      drop_point_id: args.dropPointId,
       slot: args.slot,
       note: args.note,
       total: args.quote.total,
       commission: args.quote.commission,
-      status: "onay_bekliyor",
+      status: "pending",
       created_at: now,
       updated_at: now,
       user_id: args.userId,
-      price_per_kg_snapshot: args.quote.perPiece,
-      estimated_weight: args.pieces,
-      estimated_price: args.quote.total,
-      delivery_mode: deliveryMode(args.drop),
-      scheduled_window_start: args.slot,
-      lifecycle: "pending",
-      product_id: args.productId ?? null,
-      product_name: args.productName ?? null,
-      guest_count: args.guestCount ?? null,
-      allergy_note: args.allergyNote ?? null,
-      fulfillment_type: args.fulfillmentType ?? "dropoff",
-      visit_district: args.visitDistrict ?? null,
-      visit_neighborhood: args.visitNeighborhood ?? null,
-      visit_address: args.visitAddress ?? null,
-      address_share_consent: args.addressShareConsent ? 1 : 0,
+      delivery_mode: deliveryMode(),
+      scheduled_window_start: `${args.pickup.date}T${args.pickup.windowStart}:00+03:00`,
+      size: args.size,
+      machine_units: args.quote.machineUnits,
+      estimated_delivery_date: args.estimatedDeliveryDate,
+      respond_by: args.respondBy,
+      public_code: generatePublicCode(),
     });
-    if (args.fulfillmentType === "home_visit" && args.appointment) {
-      insertAppointment({
-        orderId: id,
-        date: args.appointment.date,
-        windowStart: args.appointment.windowStart,
-        windowEnd: args.appointment.windowEnd,
-        at: now,
+    insertOrderItem({
+      order_id: id,
+      kind: "size",
+      variant: args.size,
+      qty: 1,
+      unit_price: args.quote.sizePrice,
+    });
+    for (const a of args.addons) {
+      const key = addonKey(a.addon, a.variant);
+      const unit = getAddonPrice(args.providerId, a.addon, a.variant);
+      if (unit == null) throw new ApiError(400, "Ek fiyatı tanımlı değil.", "VALIDATION_ERROR");
+      insertOrderItem({
+        order_id: id,
+        kind: "addon",
+        variant: key,
+        qty: a.qty,
+        unit_price: unit,
       });
     }
     recordTransition({
       orderId: id,
       fromStatus: null,
-      toStatus: "onay_bekliyor",
-      fromLifecycle: null,
-      toLifecycle: "pending",
+      toStatus: "pending",
       actorId: args.userId,
       actorRole: "customer",
+      note: null,
       at: now,
     });
     authorizePayment({
@@ -376,844 +337,142 @@ function insertPendingOrder(args: {
       commission: args.quote.commission,
       at: now,
     });
+    insertAppointment({
+      orderId: id,
+      kind: "pickup",
+      date: args.pickup.date,
+      windowStart: args.pickup.windowStart,
+      windowEnd: args.pickup.windowEnd,
+      at: now,
+    });
+    insertAppointment({
+      orderId: id,
+      kind: "delivery",
+      date: args.delivery.date,
+      windowStart: args.delivery.windowStart,
+      windowEnd: args.delivery.windowEnd,
+      at: now,
+    });
+    // ledger.order_id → orders: rezerv sipariş satırından sonra (FK).
+    holdForOrder(args.userId, id, args.quote.total);
   });
   return id;
 }
 
 function createLaundryOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const pieces = Math.round(input.pieces ?? NaN);
-  if (!Number.isFinite(pieces) || pieces < PIECES_MIN || pieces > PIECES_MAX) {
-    throw new ApiError(400, `Parça sayısı ${PIECES_MIN}–${PIECES_MAX} olmalı.`, "VALIDATION_ERROR");
-  }
   if (!input.packageId) {
     throw new ApiError(400, "Paket seç.", "VALIDATION_ERROR");
-  }
-  if (input.productId) {
-    throw new ApiError(400, "Çamaşır siparişinde menü ürünü yok.", "VALIDATION_ERROR");
   }
 
   const pack = provider.packages.find((p) => p.id === input.packageId);
   if (!pack) throw new ApiError(400, "Bu paket bu komşuda yok.", "VALIDATION_ERROR");
 
-  const express = resolveExpress(provider.express, requireSlot(input));
-  if (input.express && !provider.express) {
-    throw new ApiError(400, "Bu komşu aynı gün almıyor.", "VALIDATION_ERROR");
+  validateDrop(provider, input);
+  ensureProviderPriceGrid(provider.id);
+  const addons = normalizeAddons(input.addons);
+  const express = Boolean(input.express);
+  const now = new Date();
+  const units = machineUnitsFor(input.size, addons);
+  if (express) {
+    if (!provider.express) {
+      throw new ApiError(400, "Bu hizmet veren acil teslim sunmuyor.", "EXPRESS_NOT_OFFERED");
+    }
+    if (input.pickup.date !== isoDateInIstanbul(now)) {
+      throw new ApiError(400, "Acil teslim yalnız bugün alım için seçilebilir.", "EXPRESS_NOT_TODAY");
+    }
+    const start = pickupInstantIso(input.pickup.date, input.pickup.windowStart);
+    if (start.getTime() < now.getTime() + 60 * 60 * 1000) {
+      throw new ApiError(400, "Acil alım için pencere başlangıcına en az 1 saat kalmalı.", "EXPRESS_LEAD_TIME");
+    }
+    const free = remainingUnitsOnDate(provider.id, input.pickup.date);
+    if (units > free) {
+      throw new ApiError(409, "Bugünün kalan kapasitesi bu acil sipariş için yetmiyor.", "CAPACITY");
+    }
   }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFor(
-    provider,
-    pieces,
-    input.packageId,
+  const line = scheduleLine({
+    packageId: input.packageId,
+    machineUnits: 0,
+    addons,
+    pickupDate: input.pickup.date,
     express,
-    loyaltyRate(deliveredCount(userId)),
+    pickupWindowStart: input.pickup.windowStart,
+  });
+  const quotePreview = quoteForProviderOrder(
+    provider.id,
+    input.packageId,
+    input.size,
+    addons,
+    express,
   );
+  line.machineUnits = quotePreview.machineUnits;
+  const plan = planOrder(provider.id, line);
+  if (!plan) {
+    throw new ApiError(409, "Bu tarihlerde kapasite uygun değil.", "CAPACITY");
+  }
+  validateWindows(provider.id, input, plan.deliveryDate, express);
+  const quote = quotePreview;
+  assertCanServeOrder(provider.id, quote.machineUnits);
+  const slot = windowLabel(input.pickup.date, input.pickup.windowStart, input.pickup.windowEnd);
+  const createdAt = now;
+  const respondBy = computeRespondBy(createdAt, listSlots(provider.id, true), express);
+
   const id = insertPendingOrder({
     providerId: provider.id,
     packageId: input.packageId,
-    pieces,
+    size: input.size,
+    addons,
     express,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces,
-  });
-  return order;
-}
-
-function createDavetOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const productId = (input.productId ?? "").trim();
-  if (!productId) throw new ApiError(400, "Ürün seç.", "VALIDATION_ERROR");
-  const product = getProduct(productId);
-  if (!product || product.provider_id !== provider.id || !product.is_active) {
-    throw new ApiError(400, "Bu ürün bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const guests = Math.round(input.guestCount ?? NaN);
-  const card = toPublicProduct(product);
-  const { min, max } = foodQtyBounds(card);
-  const unit = foodUnitMeta(card.priceUnit).qty;
-  if (!Number.isFinite(guests) || guests < min || guests > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} ${unit} olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allergy = (input.allergyNote ?? "").trim();
-  if (!allergy) {
-    throw new ApiError(400, "Alerji durumunu yaz. Yoksa “yok” de.", "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForFood(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu ürün için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(guests, product.price_per_person, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "davet",
-    pieces: guests,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: product.id,
-    productName: product.name,
-    guestCount: guests,
-    allergyNote: allergy.slice(0, 300),
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: guests,
-  });
-  return order;
-}
-
-function createDikisOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const serviceId = (input.productId ?? "").trim();
-  if (!serviceId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getService(serviceId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const card = toPublicService(row);
-  const { min, max } = sewingQtyBounds(card);
-  const unit = sewingUnitMeta(card.priceUnit).qty;
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} ${unit} olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForSewing(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "dikis",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
-}
-
-function createTamirOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const repairId = (input.productId ?? "").trim();
-  if (!repairId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getRepair(repairId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const card = toPublicRepair(row);
-  if (!repairCanOrder(card)) {
-    throw new ApiError(400, "Bu iş için önce inceleme. Fiyat ürünü görünce netleşir.", "VALIDATION_ERROR");
-  }
-
-  const fulfillmentType = card.fulfillmentType === "home_visit" ? "home_visit" : "dropoff";
-  if (fulfillmentType === "home_visit" && !homeVisitStrategy.ready) {
-    throw new ApiError(409, "Eve gelen tamir henüz açık değil.", "CATEGORY_NOT_READY");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = repairQtyBounds(card);
-  const unit = repairUnitMeta(card.priceUnit).qty;
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} ${unit} olmalı.`, "VALIDATION_ERROR");
-  }
-
-  let dropPointId: string | null = null;
-  let slot = "";
-  let drop = input.drop;
-  let appointment: { date: string; windowStart: string; windowEnd: string } | null = null;
-  let visitDistrict: string | null = null;
-  let visitNeighborhood: string | null = null;
-  let visitAddress: string | null = null;
-  let addressShareConsent = false;
-
-  if (fulfillmentType === "home_visit") {
-    drop = "kapi";
-    const date = (input.appointmentDate ?? "").trim();
-    const windowStart = (input.appointmentWindowStart ?? "").trim();
-    const windowEnd = (input.appointmentWindowEnd ?? "").trim();
-    if (!date || !windowStart || !windowEnd) {
-      throw new ApiError(400, "Randevu tarihi ve saat aralığı gerekli.", "VALIDATION_ERROR");
-    }
-    visitDistrict = (input.visitDistrict ?? "").trim().slice(0, 80) || null;
-    visitNeighborhood = (input.visitNeighborhood ?? "").trim().slice(0, 80) || null;
-    visitAddress = (input.visitAddress ?? "").trim().slice(0, 200) || null;
-    if (!visitDistrict || !visitNeighborhood || !visitAddress) {
-      throw new ApiError(400, "İlçe, mahalle ve tam adres gerekli.", "VALIDATION_ERROR");
-    }
-    if (!input.addressShareConsent) {
-      throw new ApiError(400, "Adres paylaşımı için açık rıza gerekli.", "VALIDATION_ERROR");
-    }
-    addressShareConsent = true;
-    appointment = { date, windowStart, windowEnd };
-    slot = `${date} ${windowStart}–${windowEnd}`;
-  } else {
-    const allowedDrops = dropsForRepair(card, provider.drops);
-    if (!allowedDrops.includes(input.drop)) {
-      throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-    }
-    dropPointId = validateDropAndSlot(provider, input);
-    slot = requireSlot(input);
-  }
-
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "tamir",
-    pieces: qty,
-    express: false,
-    drop,
-    dropPointId,
+    drop: "kapi",
     slot,
+    pickup: input.pickup,
+    delivery: input.delivery,
     note: (input.note ?? "").trim().slice(0, 500),
     quote,
     userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-    fulfillmentType,
-    visitDistrict,
-    visitNeighborhood,
-    visitAddress,
-    addressShareConsent,
-    appointment,
+    estimatedDeliveryDate: plan.deliveryDate,
+    respondBy,
   });
   const order = getOrder(id)!;
   notifyNewOrder({
     id,
     provider_id: provider.id,
     user_id: userId,
-    pieces: qty,
+    machineUnits: quote.machineUnits,
   });
   return order;
 }
 
-function createTeknolojiOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const techId = (input.productId ?? "").trim();
-  if (!techId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getTech(techId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
+function orderStatus(row: OrderRow): OrderStatusId {
+  if (!isOrderStatus(row.status)) {
+    throw new ApiError(500, "Geçersiz sipariş durumu.", "INTERNAL");
   }
-
-  const card = toPublicTech(row);
-  if (!techCanOrder(card)) {
-    throw new ApiError(400, "Bu iş için önce inceleme. Fiyat cihazı görünce netleşir.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = techQtyBounds(card);
-  const unit = techUnitMeta(card.priceUnit).qty;
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} ${unit} olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForTech(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "teknoloji",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
+  return row.status;
 }
 
-function createArabaOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const washId = (input.productId ?? "").trim();
-  if (!washId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getWash(washId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const card = toPublicWash(row);
-  if (!washCanOrder(card)) {
-    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = washQtyBounds(card);
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} araç olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForWash(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "araba",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
-}
-
-function createKuryeOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const courierId = (input.productId ?? "").trim();
-  if (!courierId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getCourier(courierId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const card = toPublicCourier(row);
-  if (!courierCanOrder(card)) {
-    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = courierQtyBounds(card);
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} gönderi olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForCourier(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "kurye",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
-}
-
-function createBahceOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const gardenId = (input.productId ?? "").trim();
-  if (!gardenId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getGarden(gardenId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const card = toPublicGarden(row);
-  if (!gardenCanOrder(card)) {
-    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = gardenQtyBounds(card);
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} iş olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForGarden(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "bahce",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
-}
-
-function createKargoOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const cargoId = (input.productId ?? "").trim();
-  if (!cargoId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getCargo(cargoId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const card = toPublicCargo(row);
-  if (!cargoCanOrder(card)) {
-    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = cargoQtyBounds(card);
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} paket olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForCargo(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "kargo",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
-}
-
-function createCiktiOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const printId = (input.productId ?? "").trim();
-  if (!printId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getPrint(printId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const card = toPublicPrint(row);
-  if (!printCanOrder(card)) {
-    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = printQtyBounds(card, provider.remaining);
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} sayfa olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForPrint(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "cikti",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
-}
-
-function createKislikOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const preserveId = (input.productId ?? "").trim();
-  if (!preserveId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getPreserve(preserveId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const card = toPublicPreserve(row);
-  if (!preserveCanOrder(card)) {
-    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = preserveQtyBounds(card, provider.remaining);
-  const unit = preserveUnitMeta(card.priceUnit);
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} ${unit.qty} olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForPreserve(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "kislik",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
-}
-
-function createHaliOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const carpetId = (input.productId ?? "").trim();
-  if (!carpetId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getCarpet(carpetId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const card = toPublicCarpet(row);
-  if (!carpetCanOrder(card)) {
-    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = carpetQtyBounds(card, provider.remaining);
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} adet olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForCarpet(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "hali",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
-}
-
-function createOdevOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const lessonId = (input.productId ?? "").trim();
-  if (!lessonId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getLesson(lessonId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const card = toPublicLesson(row);
-  if (!lessonCanOrder(card)) {
-    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = lessonQtyBounds(card, provider.remaining);
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} ders olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForLesson(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "odev",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
-}
-
-function createDilOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const talkId = (input.productId ?? "").trim();
-  if (!talkId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getTalk(talkId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const card = toPublicTalk(row);
-  if (!talkCanOrder(card)) {
-    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = talkQtyBounds(card, provider.remaining);
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} görüşme olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForTalk(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "dil",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
-}
-
-function createMezarOrder(input: CreateOrderInput, userId: string, provider: NonNullable<ReturnType<typeof getProvider>>): Order {
-  const graveId = (input.productId ?? "").trim();
-  if (!graveId) throw new ApiError(400, "Hizmet seç.", "VALIDATION_ERROR");
-  const row = getGrave(graveId);
-  if (!row || row.provider_id !== provider.id || !row.is_active) {
-    throw new ApiError(400, "Bu hizmet bu komşuda yok.", "VALIDATION_ERROR");
-  }
-
-  const card = toPublicGrave(row);
-  if (!graveCanOrder(card)) {
-    throw new ApiError(400, "Bu hizmet için fiyat yok.", "VALIDATION_ERROR");
-  }
-
-  const qty = Math.round(input.guestCount ?? input.pieces ?? NaN);
-  const { min, max } = graveQtyBounds(card, provider.remaining);
-  const unit = graveUnitMeta(card.pricing);
-  if (!Number.isFinite(qty) || qty < min || qty > max) {
-    throw new ApiError(400, `Miktar ${min}–${max} ${unit.qty} olmalı.`, "VALIDATION_ERROR");
-  }
-
-  const allowedDrops = dropsForGrave(card, provider.drops);
-  if (!allowedDrops.includes(input.drop)) {
-    throw new ApiError(400, "Bu hizmet için bu teslimat kapalı.", "VALIDATION_ERROR");
-  }
-
-  const dropPointId = validateDropAndSlot(provider, input);
-  const quote = estimateFood(qty, row.price, loyaltyRate(deliveredCount(userId)));
-  const id = insertPendingOrder({
-    providerId: provider.id,
-    packageId: "mezar",
-    pieces: qty,
-    express: false,
-    drop: input.drop,
-    dropPointId,
-    slot: requireSlot(input),
-    note: (input.note ?? "").trim().slice(0, 500),
-    quote,
-    userId,
-    productId: row.id,
-    productName: row.name,
-    guestCount: qty,
-  });
-  const order = getOrder(id)!;
-  notifyNewOrder({
-    id,
-    provider_id: provider.id,
-    user_id: userId,
-    pieces: qty,
-  });
-  return order;
-}
-
-function currentLifecycle(row: OrderRow): ApiLifecycle {
-  return lifecycleOf(row.status as OrderStatus, row.lifecycle);
-}
-
-function assertFulfillmentReady(providerId: string, fulfillmentType?: string) {
-  const cat = getCategoryForProvider(providerId);
-  const strat = strategyFor(cat.fulfillment_mode, cat.id, fulfillmentType);
-  if (!strat.ready) {
+function assertFulfillmentReady() {
+  if (!laundryDeliveryStrategy.ready) {
     throw new ApiError(409, "Bu hizmet tipi henüz açık değil.", "CATEGORY_NOT_READY");
   }
-  return strat;
+  return laundryDeliveryStrategy;
 }
 
-function assertCanMove(row: OrderRow, from: ApiLifecycle, to: ApiLifecycle, packageId: PackageId) {
-  const strat = strategyFor(
-    getCategoryForProvider(row.provider_id).fulfillment_mode,
-    getCategoryForProvider(row.provider_id).id,
-    row.fulfillment_type,
-  );
-  if (!strat.ready) {
-    throw new ApiError(409, "Bu hizmet tipi henüz açık değil.", "CATEGORY_NOT_READY");
+function assertCanMove(row: OrderRow, from: OrderStatusId, to: OrderStatusId, user: AuthUser, packageId: PackageId) {
+  assertFulfillmentReady();
+  const isOrderParty = row.user_id === user.id || row.provider_id === user.id;
+  const roleForCheck =
+    user.role === "admin"
+      ? "admin"
+      : !REQUIRE_PROVIDER_TO_MUTATE && canMutateOrder(user, row)
+        ? "provider"
+        : user.role;
+  if (
+    canTransition(from, to, roleForCheck, {
+      packageId,
+      isOrderParty,
+    })
+  ) {
+    return;
   }
-  if (strat.canTransition(from, to, packageId)) return;
   if (to === "ironing" && packageId !== "tam") {
     throw new ApiError(409, "Ütü bu pakette yok.", "INVALID_TRANSITION");
   }
@@ -1223,157 +482,140 @@ function assertCanMove(row: OrderRow, from: ApiLifecycle, to: ApiLifecycle, pack
   throw new ApiError(409, "Bu duruma geçilemez.", "INVALID_TRANSITION");
 }
 
-function assertStatusRole(user: AuthUser, row: OrderRow, next: ApiLifecycle) {
-  if (user.role === "admin") return;
-  if (next === "completed") {
-    if (row.user_id === user.id || row.provider_id === user.id) return;
-    throw new ApiError(403, "Teslimi yalnızca taraflar onaylar.", "FORBIDDEN");
-  }
-  if (canMutateOrder(user, row)) return;
-  throw new ApiError(403, "Bu siparişi yalnızca hizmet veren ilerletebilir.", "FORBIDDEN");
-}
-
-function verifyPickupCode(row: OrderRow, code: string | undefined, now: string) {
-  const entered = digits(code ?? "");
-  const expected = row.pickup_code ?? "";
-  if (entered.length !== PICKUP_CODE_LEN || entered !== expected) {
-    const attempts = (row.code_attempts ?? 0) + 1;
-    if (attempts >= PICKUP_CODE_TRIES) {
-      const fresh = genCode();
-      rotatePickupCode(row.id, fresh, now);
-      notifyPickupCodeRotated(row, fresh);
-      throw new ApiError(
-        409,
-        "Beş hatalı deneme. Yeni kod müşteriye gitti (SMS simülasyonu).",
-        "INVALID_CODE",
-      );
-    }
-    bumpCodeAttempts(row.id, attempts, now);
-    throw new ApiError(409, `Kod uyuşmadı. Kalan deneme: ${PICKUP_CODE_TRIES - attempts}.`, "INVALID_CODE");
-  }
+export function completeOrderOverride(user: AuthUser, orderId: string, reason: string) {
+  return applyStatus(orderId, user, "completed", undefined, `override:${reason}`, { skipHandoff: true });
 }
 
 export function applyStatus(
   id: string,
   user: AuthUser,
-  next: ApiLifecycle,
+  next: OrderStatusId,
   code?: string,
   note?: string,
+  opts?: { skipHandoff?: boolean },
 ): Order {
   const row = getOrderRow(id);
   if (!row || !canSeeOrder(user, row)) {
     throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
   }
-  if (isHomeVisitFulfillment(row.fulfillment_type)) {
-    throw new ApiError(400, "Bu siparişte durum gönderilmez, aksiyon gönder.", "VALIDATION_ERROR");
-  }
-  const from = currentLifecycle(row);
+  const from = orderStatus(row);
   const pack = row.package_id as PackageId;
-  assertCanMove(row, from, next, pack);
-  assertStatusRole(user, row, next);
+  assertCanMove(row, from, next, user, pack);
+  if (next === "dropped_off") assertReadyForDroppedOff(row);
 
   const now = new Date().toISOString();
-  if (next === "completed") verifyPickupCode(row, code, now);
+  if (next === "dropped_off") {
+    verifyHandoffPin(row, "pickup", code, user.id, now);
+  }
+  if (next === "completed" && !opts?.skipHandoff) {
+    assertDeliveryPhoto(id);
+    verifyHandoffPin(row, "return", code, user.id, now);
+  }
 
-  const nextPilot = pilotFromLifecycle(next);
-  const issuedCode = next === "ready" ? genCode() : null;
   const capture = next === "completed";
   const voidPay = next === "rejected" || next === "cancelled";
 
   runOrderTx(() => {
-    if (issuedCode) {
-      updateOrderStatus({
-        id,
-        status: nextPilot,
-        lifecycle: next,
-        updatedAt: now,
-        pickupCode: issuedCode,
-      });
+    if (next === "ready") {
+      issueReturnHandoffCode(id);
+      updateOrderStatus({ id, status: next, updatedAt: now });
     } else if (capture) {
       updateOrderStatus({
         id,
-        status: nextPilot,
-        lifecycle: next,
+        status: next,
         updatedAt: now,
-        pickupCode: null,
         resetAttempts: true,
         paymentStatus: "captured",
         paidAt: now,
-        finalPrice: row.total,
       });
     } else if (voidPay) {
       updateOrderStatus({
         id,
-        status: nextPilot,
-        lifecycle: next,
+        status: next,
         updatedAt: now,
         paymentStatus: "voided",
       });
     } else {
-      updateOrderStatus({ id, status: nextPilot, lifecycle: next, updatedAt: now });
+      updateOrderStatus({ id, status: next, updatedAt: now });
     }
     recordTransition({
       orderId: id,
-      fromStatus: row.status,
-      toStatus: nextPilot,
-      fromLifecycle: from,
-      toLifecycle: next,
+      fromStatus: from,
+      toStatus: next,
       actorId: user.id,
       actorRole: user.role,
       note: note?.trim().slice(0, 200) || null,
       at: now,
     });
-    if (voidPay) addRemaining(row.provider_id, row.pieces);
+    if (voidPay) {
+      releaseOrderCapacity(row.provider_id, parseAllocations(row.capacity_allocations));
+    }
     if (capture) capturePayment(id, now);
     if (voidPay) voidPayment(id, now);
   });
 
-  const order = getOrder(id)!;
   notifyStatusChange({
     row,
     from,
     next,
     actorId: user.id,
-    pickupCode: order.pickupCode,
   });
-  return order;
+  return toOrder(getOrderRow(id)!, user);
 }
 
 export function applyOrderAction(id: string, action: OrderAction, user: AuthUser, code?: string): Order {
   const row = getOrderRow(id);
   if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  if (isHomeVisitFulfillment(row.fulfillment_type)) {
-    return applyHomeVisitOrderAction(id, action, user);
-  }
   if (!canMutateOrder(user, row)) {
     throw new ApiError(403, "Bu siparişi yalnızca hizmet veren ilerletebilir.", "FORBIDDEN");
   }
 
   const order = toOrder(row);
-  let next: ApiLifecycle;
+  let next: OrderStatusId;
 
   if (action === "accept") {
-    if (order.status !== "onay_bekliyor") {
+    if (order.status !== "pending") {
       throw new ApiError(409, "Bu sipariş kabul edilemez.", "INVALID_TRANSITION");
     }
+    const items = listOrderItems(id);
+    const addons = addonsFromItems(items);
+    const pickupAppt = getAppointment(row.id, "pickup");
+    const line = scheduleLine({
+      packageId: row.package_id as PackageId,
+      machineUnits: row.machine_units,
+      addons,
+      pickupDate: pickupAppt?.date ?? row.estimated_delivery_date ?? "",
+      express: Boolean(row.express),
+      pickupWindowStart: pickupAppt?.window_start,
+    });
+    const now = new Date().toISOString();
+    runOrderTx(() => {
+      const { schedule, allocations } = reserveOrderCapacity(row.provider_id, line);
+      updateOrderCapacityCommit({
+        id,
+        promisedDeliveryDate: schedule.deliveryDate,
+        allocationsJson: JSON.stringify(allocations),
+        updatedAt: now,
+      });
+    });
     next = "accepted";
   } else if (action === "reject") {
     if (!canCancel(order.status)) {
       throw new ApiError(409, "Bu aşamada iptal yok.", "INVALID_TRANSITION");
     }
-    next = currentLifecycle(row) === "pending" ? "rejected" : "cancelled";
+    next = orderStatus(row) === "pending" ? "rejected" : "cancelled";
   } else if (action === "deliver") {
-    if (order.status !== "hazir") {
+    if (order.status !== "ready" || order.adminHold) {
       throw new ApiError(409, "Kod ancak hazır siparişte geçer.", "INVALID_TRANSITION");
     }
     next = "completed";
   } else if (action === "advance") {
-    const n = nextStatus(order.status, order.packageId, Boolean(order.productId));
-    if (!n) throw new ApiError(409, "Daha ileri durum yok.", "INVALID_TRANSITION");
-    if (n === "teslim_edildi") {
-      throw new ApiError(409, "Teslim için müşterinin kodunu gir.", "INVALID_TRANSITION");
+    const step = nextOperationalStatus(orderStatus(row), order.packageId);
+    if (!step) throw new ApiError(409, "Daha ileri durum yok.", "INVALID_TRANSITION");
+    if (step === "dropped_off" && !code) {
+      throw new ApiError(400, "Alım kodu gerekli.", "VALIDATION_ERROR");
     }
-    next = lifecycleOf(n);
+    next = step;
   } else {
     throw new ApiError(400, "Bu sipariş için bu aksiyon yok.", "VALIDATION_ERROR");
   }
@@ -1381,92 +623,7 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
   return applyStatus(id, user, next, code);
 }
 
-function homeVisitActorOf(user: AuthUser, row: OrderRow): HomeVisitActor {
-  if (user.role === "admin") return "admin";
-  if (user.id === row.provider_id) return "provider";
-  if (user.id === row.user_id) return "customer";
-  throw new ApiError(403, "Bu siparişe erişemezsin.", "FORBIDDEN");
-}
-
-function resolveHomeVisitAction(action: OrderAction, from: string): HomeVisitAction {
-  if (action === "accept" || action === "confirm") return "confirm";
-  if (action === "reject") return "reject";
-  if (action === "cancel") return "cancel";
-  if (action === "start_travel") return "start_travel";
-  if (action === "start_work") return "start_work";
-  if (action === "complete" || action === "deliver") return "complete";
-  if (action === "timeout") return "timeout";
-  if (action === "force_cancel") return "force_cancel";
-  if (action === "advance") {
-    if (from === "confirmed") return "start_travel";
-    if (from === "on_the_way") return "start_work";
-  }
-  throw new ApiError(400, "Bu sipariş için bu aksiyon yok.", "VALIDATION_ERROR");
-}
-
-function applyHomeVisitOrderAction(id: string, action: OrderAction, user: AuthUser): Order {
-  const row = getOrderRow(id);
-  if (!row || !canSeeOrder(user, row)) {
-    throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  }
-  if (!isHomeVisitStatus(row.lifecycle)) {
-    throw new ApiError(409, "Bu sipariş eve gelen akışta değil.", "INVALID_TRANSITION");
-  }
-  const actor = homeVisitActorOf(user, row);
-  const hvAction = resolveHomeVisitAction(action, row.lifecycle);
-  const next = homeVisitNext(row.lifecycle, hvAction, actor);
-  if (!next) {
-    throw new ApiError(409, "Bu duruma geçilemez.", "INVALID_TRANSITION");
-  }
-
-  const now = new Date().toISOString();
-  const nextPilot = pilotFromHomeVisit(next);
-  const voidPay = next === "rejected" || next === "cancelled";
-  const capture = next === "completed";
-
-  runOrderTx(() => {
-    if (capture) {
-      updateOrderStatus({
-        id,
-        status: nextPilot,
-        lifecycle: next,
-        updatedAt: now,
-        pickupCode: null,
-        resetAttempts: true,
-        paymentStatus: "captured",
-        paidAt: now,
-        finalPrice: row.total,
-      });
-    } else if (voidPay) {
-      updateOrderStatus({
-        id,
-        status: nextPilot,
-        lifecycle: next,
-        updatedAt: now,
-        paymentStatus: "voided",
-      });
-    } else {
-      updateOrderStatus({ id, status: nextPilot, lifecycle: next, updatedAt: now });
-    }
-    recordTransition({
-      orderId: id,
-      fromStatus: row.status,
-      toStatus: nextPilot,
-      fromLifecycle: row.lifecycle,
-      toLifecycle: next,
-      actorId: user.id,
-      actorRole: actor,
-      at: now,
-    });
-    if (voidPay) addRemaining(row.provider_id, row.pieces);
-    if (capture) capturePayment(id, now);
-    if (voidPay) voidPayment(id, now);
-  });
-
-  return toOrder(getOrderRow(id)!, user);
-}
-
-const PHOTO_KINDS: OrderPhotoKind[] = ["dropoff", "pickup", "damage"];
+const PHOTO_KINDS: OrderPhotoKind[] = ["dropoff", "pickup", "damage", "delivery"];
 
 function parsePhotoKind(raw?: string): OrderPhotoKind {
   if (!raw) return "dropoff";
@@ -1478,10 +635,8 @@ export function listOrderHistory(user: AuthUser, id: string): OrderStatusEvent[]
   getOrderFor(user, id);
   return listHistoryRows(id).map((row) => ({
     id: row.id,
-    from: row.from_lifecycle || (row.from_status
-      ? lifecycleOf(row.from_status as OrderStatus, row.from_lifecycle)
-      : null),
-    to: row.to_lifecycle || lifecycleOf(row.to_status as OrderStatus, row.to_lifecycle),
+    from: row.from_status,
+    to: row.to_status,
     actorId: row.actor_id,
     actorRole: row.actor_role,
     note: row.note,
@@ -1502,7 +657,7 @@ export function addOrderPhoto(user: AuthUser, id: string, buf: Buffer, kindRaw?:
   if (!canMutateOrder(user, row)) {
     throw new ApiError(403, "Fotoğrafı hizmet veren ekler.", "FORBIDDEN");
   }
-  if (!canAddPhotos(row.status as OrderStatus)) {
+  if (!canAddPhotos(orderStatus(row))) {
     throw new ApiError(409, "Bu aşamada fotoğraf eklenmez.", "INVALID_TRANSITION");
   }
   return addPhoto(id, buf, parsePhotoKind(kindRaw));

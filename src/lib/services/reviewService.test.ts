@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
+import { insertOrderItem } from "@/lib/db/orderItems";
 import { insertOrderRow } from "@/lib/db/orders";
 import { getProfile } from "@/lib/db/providers";
 import {
@@ -49,30 +50,33 @@ describe("yorum ortalaması", () => {
   });
 });
 
-function seedOrder(id: string, userId: string, status: string, lifecycle: string, providerId = "jale") {
+function seedOrder(id: string, userId: string, status: string, providerId = "elif") {
   const now = new Date().toISOString();
   insertOrderRow({
     id,
     provider_id: providerId,
     package_id: "yikama",
-    pieces: 6,
     express: 0,
     drop_method: "kapi",
-    drop_point_id: null,
     slot: "Bugün 18:00–19:00",
     note: "",
     total: 180,
     commission: 18,
-    status,
+    status: status as "completed",
     created_at: now,
     updated_at: now,
     user_id: userId,
-    price_per_kg_snapshot: 30,
-    estimated_weight: 6,
-    estimated_price: 180,
     delivery_mode: "door",
     scheduled_window_start: now,
-    lifecycle,
+    size: "orta",
+    machine_units: 2,
+  });
+  insertOrderItem({
+    order_id: id,
+    kind: "size",
+    variant: "orta",
+    qty: 1,
+    unit_price: 180,
   });
 }
 
@@ -97,13 +101,13 @@ describe("yorum kırılımı", () => {
     insertReview({
       id: "rev-test-one",
       order_id: null,
-      provider_id: "jale",
+      provider_id: "leyla",
       rating: 5,
       body: "Tek yorum, alt puan yok.",
       author: "A.A.",
       created_at: "2026-08-29T12:00:00.000Z",
     });
-    expect(ratingBreakdown("jale")).toEqual({
+    expect(ratingBreakdown("leyla")).toEqual({
       overall: 5,
       count: 1,
       quality: null,
@@ -117,7 +121,7 @@ describe("yorum kırılımı", () => {
     insertReview({
       id: "rev-test-dim",
       order_id: null,
-      provider_id: "nuran",
+      provider_id: "burak",
       rating: 4,
       body: "Yalnızca kalite ve tekrar var.",
       author: "B.B.",
@@ -125,7 +129,7 @@ describe("yorum kırılımı", () => {
       quality: 5,
       would_repeat: 1,
     });
-    const live = ratingBreakdown("nuran");
+    const live = ratingBreakdown("burak");
     expect(live.quality).toBe(5);
     expect(live.timeliness).toBeNull();
     expect(live.communication).toBeNull();
@@ -133,7 +137,7 @@ describe("yorum kırılımı", () => {
   });
 
   it("trust sinyali ham ortalama yanında rankScore üretir", () => {
-    const signals = reviewSignalsForProvider("jale");
+    const signals = reviewSignalsForProvider("leyla");
     expect(signals.overall).toBe(5);
     expect(signals.count).toBe(1);
     expect(signals.rankScore).toBeLessThan(5);
@@ -144,9 +148,9 @@ describe("yorum kırılımı", () => {
 describe("yorum yazma kuralları", () => {
   it("aynı siparişe ikinci yorumu, iptali ve tamamlanmamış siparişi reddeder", async () => {
     const user = await customer("5550000301");
-    seedOrder("ord-rev-ok", user.id, "teslim_edildi", "completed");
-    seedOrder("ord-rev-cancel", user.id, "iptal", "cancelled");
-    seedOrder("ord-rev-open", user.id, "onay_bekliyor", "pending");
+    seedOrder("ord-rev-ok", user.id, "completed");
+    seedOrder("ord-rev-cancel", user.id, "cancelled");
+    seedOrder("ord-rev-open", user.id, "pending");
 
     const first = createReview(
       "ord-rev-ok",

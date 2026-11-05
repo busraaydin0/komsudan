@@ -1,4 +1,4 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { parseBody, phoneSchema } from "@/lib/validation/auth.schema";
 import { requestOtp } from "@/lib/services/authService";
 

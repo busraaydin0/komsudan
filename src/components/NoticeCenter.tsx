@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AppNotification } from "@/lib/types";
-import { markAllNotificationsRead, markNotificationRead, useNotifications, useSession } from "@/lib/api";
+import { markAllNotificationsRead, markNotificationRead, useNotifications } from "@/lib/api";
 import { pickNudgeCopy } from "@/lib/noticeCopy";
 import { requestNotifications, showAppNotification } from "@/lib/permissions";
 
@@ -17,7 +17,6 @@ function when(iso: string) {
 
 export function NoticeCenter({ onOpen }: { onOpen: (n: AppNotification) => void }) {
   const { notifications, unread, reload } = useNotifications();
-  const { account } = useSession();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sample, setSample] = useState<{ title: string; body: string } | null>(null);
@@ -55,7 +54,7 @@ export function NoticeCenter({ onOpen }: { onOpen: (n: AppNotification) => void 
   }
 
   async function trySample() {
-    const copy = pickNudgeCopy(undefined, account?.preferredCategoryIds);
+    const copy = pickNudgeCopy(undefined);
     await requestNotifications();
     showAppNotification(copy.title, copy.body, "komsu-demo");
     setSample(copy);

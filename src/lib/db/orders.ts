@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
+import type { LaundrySize, PriceChangeStatus } from "@/lib/laundryModel";
+import type { OrderStatusId } from "@/lib/status";
 import { db } from "./client";
 
 export type OrderRow = {
   id: string;
   provider_id: string;
   package_id: string;
-  pieces: number;
   express: number;
   drop_method: string;
-  drop_point_id: string | null;
   slot: string;
   note: string;
   total: number;
@@ -16,150 +16,140 @@ export type OrderRow = {
   status: string;
   created_at: string;
   updated_at: string;
-  pickup_code: string | null;
-  code_attempts: number;
   paid_at: string | null;
   payment_status: string;
   user_id: string | null;
-  price_per_kg_snapshot: number | null;
-  estimated_weight: number | null;
-  actual_weight: number | null;
-  estimated_price: number | null;
-  final_price: number | null;
   delivery_mode: string | null;
   scheduled_window_start: string | null;
-  scheduled_window_end: string | null;
-  lifecycle: string | null;
-  product_id: string | null;
-  product_name: string | null;
-  guest_count: number | null;
-  allergy_note: string | null;
-  fulfillment_type: string;
-  visit_district: string | null;
-  visit_neighborhood: string | null;
-  visit_address: string | null;
-  address_share_consent: number;
-  dispute_window_hours: number | null;
+  size: LaundrySize | null;
+  confirmed_size: LaundrySize | null;
+  machine_units: number;
+  pickup_confirmed_at: string | null;
+  color_groups: number | null;
+  price_change: PriceChangeStatus;
+  cancel_reason: string | null;
+  estimated_delivery_date: string | null;
+  promised_delivery_date: string | null;
+  capacity_allocations: string | null;
+  delay_count: number;
   cancel_free_hours: number | null;
+  respond_by: string | null;
+  respond_reminder_sent: number;
+  public_code: string | null;
+  pickup_summary_approved_at: string | null;
+  admin_hold: number;
+  dispute_window_end: string | null;
 };
 
 export type InsertOrderInput = {
   id: string;
   provider_id: string;
   package_id: string;
-  pieces: number;
   express: number;
   drop_method: string;
-  drop_point_id: string | null;
   slot: string;
   note: string;
   total: number;
   commission: number;
-  status: string;
+  status: OrderStatusId;
   created_at: string;
   updated_at: string;
-  user_id: string;
-  price_per_kg_snapshot: number;
-  estimated_weight: number;
-  estimated_price: number;
+  user_id: string | null;
   delivery_mode: string;
   scheduled_window_start: string;
-  lifecycle: string;
-  product_id?: string | null;
-  product_name?: string | null;
-  guest_count?: number | null;
-  allergy_note?: string | null;
-  fulfillment_type?: string;
-  visit_district?: string | null;
-  visit_neighborhood?: string | null;
-  visit_address?: string | null;
-  address_share_consent?: number;
+  size: LaundrySize;
+  machine_units: number;
+  estimated_delivery_date?: string | null;
+  respond_by?: string | null;
+  public_code?: string | null;
 };
-
-export function getRemaining(providerId: string) {
-  const row = db()
-    .prepare("SELECT remaining FROM providers WHERE id = ?")
-    .get(providerId) as { remaining: number } | undefined;
-  return row?.remaining;
-}
-
-export function addRemaining(providerId: string, delta: number) {
-  db().prepare("UPDATE providers SET remaining = remaining + ? WHERE id = ?").run(delta, providerId);
-}
-
-export function dropPointExists(id: string) {
-  const row = db().prepare("SELECT id FROM drop_points WHERE id = ?").get(id) as { id: string } | undefined;
-  return Boolean(row);
-}
 
 export function getOrderRow(id: string): OrderRow | undefined {
   return db().prepare("SELECT * FROM orders WHERE id = ?").get(id) as OrderRow | undefined;
 }
 
-export function listOrderRowsAll(): OrderRow[] {
+export const ORDER_LIST_DEFAULT_LIMIT = 100;
+
+/** Dahili işler (expire vb.) — API listesinden ayrı. */
+export function listAllOrderRows(): OrderRow[] {
   return db().prepare("SELECT * FROM orders ORDER BY created_at DESC").all() as OrderRow[];
 }
 
-export function listOrderRowsForCustomer(userId: string): OrderRow[] {
+export function listOrderRowsAll(limit = ORDER_LIST_DEFAULT_LIMIT, offset = 0): OrderRow[] {
   return db()
-    .prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC")
-    .all(userId) as OrderRow[];
+    .prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT ? OFFSET ?")
+    .all(limit, offset) as OrderRow[];
+}
+
+export function listOrderRowsForCustomer(
+  userId: string,
+  limit = ORDER_LIST_DEFAULT_LIMIT,
+  offset = 0,
+): OrderRow[] {
+  return db()
+    .prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?")
+    .all(userId, limit, offset) as OrderRow[];
 }
 
 export function customerHasOpenOrder(userId: string) {
   const row = db()
     .prepare(
       `SELECT 1 AS n FROM orders
-       WHERE user_id = ? AND status NOT IN ('teslim_edildi', 'iptal')
+       WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected', 'disputed')
        LIMIT 1`,
     )
     .get(userId) as { n: number } | undefined;
   return Boolean(row);
 }
 
-export function listOrderRowsForProvider(userId: string): OrderRow[] {
+export function listOrderRowsForProvider(
+  userId: string,
+  limit = ORDER_LIST_DEFAULT_LIMIT,
+  offset = 0,
+): OrderRow[] {
   return db()
     .prepare(
       `SELECT * FROM orders
        WHERE user_id = ? OR provider_id = ?
-       ORDER BY created_at DESC`,
+       ORDER BY created_at DESC
+       LIMIT ? OFFSET ?`,
     )
-    .all(userId, userId) as OrderRow[];
+    .all(userId, userId, limit, offset) as OrderRow[];
 }
 
 export function insertOrderRow(input: InsertOrderInput) {
   db()
     .prepare(
       `INSERT INTO orders (
-        id, provider_id, package_id, pieces, express, drop_method, drop_point_id,
-        slot, note, total, commission, status, created_at, updated_at,
-        pickup_code, code_attempts, paid_at, payment_status, user_id,
-        price_per_kg_snapshot, estimated_weight, actual_weight, estimated_price, final_price,
-        delivery_mode, scheduled_window_start, scheduled_window_end, lifecycle,
-        product_id, product_name, guest_count, allergy_note,
-        fulfillment_type, visit_district, visit_neighborhood, visit_address, address_share_consent
+        id, provider_id, package_id, express, drop_method, slot, note, total, commission,
+        status, created_at, updated_at, payment_status, user_id, delivery_mode,
+        scheduled_window_start, size, machine_units, price_change,
+        estimated_delivery_date, respond_by, public_code
       ) VALUES (
-        @id, @provider_id, @package_id, @pieces, @express, @drop_method, @drop_point_id,
-        @slot, @note, @total, @commission, @status, @created_at, @updated_at,
-        NULL, 0, NULL, 'authorized', @user_id,
-        @price_per_kg_snapshot, @estimated_weight, NULL, @estimated_price, NULL,
-        @delivery_mode, @scheduled_window_start, NULL, @lifecycle,
-        @product_id, @product_name, @guest_count, @allergy_note,
-        @fulfillment_type, @visit_district, @visit_neighborhood, @visit_address, @address_share_consent
+        @id, @provider_id, @package_id, @express, @drop_method, @slot, @note, @total, @commission,
+        @status, @created_at, @updated_at, 'authorized', @user_id, @delivery_mode,
+        @scheduled_window_start, @size, @machine_units, 'none',
+        @estimated_delivery_date, @respond_by, @public_code
       )`,
     )
     .run({
-      product_id: null,
-      product_name: null,
-      guest_count: null,
-      allergy_note: null,
-      fulfillment_type: "dropoff",
-      visit_district: null,
-      visit_neighborhood: null,
-      visit_address: null,
-      address_share_consent: 0,
+      estimated_delivery_date: input.estimated_delivery_date ?? null,
+      respond_by: input.respond_by ?? null,
+      public_code: input.public_code ?? null,
       ...input,
     });
+}
+
+export function updateOrderPickupSummaryApproved(id: string, at: string) {
+  db().prepare(`UPDATE orders SET pickup_summary_approved_at = ?, updated_at = ? WHERE id = ?`).run(at, at, id);
+}
+
+export function setOrderAdminHold(id: string, hold: boolean, disputeWindowEnd: string | null, updatedAt: string) {
+  db()
+    .prepare(
+      `UPDATE orders SET admin_hold = ?, dispute_window_end = ?, status = ?, updated_at = ? WHERE id = ?`,
+    )
+    .run(hold ? 1 : 0, disputeWindowEnd, hold ? "admin_pending" : "ready", updatedAt, id);
 }
 
 export type HistoryRow = {
@@ -167,8 +157,6 @@ export type HistoryRow = {
   order_id: string;
   from_status: string | null;
   to_status: string;
-  from_lifecycle: string | null;
-  to_lifecycle: string;
   actor_id: string | null;
   actor_role: string | null;
   note: string | null;
@@ -179,30 +167,25 @@ export function recordTransition(input: {
   orderId: string;
   fromStatus: string | null;
   toStatus: string;
-  fromLifecycle: string | null;
-  toLifecycle: string;
   actorId: string | null;
   actorRole: string | null;
-  note?: string | null;
+  note: string | null;
   at: string;
 }) {
   db()
     .prepare(
       `INSERT INTO order_status_history (
-        id, order_id, from_status, to_status, from_lifecycle, to_lifecycle,
-        actor_id, actor_role, note, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, order_id, from_status, to_status, actor_id, actor_role, note, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
-      `h-${randomUUID()}`,
+      `h-${randomUUID().slice(0, 12)}`,
       input.orderId,
       input.fromStatus,
       input.toStatus,
-      input.fromLifecycle,
-      input.toLifecycle,
       input.actorId,
       input.actorRole,
-      input.note ?? null,
+      input.note,
       input.at,
     );
 }
@@ -213,59 +196,108 @@ export function listHistoryRows(orderId: string): HistoryRow[] {
     .all(orderId) as HistoryRow[];
 }
 
-export function setPickupCode(id: string, code: string) {
-  db().prepare("UPDATE orders SET pickup_code = ? WHERE id = ?").run(code, id);
-}
-
-export function bumpCodeAttempts(id: string, attempts: number, updatedAt: string) {
-  db().prepare("UPDATE orders SET code_attempts = ?, updated_at = ? WHERE id = ?").run(attempts, updatedAt, id);
-}
-
-export function rotatePickupCode(id: string, code: string, updatedAt: string) {
-  db()
-    .prepare("UPDATE orders SET pickup_code = ?, code_attempts = 0, updated_at = ? WHERE id = ?")
-    .run(code, updatedAt, id);
-}
-
 export function updateOrderStatus(input: {
   id: string;
-  status: string;
-  lifecycle: string;
+  status: OrderStatusId;
   updatedAt: string;
-  pickupCode?: string | null;
   resetAttempts?: boolean;
   paymentStatus?: string;
   paidAt?: string | null;
-  finalPrice?: number | null;
 }) {
-  if (input.pickupCode !== undefined && input.resetAttempts && input.paymentStatus === "captured") {
+  if (input.resetAttempts && input.paymentStatus === "captured") {
     db()
       .prepare(
-        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'captured', paid_at = ?, pickup_code = NULL,
-         code_attempts = 0, final_price = ?, updated_at = ? WHERE id = ?`,
+        `UPDATE orders SET status = ?, payment_status = 'captured', paid_at = ?, updated_at = ? WHERE id = ?`,
       )
-      .run(input.status, input.lifecycle, input.paidAt, input.finalPrice ?? null, input.updatedAt, input.id);
+      .run(input.status, input.paidAt, input.updatedAt, input.id);
     return;
   }
   if (input.paymentStatus === "voided") {
     db()
-      .prepare(
-        `UPDATE orders SET status = ?, lifecycle = ?, payment_status = 'voided', pickup_code = NULL, updated_at = ? WHERE id = ?`,
-      )
-      .run(input.status, input.lifecycle, input.updatedAt, input.id);
-    return;
-  }
-  if (input.pickupCode) {
-    db()
-      .prepare(
-        "UPDATE orders SET status = ?, lifecycle = ?, pickup_code = ?, code_attempts = 0, updated_at = ? WHERE id = ?",
-      )
-      .run(input.status, input.lifecycle, input.pickupCode, input.updatedAt, input.id);
+      .prepare(`UPDATE orders SET status = ?, payment_status = 'voided', updated_at = ? WHERE id = ?`)
+      .run(input.status, input.updatedAt, input.id);
     return;
   }
   db()
-    .prepare("UPDATE orders SET status = ?, lifecycle = ?, updated_at = ? WHERE id = ?")
-    .run(input.status, input.lifecycle, input.updatedAt, input.id);
+    .prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?")
+    .run(input.status, input.updatedAt, input.id);
+}
+
+export function updateOrderPickupConfirm(input: {
+  id: string;
+  confirmedSize: LaundrySize;
+  colorGroups: number;
+  machineUnits: number;
+  total: number;
+  commission: number;
+  priceChange: PriceChangeStatus;
+  at: string;
+}) {
+  db()
+    .prepare(
+      `UPDATE orders SET confirmed_size = ?, color_groups = ?, machine_units = ?, total = ?, commission = ?,
+        price_change = ?, pickup_confirmed_at = ?, updated_at = ? WHERE id = ?`,
+    )
+    .run(
+      input.confirmedSize,
+      input.colorGroups,
+      input.machineUnits,
+      input.total,
+      input.commission,
+      input.priceChange,
+      input.at,
+      input.at,
+      input.id,
+    );
+}
+
+export function updateOrderPriceChange(id: string, priceChange: PriceChangeStatus, at: string) {
+  db().prepare(`UPDATE orders SET price_change = ?, updated_at = ? WHERE id = ?`).run(priceChange, at, id);
+}
+
+export function updateOrderCancelReason(id: string, reason: string, at: string) {
+  db().prepare(`UPDATE orders SET cancel_reason = ?, updated_at = ? WHERE id = ?`).run(reason, at, id);
+}
+
+export function updateOrderCapacityCommit(input: {
+  id: string;
+  promisedDeliveryDate: string;
+  allocationsJson: string;
+  updatedAt: string;
+}) {
+  db()
+    .prepare(
+      `UPDATE orders SET promised_delivery_date = ?, capacity_allocations = ?, updated_at = ? WHERE id = ?`,
+    )
+    .run(input.promisedDeliveryDate, input.allocationsJson, input.updatedAt, input.id);
+}
+
+export function updateOrderDelay(input: {
+  id: string;
+  promisedDeliveryDate: string;
+  delayCount: number;
+  updatedAt: string;
+  cancelFreeHours?: number;
+}) {
+  if (input.cancelFreeHours != null) {
+    db()
+      .prepare(
+        `UPDATE orders SET promised_delivery_date = ?, delay_count = ?, cancel_free_hours = ?, updated_at = ? WHERE id = ?`,
+      )
+      .run(
+        input.promisedDeliveryDate,
+        input.delayCount,
+        input.cancelFreeHours,
+        input.updatedAt,
+        input.id,
+      );
+    return;
+  }
+  db()
+    .prepare(
+      `UPDATE orders SET promised_delivery_date = ?, delay_count = ?, updated_at = ? WHERE id = ?`,
+    )
+    .run(input.promisedDeliveryDate, input.delayCount, input.updatedAt, input.id);
 }
 
 export function runOrderTx<T>(fn: () => T): T {

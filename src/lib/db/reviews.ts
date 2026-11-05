@@ -43,10 +43,6 @@ function numOrNull(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function getReviewById(id: string): ReviewRow | undefined {
-  return db().prepare("SELECT * FROM reviews WHERE id = ?").get(id) as ReviewRow | undefined;
-}
-
 export function getReviewByOrderId(orderId: string): ReviewRow | undefined {
   return db().prepare("SELECT * FROM reviews WHERE order_id = ?").get(orderId) as ReviewRow | undefined;
 }

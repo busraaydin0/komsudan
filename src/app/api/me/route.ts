@@ -1,21 +1,16 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { parseBody, mePatchSchema } from "@/lib/validation/auth.schema";
 import { requireAuth } from "@/lib/auth/middleware";
 import { publicUser } from "@/lib/auth/types";
 import { updateProfile } from "@/lib/services/authService";
-import { deliveredCount } from "@/lib/db/auth";
-import { loyaltyFromDelivered } from "@/lib/loyalty";
-import { deleteMyAccount } from "@/server/auth";
+import { deleteMyAccount } from "@/lib/auth/routeAccount";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
     const user = await requireAuth(req);
-    return ok({
-      user: publicUser(user),
-      loyalty: loyaltyFromDelivered(deliveredCount(user.id)),
-    });
+    return ok({ user: publicUser(user) });
   } catch (e) {
     return fail(e);
   }
@@ -27,16 +22,10 @@ export async function PATCH(req: Request) {
     const body = await parseBody(req, mePatchSchema);
     const name = body.fullName ?? body.name;
     if (!name) {
-      return ok({
-        user: publicUser(user),
-        loyalty: loyaltyFromDelivered(deliveredCount(user.id)),
-      });
+      return ok({ user: publicUser(user) });
     }
     const next = updateProfile(user, name);
-    return ok({
-      user: publicUser(next),
-      loyalty: loyaltyFromDelivered(deliveredCount(next.id)),
-    });
+    return ok({ user: publicUser(next) });
   } catch (e) {
     return fail(e);
   }

@@ -1,19 +1,17 @@
 ---
-description: Çok kategorili genişleme — 7 davet menü. Atlama.
+description: Pilot kapsam — yalnız çamaşır. Yeni kategori açma.
 alwaysApply: true
 ---
 
-# Genişleme sırası (Faz 6 → 9)
+# Pilot kapsam
 
-Kaynak: masaüstü `KOMSUDAN-ROADMAP-GENISLEME.md`. Faz atlama.
+PWA ve keşif **yalnız Çamaşır Yıkama**. Sabitler `src/lib/laundry/` (paket, boy, ek); kategori tablosu/registry yok. Faz atlama. Çamaşır dışı alan ekleme.
 
-- **Tip A delivery:** çamaşır, sonra **davet** (kısır, pasta, kurabiye). Evde hazırla, kapı/nokta teslim.
-- **Tip B home_visit:** tamir, klima vb. Eve git, randevu. Faz 8’e kadar doldurma.
+- Teslim: MVP dışı, yalnız kapı. Eve kimse girmez.
+- Paket: `yikama` / `katlama` / `tam`. Tutar sunucuda.
 
 ## Sıra
 
-6 Ödeme (bitti) → 6.5 kategori (bitti) → 6.6 keşif (bitti) → **7 davet (bitti: menü/kişi/alerji)** → 8 home-visit (Tip B) → 9+ review/dispute/log.
-
-Faz 7: her aşçı kendi ürününü ve kişi başı fiyatını girer. Siparişte kaç kişilik + alerji. Tutar sunucuda. Çamaşır state machine aynen. Seed: Fatma kısır+kurabiye, Hatice pasta+kısır, Nurcan kurabiye.
+6 Ödeme (bitti) → 6.6 keşif (bitti) → 9+ review/dispute/log.
 
 PWA’yı kırma. Tutar/status client’tan alma. Route’ta SQL yok.

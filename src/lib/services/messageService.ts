@@ -24,9 +24,9 @@ import {
 } from "@/lib/db/messages";
 import { moderateMessage } from "@/lib/moderation/messageModeration";
 import { collapseSpaces } from "@/lib/moderation/normalize";
-import { canSeeOrder } from "@/lib/services/orderService";
+import { isOrderParty } from "@/lib/services/orderService";
 import { notifyOrderMessage } from "@/lib/services/notificationService";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 
 export const MSG_PER_MINUTE = 8;
 export const MSG_PER_HOUR = 40;
@@ -37,7 +37,7 @@ const REMOVED = "Bu mesaj kaldırıldı";
 
 function requireOrderParty(user: AuthUser, orderId: string) {
   const row = getOrderRow(orderId);
-  if (!row || !canSeeOrder(user, row)) {
+  if (!row || !isOrderParty(user, row)) {
     throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
   }
   return row;
@@ -123,7 +123,7 @@ export function listMessageInbox(user: AuthUser) {
   const threads = listInboxRows(user.id).map((row) => ({
     orderId: row.order_id,
     peerName: row.peer_name?.trim() || "Komşu",
-    title: row.product_name?.trim() || "Sipariş",
+    title: row.package_id ? `Sipariş · ${row.package_id}` : "Sipariş",
     status: row.status,
     preview: row.preview?.trim() || "Henüz mesaj yok.",
     unread: Number(row.unread) || 0,
@@ -269,10 +269,3 @@ export function deleteOrderMessage(user: AuthUser, orderId: string, messageId: s
   return { message: toPublicMessage({ ...next, deleted_at: next.deleted_at ?? at }) };
 }
 
-export function unreadCountForOrder(user: AuthUser, orderId: string) {
-  const row = getOrderRow(orderId);
-  if (!row || !canSeeOrder(user, row)) return 0;
-  const convo = getConversationByOrderId(orderId);
-  if (!convo) return 0;
-  return countUnreadForViewer(convo.id, user.id);
-}

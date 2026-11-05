@@ -13,11 +13,13 @@ export type ProfileRow = {
   is_founder: number;
   verification_status: "pending" | "verified" | "rejected";
   status: "active" | "paused";
+  suspended: number;
+  suspended_at: string | null;
+  suspended_reason: string | null;
   commission_rate: number;
   rating_avg: number;
   rating_count: number;
   completed_orders: number;
-  category_id: string | null;
   updated_at: string;
 };
 
@@ -27,18 +29,10 @@ export type PackageRow = {
   name: string;
   price_per_kg: number;
   min_order_amount: number;
+  /** Fiyatı etkilemez (K-008); katalog `express` kullanılır. */
   express_available: number;
+  /** Fiyatı etkilemez (K-008); zam `EXPRESS_BUMP` sabitinden. */
   express_surcharge_pct: number;
-  is_active: number;
-  category_id: string | null;
-};
-
-export type DropRow = {
-  id: string;
-  provider_id: string;
-  label: string;
-  lat: number;
-  lng: number;
   is_active: number;
 };
 
@@ -54,8 +48,9 @@ export type SlotRow = {
 
 const PROFILE_SELECT = `
   p.user_id, u.full_name, p.bio, p.avatar_url, p.lat, p.lng, p.neighborhood,
-  p.has_dryer, p.is_founder, p.verification_status, p.status, p.commission_rate,
-  p.rating_avg, p.rating_count, p.completed_orders, p.category_id, p.updated_at
+  p.has_dryer, p.is_founder, p.verification_status, p.status,
+  p.suspended, p.suspended_at, p.suspended_reason, p.commission_rate,
+  p.rating_avg, p.rating_count, p.completed_orders, p.updated_at
 `;
 
 export function upsertProviderUser(input: {
@@ -91,23 +86,20 @@ export function upsertProfile(input: {
   ratingAvg: number;
   ratingCount: number;
   avatarUrl?: string | null;
-  categoryId?: string;
 }) {
   const now = new Date().toISOString();
-  const categoryId = input.categoryId ?? "camasir";
   db()
     .prepare(
       `INSERT INTO provider_profiles (
          user_id, bio, avatar_url, lat, lng, neighborhood, has_dryer, is_founder,
          verification_status, status, commission_rate, rating_avg, rating_count,
-         completed_orders, category_id, updated_at
+         completed_orders, updated_at
        ) VALUES (
          @userId, @bio, @avatarUrl, @lat, @lng, @neighborhood, @hasDryer, @isFounder,
-         'verified', 'active', 0.10, @ratingAvg, @ratingCount, 0, @categoryId, @now
+         'verified', 'active', 0.10, @ratingAvg, @ratingCount, 0, @now
        )
        ON CONFLICT(user_id) DO UPDATE SET
          bio = excluded.bio,
-         category_id = excluded.category_id,
          rating_avg = excluded.rating_avg,
          rating_count = excluded.rating_count,
          is_founder = excluded.is_founder,
@@ -122,10 +114,8 @@ export function upsertProfile(input: {
       avatarUrl: input.avatarUrl ?? null,
       hasDryer: input.hasDryer ? 1 : 0,
       isFounder: input.isFounder ? 1 : 0,
-      categoryId,
       now,
     });
-  db().prepare("UPDATE providers SET category_id = ? WHERE id = ?").run(categoryId, input.userId);
 }
 
 export function getProfile(userId: string): ProfileRow | undefined {
@@ -148,28 +138,17 @@ export function listAvatarUrls() {
   return Object.fromEntries(rows.map((row) => [row.user_id, row.avatar_url]));
 }
 
-export function listProfilesInBox(
-  box: { south: number; north: number; west: number; east: number },
-  categoryIds?: string[],
-) {
-  const cats = categoryIds?.filter(Boolean) ?? [];
-  const inList = cats.length
-    ? `AND COALESCE(p.category_id, 'camasir') IN (${cats.map((_, i) => `@c${i}`).join(",")})`
-    : "";
-  const params: Record<string, number | string> = { ...box };
-  cats.forEach((id, i) => {
-    params[`c${i}`] = id;
-  });
+export function listProfilesInBox(box: { south: number; north: number; west: number; east: number }) {
   return db()
     .prepare(
       `SELECT ${PROFILE_SELECT}
        FROM provider_profiles p JOIN users u ON u.id = p.user_id
        WHERE p.status = 'active' AND p.verification_status != 'rejected'
+         AND p.suspended = 0
          AND p.lat BETWEEN @south AND @north
-         AND p.lng BETWEEN @west AND @east
-         ${inList}`,
+         AND p.lng BETWEEN @west AND @east`,
     )
-    .all(params) as ProfileRow[];
+    .all(box) as ProfileRow[];
 }
 
 export function updateProfileFields(
@@ -181,7 +160,6 @@ export function updateProfileFields(
     neighborhood?: string;
     hasDryer?: boolean;
     status?: "active" | "paused";
-    categoryId?: string;
   },
 ) {
   const current = getProfile(userId);
@@ -191,7 +169,7 @@ export function updateProfileFields(
     .prepare(
       `UPDATE provider_profiles SET
          bio = @bio, lat = @lat, lng = @lng, neighborhood = @neighborhood,
-         has_dryer = @hasDryer, status = @status, category_id = @categoryId, updated_at = @now
+         has_dryer = @hasDryer, status = @status, updated_at = @now
        WHERE user_id = @userId`,
     )
     .run({
@@ -202,12 +180,8 @@ export function updateProfileFields(
       neighborhood: patch.neighborhood ?? current.neighborhood,
       hasDryer: (patch.hasDryer ?? Boolean(current.has_dryer)) ? 1 : 0,
       status: patch.status ?? current.status,
-      categoryId: patch.categoryId ?? current.category_id ?? "camasir",
       now,
     });
-  db()
-    .prepare("UPDATE providers SET category_id = ? WHERE id = ?")
-    .run(patch.categoryId ?? current.category_id ?? "camasir", userId);
   patchCatalogPayload(userId, {
     bio: patch.bio ?? current.bio ?? "",
     hasDryer: patch.hasDryer ?? Boolean(current.has_dryer),
@@ -231,22 +205,12 @@ export function catalogProviderExists(id: string) {
   return Boolean(db().prepare("SELECT 1 AS ok FROM providers WHERE id = ?").get(id));
 }
 
-export function insertCatalogProvider(input: {
-  id: string;
-  payload: object;
-  remaining: number;
-  categoryId: string;
-}) {
+export function insertCatalogProvider(input: { id: string; payload: object }) {
   db()
-    .prepare(
-      `INSERT INTO providers (id, payload, remaining, category_id)
-       VALUES (@id, @payload, @remaining, @categoryId)`,
-    )
+    .prepare(`INSERT INTO providers (id, payload) VALUES (@id, @payload)`)
     .run({
       id: input.id,
       payload: JSON.stringify(input.payload),
-      remaining: input.remaining,
-      categoryId: input.categoryId,
     });
 }
 
@@ -276,18 +240,15 @@ export function deactivateOtherPackages(providerId: string, keepIds: string[]) {
     .run(providerId, ...keepIds);
 }
 
-export function upsertPackage(row: Omit<PackageRow, "is_active" | "category_id"> & {
-  is_active?: number;
-  category_id?: string | null;
-}) {
+export function upsertPackage(row: Omit<PackageRow, "is_active"> & { is_active?: number }) {
   db()
     .prepare(
       `INSERT INTO service_packages (
          id, provider_id, name, price_per_kg, min_order_amount,
-         express_available, express_surcharge_pct, is_active, category_id
+         express_available, express_surcharge_pct, is_active
        ) VALUES (
          @id, @provider_id, @name, @price_per_kg, @min_order_amount,
-         @express_available, @express_surcharge_pct, @is_active, @category_id
+         @express_available, @express_surcharge_pct, @is_active
        )
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
@@ -297,7 +258,7 @@ export function upsertPackage(row: Omit<PackageRow, "is_active" | "category_id">
          express_surcharge_pct = excluded.express_surcharge_pct,
          is_active = excluded.is_active`,
     )
-    .run({ is_active: 1, category_id: "camasir", ...row });
+    .run({ is_active: 1, ...row });
 }
 
 export function listPackages(providerId: string, activeOnly = true): PackageRow[] {
@@ -305,42 +266,6 @@ export function listPackages(providerId: string, activeOnly = true): PackageRow[
     ? `SELECT * FROM service_packages WHERE provider_id = ? AND is_active = 1`
     : `SELECT * FROM service_packages WHERE provider_id = ?`;
   return db().prepare(sql).all(providerId) as PackageRow[];
-}
-
-export function upsertDrop(row: DropRow) {
-  db()
-    .prepare(
-      `INSERT INTO provider_drop_points (id, provider_id, label, lat, lng, is_active)
-       VALUES (@id, @provider_id, @label, @lat, @lng, @is_active)
-       ON CONFLICT(id) DO UPDATE SET
-         label = excluded.label, lat = excluded.lat, lng = excluded.lng`,
-    )
-    .run(row);
-}
-
-export function listDrops(providerId: string, activeOnly = true): DropRow[] {
-  const sql = activeOnly
-    ? `SELECT * FROM provider_drop_points WHERE provider_id = ? AND is_active = 1`
-    : `SELECT * FROM provider_drop_points WHERE provider_id = ?`;
-  return db().prepare(sql).all(providerId) as DropRow[];
-}
-
-export function insertDrop(input: { providerId: string; label: string; lat: number; lng: number }): DropRow {
-  const row: DropRow = {
-    id: randomUUID(),
-    provider_id: input.providerId,
-    label: input.label,
-    lat: input.lat,
-    lng: input.lng,
-    is_active: 1,
-  };
-  db()
-    .prepare(
-      `INSERT INTO provider_drop_points (id, provider_id, label, lat, lng, is_active)
-       VALUES (@id, @provider_id, @label, @lat, @lng, @is_active)`,
-    )
-    .run(row);
-  return row;
 }
 
 export function countSlots(providerId: string) {

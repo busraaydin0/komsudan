@@ -32,4 +32,4 @@ Girdi **zod** ile. Raw `req.body` ile iş yapma.
 `POST /api/auth/otp/request|verify`, `POST /api/auth/refresh`, `GET|PATCH /api/me`.
 Provider: `GET /api/providers?lat&lng&radius`, `GET /api/providers/[id]`, `PATCH /api/providers/me/*`.
 Sipariş: `GET|POST /api/orders`, `GET /api/orders/[id]`, `PATCH /api/orders/[id]/status`.
-Foto, review, `POST /api/payments/webhook`.
+Foto, review, `POST /api/payments/webhook` (MVP'de simülasyon, gerçek iyzico webhook'u yok).

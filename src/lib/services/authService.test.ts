@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import { requestOtp, verifyOtp } from "./authService";
 
 describe("OTP request/verify", () => {

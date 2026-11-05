@@ -1,5 +1,4 @@
 import type { Account, PreferredIntent } from "@/lib/types";
-import { normalizeCategoryIds } from "@/lib/categories/registry";
 import type { UserRole, UserRow } from "@/lib/db/auth";
 
 export type AuthUser = {
@@ -24,7 +23,7 @@ function parseCategoryIds(raw: string | null | undefined): string[] {
   try {
     const value = JSON.parse(raw) as unknown;
     if (!Array.isArray(value)) return [];
-    return normalizeCategoryIds(value.filter((id): id is string => typeof id === "string" && id.length > 0));
+    return value.filter((id): id is string => typeof id === "string" && id.length > 0);
   } catch {
     return [];
   }
@@ -42,11 +41,14 @@ export function toAuthUser(row: UserRow): AuthUser {
     phone: row.phone,
     name,
     fullName: name,
-    role: row.role === "provider" || row.role === "admin" ? row.role : "customer",
+    role:
+      row.role === "provider" || row.role === "admin" || row.role === "service_admin"
+        ? row.role
+        : "customer",
     identityVerified: Boolean(row.identity_verified),
     passkeyEnabled: Boolean(row.passkey_id),
     avatarUrl: row.avatar_url || null,
-    preferredCategoryIds: parseCategoryIds(row.preferred_category_ids),
+    preferredCategoryIds: parseCategoryIds(row.preferred_category_ids).length ? ["camasir"] : [],
     preferredIntent: parseIntent(row.preferred_intent),
     onboardingCompletedAt: row.onboarding_completed_at ?? null,
     homeLat: row.home_lat ?? null,

@@ -1,14 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Map, Marker, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
-import { PILOT } from "@/lib/data";
+import type { Map as MaplibreMap, Marker as MaplibreMarker, StyleSpecification } from "maplibre-gl";
+import { PILOT_AREA } from "@/lib/laundry/pilot";
 import { initials } from "@/lib/avatar";
-import { seatTone } from "@/lib/seat";
-import type { DropPoint, LngLat, MapMode, Provider } from "@/lib/types";
-
-/** Next/Turbopack does not emit the worker next to maplibre-gl-shared.mjs. */
-setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+import { providerLoadDisplay } from "@/lib/capacity/display";
+import type { LngLat, MapMode, Provider } from "@/lib/types";
 
 /** OSM sokak haritası (Carto Voyager). 3D binalar yüklenince eklenir. */
 const STYLE: StyleSpecification = {
@@ -32,106 +29,102 @@ const STYLE: StyleSpecification = {
 type Props = {
   mode: MapMode;
   selectedId: string | null;
-  dropId: string | null;
   user: LngLat | null;
   meAvatar?: string | null;
   providers: Provider[];
-  dropPoints: DropPoint[];
   onSelect: (id: string) => void;
-  onSelectDrop: (id: string) => void;
   visible?: boolean;
 };
 
 function tightBounds(): [[number, number], [number, number]] {
   return [
-    [PILOT.bounds.west, PILOT.bounds.south],
-    [PILOT.bounds.east, PILOT.bounds.north],
+    [PILOT_AREA.bounds.west, PILOT_AREA.bounds.south],
+    [PILOT_AREA.bounds.east, PILOT_AREA.bounds.north],
   ];
 }
 
 let cameraGen = 0;
 
-function pinKey(providers: Provider[], dropPoints: DropPoint[]) {
-  return [
-    ...providers.map((p) => `${p.id}:${p.loc.lng}:${p.loc.lat}:${p.avatarUrl ?? ""}`),
-    ...dropPoints.map((d) => `${d.id}:${d.loc.lng}:${d.loc.lat}`),
-  ].join("|");
+function pinKey(providers: Provider[]) {
+  return providers.map((p) => `${p.id}:${p.loc.lng}:${p.loc.lat}:${p.avatarUrl ?? ""}`).join("|");
 }
 
 export function MapCanvas({
   mode,
   selectedId,
-  dropId,
   user,
   meAvatar,
   providers,
-  dropPoints,
   onSelect,
-  onSelectDrop,
   visible = true,
 }: Props) {
   const root = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<Map | null>(null);
-  const markers = useRef<Marker[]>([]);
-  const userMarker = useRef<Marker | null>(null);
+  const mapRef = useRef<MaplibreMap | null>(null);
+  const MarkerRef = useRef<typeof MaplibreMarker | null>(null);
+  const markers = useRef<MaplibreMarker[]>([]);
+  const userMarker = useRef<MaplibreMarker | null>(null);
   const onSelectRef = useRef(onSelect);
-  const onSelectDropRef = useRef(onSelectDrop);
   const modeRef = useRef(mode);
   const providersRef = useRef(providers);
-  const dropPointsRef = useRef(dropPoints);
   const selectedRef = useRef(selectedId);
-  const dropIdRef = useRef(dropId);
   const [mapReady, setMapReady] = useState(false);
   onSelectRef.current = onSelect;
-  onSelectDropRef.current = onSelectDrop;
   modeRef.current = mode;
   providersRef.current = providers;
-  dropPointsRef.current = dropPoints;
   selectedRef.current = selectedId;
-  dropIdRef.current = dropId;
-  const pins = pinKey(providers, dropPoints);
+  const pins = pinKey(providers);
 
   useEffect(() => {
     if (!root.current || mapRef.current) return;
+    let cancelled = false;
 
-    const map = new Map({
-      container: root.current,
-      style: STYLE,
-      center: [PILOT.center.lng, PILOT.center.lat],
-      zoom: PILOT.zoom,
-      minZoom: 13.2,
-      maxZoom: 18,
-      pitch: mode === "3d" ? 58 : 0,
-      bearing: mode === "3d" ? -18 : 0,
-      maxPitch: 75,
-      pitchWithRotate: true,
-      canvasContextAttributes: { antialias: true },
-      ...(mode === "3d" ? {} : { maxBounds: tightBounds() }),
-      attributionControl: { compact: true },
-    });
-    mapRef.current = map;
-    setMapReady(true);
+    void import("maplibre-gl").then((ml) => {
+      if (cancelled || !root.current || mapRef.current) return;
+      ml.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+      MarkerRef.current = ml.Marker;
 
-    const onReady = () => {
-      map.resize();
-      ensureBuildings(map, modeRef.current);
-      syncMode(map, modeRef.current);
-    };
-    map.on("load", onReady);
-    map.once("idle", () => syncMode(map, modeRef.current));
-    map.on("sourcedata", (e) => {
-      if (e.sourceId === "openfreemap" && e.isSourceLoaded) {
+      const map = new ml.Map({
+        container: root.current,
+        style: STYLE,
+        center: [PILOT_AREA.center.lng, PILOT_AREA.center.lat],
+        zoom: PILOT_AREA.zoom,
+        minZoom: 13.2,
+        maxZoom: 18,
+        pitch: modeRef.current === "3d" ? 58 : 0,
+        bearing: modeRef.current === "3d" ? -18 : 0,
+        maxPitch: 75,
+        pitchWithRotate: true,
+        canvasContextAttributes: { antialias: true },
+        ...(modeRef.current === "3d" ? {} : { maxBounds: tightBounds() }),
+        attributionControl: { compact: true },
+      });
+      mapRef.current = map;
+      setMapReady(true);
+
+      const onReady = () => {
+        map.resize();
         ensureBuildings(map, modeRef.current);
-      }
+        syncMode(map, modeRef.current);
+      };
+      map.on("load", onReady);
+      map.once("idle", () => syncMode(map, modeRef.current));
+      map.on("sourcedata", (e) => {
+        if (e.sourceId === "openfreemap" && e.isSourceLoaded) {
+          ensureBuildings(map, modeRef.current);
+        }
+      });
     });
 
     return () => {
+      cancelled = true;
       setMapReady(false);
       markers.current.forEach((m) => m.remove());
       markers.current = [];
       userMarker.current?.remove();
-      map.remove();
+      userMarker.current = null;
+      mapRef.current?.remove();
       mapRef.current = null;
+      MarkerRef.current = null;
     };
   }, []);
 
@@ -139,14 +132,16 @@ export function MapCanvas({
     const map = mapRef.current;
     if (!mapReady || !map) return;
 
+    const Marker = MarkerRef.current;
+    if (!Marker) return;
     markers.current.forEach((m) => m.remove());
-    const next: Marker[] = [];
+    const next: MaplibreMarker[] = [];
     providers.forEach((p, i) => {
       const el = document.createElement("button");
       el.type = "button";
       el.className = "katla-pin";
       el.dataset.id = p.id;
-      el.dataset.load = seatTone(p.remaining, p.capacity);
+      el.dataset.load = providerLoadDisplay(p).tone;
       el.style.setProperty("--pin-delay", `${i * 40}ms`);
       el.setAttribute("aria-label", p.name);
       const face = document.createElement("span");
@@ -155,6 +150,8 @@ export function MapCanvas({
         const img = document.createElement("img");
         img.src = p.avatarUrl;
         img.alt = "";
+        img.loading = "lazy";
+        img.decoding = "async";
         face.appendChild(img);
       } else {
         face.textContent = initials(p.name);
@@ -175,37 +172,10 @@ export function MapCanvas({
           .addTo(map),
       );
     });
-    dropPoints.forEach((d, i) => {
-      const el = document.createElement("button");
-      el.type = "button";
-      el.className = "katla-drop";
-      el.dataset.drop = d.id;
-      el.title = d.name;
-      el.setAttribute("aria-label", `Gel al noktası: ${d.name}`);
-      el.style.setProperty("--pin-delay", `${80 + i * 40}ms`);
-      const mark = document.createElement("span");
-      mark.className = "mark";
-      mark.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 7h10l-.8 11.2a2 2 0 0 1-2 1.8H9.8a2 2 0 0 1-2-1.8L7 7Z" stroke="currentColor" stroke-width="1.9"/><path d="M9 7V5.8A3 3 0 0 1 12 3a3 3 0 0 1 3 2.8V7" stroke="currentColor" stroke-width="1.9"/></svg>`;
-      const stem = document.createElement("span");
-      stem.className = "stem";
-      el.append(mark, stem);
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        onSelectDropRef.current(d.id);
-      });
-      next.push(
-        new Marker({ element: el, anchor: "bottom" })
-          .setLngLat([d.loc.lng, d.loc.lat])
-          .addTo(map),
-      );
-    });
     markers.current = next;
     for (const m of next) {
       const el = m.getElement();
-      el.classList.toggle(
-        "is-on",
-        el.dataset.id === selectedRef.current || el.dataset.drop === dropIdRef.current,
-      );
+      el.classList.toggle("is-on", el.dataset.id === selectedRef.current);
     }
     return () => {
       next.forEach((m) => m.remove());
@@ -231,8 +201,7 @@ export function MapCanvas({
     for (const m of markers.current) {
       const el = m.getElement();
       const id = el.dataset.id;
-      const drop = el.dataset.drop;
-      el.classList.toggle("is-on", id === selectedId || drop === dropId);
+      el.classList.toggle("is-on", id === selectedId);
     }
     const map = mapRef.current;
     if (!map) return;
@@ -250,19 +219,7 @@ export function MapCanvas({
       });
       return;
     }
-    if (!dropId) return;
-    const d = dropPointsRef.current.find((x) => x.id === dropId);
-    if (!d) return;
-    map.easeTo({
-      center: [d.loc.lng, d.loc.lat],
-      zoom: Math.max(map.getZoom(), 16),
-      duration: 650,
-      offset: [0, -64],
-      pitch: modeRef.current === "3d" ? Math.max(map.getPitch(), 52) : 0,
-      bearing: modeRef.current === "3d" ? map.getBearing() : 0,
-      essential: true,
-    });
-  }, [selectedId, dropId]);
+  }, [selectedId]);
 
   useEffect(() => {
     for (const m of markers.current) {
@@ -270,7 +227,7 @@ export function MapCanvas({
       const id = el.dataset.id;
       if (!id) continue;
       const p = providers.find((x) => x.id === id);
-      if (p) el.dataset.load = seatTone(p.remaining, p.capacity);
+      if (p) el.dataset.load = providerLoadDisplay(p).tone;
     }
   }, [providers]);
 
@@ -278,11 +235,13 @@ export function MapCanvas({
     const map = mapRef.current;
     if (!map || !user) return;
     const inPilot =
-      user.lng >= PILOT.bounds.west &&
-      user.lng <= PILOT.bounds.east &&
-      user.lat >= PILOT.bounds.south &&
-      user.lat <= PILOT.bounds.north;
+      user.lng >= PILOT_AREA.bounds.west &&
+      user.lng <= PILOT_AREA.bounds.east &&
+      user.lat >= PILOT_AREA.bounds.south &&
+      user.lat <= PILOT_AREA.bounds.north;
     if (!inPilot) return;
+    const Marker = MarkerRef.current;
+    if (!Marker) return;
     if (!userMarker.current) {
       const el = document.createElement("div");
       el.className = meAvatar ? "katla-me has-face" : "katla-me";
@@ -290,6 +249,7 @@ export function MapCanvas({
         const img = document.createElement("img");
         img.src = meAvatar;
         img.alt = "";
+        img.loading = "lazy";
         el.appendChild(img);
       } else {
         el.innerHTML = `<span></span>`;
@@ -324,7 +284,7 @@ export function MapCanvas({
   );
 }
 
-function syncMode(map: Map, mode: MapMode) {
+function syncMode(map: MaplibreMap, mode: MapMode) {
   const three = mode === "3d";
   const gen = ++cameraGen;
   map.getContainer().dataset.view = mode;
@@ -368,7 +328,7 @@ function syncMode(map: Map, mode: MapMode) {
   ensureBuildings(map, mode);
 }
 
-function ensureBuildings(map: Map, mode: MapMode) {
+function ensureBuildings(map: MaplibreMap, mode: MapMode) {
   if (!map.isStyleLoaded()) return;
   if (!map.getSource("openfreemap")) {
     try {

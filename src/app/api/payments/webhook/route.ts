@@ -1,5 +1,5 @@
-import { fail, ok } from "@/server/http";
-import { ApiError } from "@/server/rules";
+import { fail, ok } from "@/lib/http/response";
+import { ApiError } from "@/lib/errors";
 import { parseBody } from "@/lib/validation/parse";
 import { paymentWebhookSchema } from "@/lib/validation/payment.schema";
 import { receiveWebhook } from "@/lib/services/paymentService";

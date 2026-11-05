@@ -9,6 +9,7 @@ import { LoginGate } from "@/components/LoginGate";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { PermissionPrompt } from "@/components/PermissionPrompt";
 import { MessagesScreen } from "@/components/MessagesScreen";
+import { AdminDesk } from "@/components/AdminDesk";
 import { ProviderDesk } from "@/components/ProviderDesk";
 import { TabBar, type AppTab } from "@/components/TabBar";
 import { useSession } from "@/lib/api";
@@ -19,7 +20,9 @@ function readTab(intent?: PreferredIntent | null): AppTab {
   if (typeof window === "undefined") return "harita";
   const q = new URLSearchParams(window.location.search).get("tab");
   if (q === "masa") return "hizmet";
-  if (q === "siparis" || q === "hizmet" || q === "harita" || q === "hesap" || q === "mesaj") return q;
+  if (q === "siparis" || q === "hizmet" || q === "yonetim" || q === "harita" || q === "hesap" || q === "mesaj") {
+    return q;
+  }
   return intent === "offer" ? "hizmet" : "harita";
 }
 
@@ -29,7 +32,7 @@ export function AppShell() {
   const [editDiscovery, setEditDiscovery] = useState(false);
   const [discoveryDone, setDiscoveryDone] = useState(false);
   const [chatOrderId, setChatOrderId] = useState<string | null>(null);
-  const { account, loyalty, ready, reload } = useSession();
+  const { account, ready, reload } = useSession();
 
   useEffect(() => {
     setTab((prev) => prev ?? readTab(account?.preferredIntent));
@@ -41,8 +44,10 @@ export function AppShell() {
   useEffect(() => {
     if (!account?.identityVerified || !account.passkeyEnabled) {
       setDiscoveryDone(false);
+    } else if (account.onboardingCompletedAt) {
+      setDiscoveryDone(true);
     }
-  }, [account?.identityVerified, account?.passkeyEnabled]);
+  }, [account?.identityVerified, account?.passkeyEnabled, account?.onboardingCompletedAt]);
 
   useEffect(() => {
     if (!ready || !account?.identityVerified || !account.passkeyEnabled) return;
@@ -72,7 +77,8 @@ export function AppShell() {
     return <LoginGate account={account} onReady={reload} />;
   }
 
-  if (!discoveryDone || editDiscovery) {
+  const isStaff = account.role === "service_admin" || account.role === "admin";
+  if ((!discoveryDone || editDiscovery) && !isStaff) {
     return (
       <OnboardingFlow
         account={account}
@@ -92,7 +98,8 @@ export function AppShell() {
     return <div className="h-dvh bg-[var(--paper)]" />;
   }
 
-  const hideMap = tab === "hizmet" || tab === "hesap" || tab === "mesaj";
+  const staff = account.role === "service_admin" || account.role === "admin";
+  const hideMap = tab === "hizmet" || tab === "hesap" || tab === "mesaj" || tab === "yonetim";
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[var(--paper)]">
@@ -107,10 +114,7 @@ export function AppShell() {
         <CustomerApp
           pane={tab === "siparis" ? "orders" : "map"}
           mapActive={tab === "harita"}
-          loyaltyRate={loyalty?.rate ?? 0}
-          loyaltyLabel={loyalty?.label ?? "Komşu"}
           meAvatar={account.avatarUrl}
-          categoryIds={account.preferredCategoryIds ?? []}
           homeLat={account.homeLat}
           homeLng={account.homeLng}
           onOpenOrders={() => go("siparis")}
@@ -142,11 +146,15 @@ export function AppShell() {
           />
         </div>
       )}
+      {tab === "yonetim" && staff && (
+        <div className="absolute inset-0 z-10 overflow-y-auto">
+          <AdminDesk />
+        </div>
+      )}
       {tab === "hesap" && (
         <div className="absolute inset-0 z-10 overflow-y-auto">
           <AccountScreen
             account={account}
-            loyalty={loyalty}
             onLogout={() => void reload()}
             onRefresh={reload}
             onOpenMap={() => go("harita")}
@@ -156,6 +164,7 @@ export function AppShell() {
       )}
       <TabBar
         tab={tab}
+        showAdmin={staff}
         onTab={(t) => {
           if (t === "mesaj") setChatOrderId(null);
           go(t);

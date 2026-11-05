@@ -1,4 +1,4 @@
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
 import type { z } from "zod";
 
 export async function parseBody<T>(req: Request, schema: z.ZodType<T>): Promise<T> {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "@/server/rules";
+import { ApiError } from "@/lib/errors";
+import { insertOrderItem } from "@/lib/db/orderItems";
 import { insertOrderRow, getOrderRow } from "@/lib/db/orders";
 import { requestOtp, verifyOtp, loadUser } from "./authService";
 import { listDisputesOnOrder, listMyDisputes, openDispute, resolveDispute } from "./disputeService";
@@ -16,24 +17,27 @@ function seedOrder(id: string, userId: string, providerId = "elif") {
     id,
     provider_id: providerId,
     package_id: "yikama",
-    pieces: 8,
     express: 0,
     drop_method: "kapi",
-    drop_point_id: null,
     slot: "Bugün 18:00–19:00",
     note: "",
     total: 240,
     commission: 24,
-    status: "teslim_edildi",
+    status: "completed",
     created_at: now,
     updated_at: now,
     user_id: userId,
-    price_per_kg_snapshot: 30,
-    estimated_weight: 8,
-    estimated_price: 240,
     delivery_mode: "door",
     scheduled_window_start: now,
-    lifecycle: "completed",
+    size: "orta",
+    machine_units: 2,
+  });
+  insertOrderItem({
+    order_id: id,
+    kind: "size",
+    variant: "orta",
+    qty: 1,
+    unit_price: 240,
   });
 }
 
@@ -57,7 +61,7 @@ describe("itiraz kaydı", () => {
     const closed = resolveDispute(provider!, opened.id);
     expect(closed.status).toBe("resolved");
     expect(closed.resolvedAt).toBeTruthy();
-    expect(getOrderRow("ord-dsp-1")?.status).toBe("teslim_edildi");
+    expect(getOrderRow("ord-dsp-1")?.status).toBe("completed");
 
     const again = openDispute(provider!, "ord-dsp-1", "Sağlayıcı da itiraz açabilsin diye.");
     expect(again.openerRole).toBe("provider");

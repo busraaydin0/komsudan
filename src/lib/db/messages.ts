@@ -31,10 +31,6 @@ export function getConversationByOrderId(orderId: string): ConversationRow | und
     .get(orderId) as ConversationRow | undefined;
 }
 
-export function getConversationById(id: string): ConversationRow | undefined {
-  return db().prepare("SELECT * FROM conversations WHERE id = ?").get(id) as ConversationRow | undefined;
-}
-
 export function insertConversation(row: ConversationRow) {
   db()
     .prepare(
@@ -104,7 +100,6 @@ export type InboxRow = {
   provider_id: string;
   user_id: string | null;
   status: string;
-  product_name: string | null;
   package_id: string;
   conversation_id: string | null;
   conversation_status: string | null;
@@ -122,7 +117,6 @@ export function listInboxRows(userId: string): InboxRow[] {
          o.provider_id,
          o.user_id,
          o.status,
-         o.product_name,
          o.package_id,
          c.id AS conversation_id,
          c.status AS conversation_status,

@@ -8,11 +8,18 @@ import { INSUFFICIENT_PAYOUT_MESSAGE, PAYOUT_METHODS } from "@/lib/walletMethods
 
 function kindLabel(kind: string) {
   if (kind === "earn") return "Tahsil";
+  if (kind === "earn_pending") return "Bekleyen kazanç";
+  if (kind === "earn_release") return "Kazanç serbest";
   if (kind === "payout") return "Çekim";
   if (kind === "topup") return "Yükleme";
   if (kind === "hold") return "Sipariş";
   if (kind === "release") return "İade";
+  if (kind === "capture") return "Tahsil";
   return kind;
+}
+
+function whenTr(iso: string) {
+  return new Date(iso).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
 }
 
 export function ProviderPayoutPanel() {
@@ -62,12 +69,29 @@ export function ProviderPayoutPanel() {
 
   return (
     <section className="k-rise mt-4 rounded-3xl bg-[var(--card)] p-5 ring-1 ring-[var(--line)]">
-      <p className="text-[11px] font-medium tracking-[0.18em] text-[var(--muted)] uppercase">Çekilebilir</p>
+      <p className="text-[11px] font-medium tracking-[0.18em] text-[var(--muted)] uppercase">Kullanılabilir</p>
       <p className="mt-1 font-[family-name:var(--font-display)] text-3xl tabular-nums">
         {wallet ? tl(wallet.balance) : "—"}
       </p>
-      <p className="mt-1 text-xs text-[var(--muted)]">
-        Teslim tahsilinde komisyon düşülür, kalan bakiyeye yazılır. Çekim 1 ise çıkar, 0 ise hata görünür.
+      <dl className="mt-3 grid gap-1.5 text-sm">
+        <div className="flex justify-between">
+          <dt className="text-[var(--muted)]">Rezerv</dt>
+          <dd className="tabular-nums">{wallet ? tl(wallet.reserved ?? 0) : "—"}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-[var(--muted)]">Bekleyen</dt>
+          <dd className="tabular-nums text-right">
+            {wallet ? tl(wallet.pending ?? 0) : "—"}
+            {wallet?.pending && wallet.pending > 0 && wallet.nextReleaseAt ? (
+              <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                {tl(wallet.pending)}, {whenTr(wallet.nextReleaseAt)} itibarıyla kullanılabilir
+              </span>
+            ) : null}
+          </dd>
+        </div>
+      </dl>
+      <p className="mt-2 text-xs text-[var(--muted)]">
+        Teslimde net kazanç bekleyene düşer; 24 saat sonra kullanılabilir olur. Çekim yalnız kullanılabilir tutardan.
       </p>
 
       <h3 className="mt-5 text-sm font-medium">Nereye</h3>
@@ -120,10 +144,10 @@ export function ProviderPayoutPanel() {
         {busy ? "Gönderiliyor…" : canWithdraw === 1 ? `Çek · ${tl(amount)}` : "Çekim yok"}
       </button>
 
-      {activity.filter((r) => r.kind === "earn" || r.kind === "payout").length > 0 ? (
+      {activity.filter((r) => r.kind === "earn" || r.kind === "earn_pending" || r.kind === "earn_release" || r.kind === "payout").length > 0 ? (
         <ul className="mt-4 space-y-1.5 border-t border-[var(--line)] pt-3">
           {activity
-            .filter((r) => r.kind === "earn" || r.kind === "payout")
+            .filter((r) => r.kind === "earn" || r.kind === "earn_pending" || r.kind === "earn_release" || r.kind === "payout")
             .slice(0, 8)
             .map((row) => (
               <li key={row.id} className="flex justify-between text-xs text-[var(--muted)]">

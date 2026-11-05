@@ -1,4 +1,4 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { parseBody } from "@/lib/validation/parse";
 import { preferencesPatchSchema } from "@/lib/validation/preferences.schema";
 import { requireAuth } from "@/lib/auth/middleware";

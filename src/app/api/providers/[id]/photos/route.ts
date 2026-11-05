@@ -1,7 +1,7 @@
-import { fail } from "@/server/http";
-import { requireAccount } from "@/server/auth";
-import { addPortfolioPhoto, bufferFromUpload, workPhotosForProvider } from "@/server/photos";
-import { ApiError } from "@/server/rules";
+import { fail } from "@/lib/http/response";
+import { requireAccount } from "@/lib/auth/routeAccount";
+import { addPortfolioPhoto, bufferFromUpload, workPhotosForProvider } from "@/lib/services/photoService";
+import { ApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 

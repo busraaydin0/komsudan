@@ -1,6 +1,5 @@
-import { fail } from "@/server/http";
-import { deliveredCount, updateProfile, verifyIdentity } from "@/server/auth";
-import { loyaltyFromDelivered } from "@/lib/loyalty";
+import { fail } from "@/lib/http/response";
+import { updateProfile, verifyIdentity } from "@/lib/auth/routeAccount";
 
 export const dynamic = "force-dynamic";
 
@@ -10,10 +9,7 @@ export async function PATCH(req: Request) {
     const account = body.identity
       ? await verifyIdentity(body.name ?? "")
       : await updateProfile(body.name ?? "");
-    return Response.json({
-      account,
-      loyalty: loyaltyFromDelivered(deliveredCount(account.id)),
-    });
+    return Response.json({ account });
   } catch (e) {
     return fail(e);
   }

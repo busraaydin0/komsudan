@@ -1,61 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { PACKAGES } from "@/lib/data";
-import { fetchOrderMessages, patchOrder, uploadOrderPhoto, useCatalog, useOrders, useSession } from "@/lib/api";
-import { MessageBadge } from "@/components/OrderThread";
-import { usesFoodSm } from "@/lib/categories/registry";
-import { tl } from "@/lib/pricing";
-import { canAddPhotos, nextStatus } from "@/lib/status";
-import type { DropPoint, Order, OrderStatus, Provider } from "@/lib/types";
-import { PhotoAdd, PhotoStrip } from "@/components/Photos";
+import { useMemo, useState } from "react";
+import {
+  useCatalog,
+  useOrders,
+  useSession,
+} from "@/lib/api";
+import type { Order } from "@/lib/types";
 import { LaundryProfile } from "@/components/LaundryProfile";
-import { FoodMenuEditor } from "@/components/FoodMenuEditor";
-import { SewingServiceEditor } from "@/components/SewingServiceEditor";
-import { RepairServiceEditor } from "@/components/RepairServiceEditor";
-import { TechServiceEditor } from "@/components/TechServiceEditor";
-import { WashServiceEditor } from "@/components/WashServiceEditor";
-import { CourierServiceEditor } from "@/components/CourierServiceEditor";
-import { GardenServiceEditor } from "@/components/GardenServiceEditor";
-import { CargoServiceEditor } from "@/components/CargoServiceEditor";
-import { PrintServiceEditor } from "@/components/PrintServiceEditor";
-import { PreserveServiceEditor } from "@/components/PreserveServiceEditor";
-import { CarpetServiceEditor } from "@/components/CarpetServiceEditor";
-import { LessonServiceEditor } from "@/components/LessonServiceEditor";
-import { TalkServiceEditor } from "@/components/TalkServiceEditor";
-import { GraveServiceEditor } from "@/components/GraveServiceEditor";
 import { ProviderPayoutPanel } from "@/components/ProviderPayoutPanel";
-
-const LABEL: Record<OrderStatus, string> = {
-  onay_bekliyor: "Bekliyor",
-  teslim_alindi: "Teslim alındı",
-  yikaniyor: "Yıkanıyor",
-  utuleniyor: "Ütüleniyor",
-  hazir: "Hazır",
-  teslim_edildi: "Bitti",
-  iptal: "İptal",
-};
-
-const BADGE: Record<OrderStatus, string> = {
-  onay_bekliyor: "bg-[var(--sand)] text-[var(--clay)]",
-  teslim_alindi: "bg-[color-mix(in_srgb,var(--teal)_14%,transparent)] text-[var(--teal)]",
-  yikaniyor: "bg-[color-mix(in_srgb,var(--teal)_14%,transparent)] text-[var(--teal)]",
-  utuleniyor: "bg-[color-mix(in_srgb,var(--teal)_14%,transparent)] text-[var(--teal)]",
-  hazir: "bg-[color-mix(in_srgb,var(--teal)_18%,transparent)] text-[var(--teal)]",
-  teslim_edildi: "bg-[var(--paper)] text-[var(--muted)]",
-  iptal: "bg-[var(--paper)] text-[var(--muted)]",
-};
-
-function monthKey(iso: string) {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function monthLabel(key: string) {
-  const [y, m] = key.split("-").map(Number);
-  const label = new Date(y, m - 1, 1).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
-  return label.charAt(0).toLocaleUpperCase("tr-TR") + label.slice(1);
-}
+import { ProviderOrderCard } from "@/components/laundry/provider/ProviderOrderCard";
+import { monthKey, monthLabel } from "@/lib/laundry/orderMonthGroup";
+import { ProviderCapacityPanel } from "@/components/ProviderCapacityPanel";
 
 export function ProviderDesk({
   onEditDiscovery,
@@ -65,14 +21,27 @@ export function ProviderDesk({
   onOpenMessages?: (orderId: string) => void;
 }) {
   const { account } = useSession();
-  const { providers, dropPoints, reload: reloadCatalog } = useCatalog();
+  const { providers, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload, err: ordersErr } = useOrders();
-  const open = orders.filter((o) => o.status !== "teslim_edildi" && o.status !== "iptal");
+  const open = orders.filter(
+    (o) =>
+      o.status !== "completed" &&
+      o.status !== "cancelled" &&
+      o.status !== "rejected" &&
+      o.status !== "disputed",
+  );
   const [openMonth, setOpenMonth] = useState<string | null>(null);
   const months = useMemo(() => {
     const map = new Map<string, Order[]>();
     for (const o of orders) {
-      if (o.status !== "teslim_edildi" && o.status !== "iptal") continue;
+      if (
+        o.status !== "completed" &&
+        o.status !== "cancelled" &&
+        o.status !== "rejected" &&
+        o.status !== "disputed"
+      ) {
+        continue;
+      }
       const key = monthKey(o.createdAt);
       const list = map.get(key);
       if (list) list.push(o);
@@ -135,11 +104,10 @@ export function ProviderDesk({
                 <p className="text-xs font-medium tracking-wide text-[var(--teal)] uppercase">Açık</p>
                 <ul className="mt-2 space-y-3">
                   {open.map((o, i) => (
-                    <OrderCard
+                    <ProviderOrderCard
                       key={o.id}
                       order={o}
                       providers={providers}
-                      dropPoints={dropPoints}
                       onChanged={reloadAll}
                       delay={i * 40}
                       onOpenMessages={onOpenMessages}
@@ -170,11 +138,10 @@ export function ProviderDesk({
                         {on && (
                           <ul className="space-y-3 bg-[var(--paper)] px-3 pt-1 pb-3">
                             {list.map((o, i) => (
-                              <OrderCard
+                              <ProviderOrderCard
                                 key={o.id}
                                 order={o}
                                 providers={providers}
-                                dropPoints={dropPoints}
                                 onChanged={reloadAll}
                                 delay={i * 30}
                                 onOpenMessages={onOpenMessages}
@@ -192,238 +159,17 @@ export function ProviderDesk({
         )}
 
         <LaundryProfile me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
+        <ProviderCapacityPanel onSaved={reloadAll} />
 
         {!providers.some((p) => p.id === account?.id) && (
           <p className="k-rise mt-6 text-sm text-[var(--muted)]">
-            Hizmet kartın burada görünmüyor. Keşifte “Hizmet vermek istiyorum”u işaretleyip alanı kaydet; kart ve gelen
-            işler bu sekmede açılır.
+            Hizmet kartın burada görünmüyor. Keşifte “Hizmet vermek istiyorum”u işaretleyip çamaşır paketini kaydet; kart
+            ve gelen işler bu sekmede açılır.
           </p>
         )}
 
-        <FoodMenuEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <SewingServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <RepairServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <TechServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <WashServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <CourierServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <GardenServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <CargoServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <PrintServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <PreserveServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <CarpetServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <LessonServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <TalkServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
-
-        <GraveServiceEditor me={providers.find((p) => p.id === account?.id)} onChanged={reloadAll} />
       </main>
     </div>
   );
 }
 
-function OrderCard({
-  order,
-  providers,
-  dropPoints,
-  onChanged,
-  delay,
-  onOpenMessages,
-}: {
-  order: Order;
-  providers: Provider[];
-  dropPoints: DropPoint[];
-  onChanged: () => void;
-  delay: number;
-  onOpenMessages?: (orderId: string) => void;
-}) {
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [code, setCode] = useState("");
-  const [unread, setUnread] = useState(0);
-  const p = providers.find((x) => x.id === order.providerId);
-  const pack =
-    p?.packages.find((x) => x.id === order.packageId) ??
-    PACKAGES.find((x) => x.id === order.packageId);
-  const drop = dropPoints.find((d) => d.id === order.dropPointId);
-  const food = order.packageId === "davet";
-  const catalog = usesFoodSm(order.packageId);
-  const next = nextStatus(order.status, order.packageId, catalog);
-
-  useEffect(() => {
-    let alive = true;
-    void fetchOrderMessages(order.id)
-      .then((data) => {
-        if (alive) setUnread(data.unreadCount ?? 0);
-      })
-      .catch(() => undefined);
-    const t = setInterval(() => {
-      void fetchOrderMessages(order.id)
-        .then((data) => {
-          if (alive) setUnread(data.unreadCount ?? 0);
-        })
-        .catch(() => undefined);
-    }, 15_000);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, [order.id]);
-
-  const foodLabel: Partial<Record<OrderStatus, string>> = {
-    teslim_alindi: "Hazırlanıyor",
-    hazir: "Hazır",
-  };
-
-  async function act(action: "accept" | "reject" | "advance" | "deliver") {
-    if (busy) return;
-    setBusy(true);
-    setErr("");
-    try {
-      await patchOrder(order.id, action, action === "deliver" ? code : undefined);
-      setCode("");
-      await onChanged();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "İşlem alınamadı.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <li
-      className="k-rise rounded-3xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)] transition-shadow duration-200 hover:shadow-[0_10px_28px_rgba(28,23,18,0.08)]"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      <p className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE[order.status] ?? "bg-[var(--paper)] text-[var(--muted)]"}`}>
-        {catalog && foodLabel[order.status] ? foodLabel[order.status] : (LABEL[order.status] ?? order.status)}
-      </p>
-      <p className="mt-2 font-medium">
-        {p?.name} ·{" "}
-        {food
-          ? `${order.guestCount ?? order.pieces} kişilik ${order.productName ?? "davet"}`
-          : catalog
-            ? `${order.guestCount ?? order.pieces} ${order.productName ?? "hizmet"}`
-            : `${order.pieces} parça · ${pack?.title}`}
-      </p>
-      {food && order.allergyNote && (
-        <p className="mt-1 text-sm text-[var(--muted)]">Alerji: {order.allergyNote}</p>
-      )}
-      <p className="mt-1 text-sm text-[var(--muted)]">
-        {new Date(order.createdAt).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
-        {" · "}
-        {order.drop === "kapi" ? "Kapı teslim" : drop?.name ?? "Gel al noktası"} · {order.slot}
-      </p>
-      {order.note && <p className="mt-1 text-sm">Not: {order.note}</p>}
-      {order.photos.length > 0 && <PhotoStrip photos={order.photos} size="sm" />}
-      <p className="mt-2 text-sm tabular-nums">
-        {tl(order.total)} · eline {tl(order.total - order.commission)}
-        {order.paymentStatus === "captured" ? " · tahsil edildi" : ""}
-        {order.paymentStatus === "authorized" ? " · tutanakta" : ""}
-      </p>
-      {err && <p className="k-rise mt-2 text-sm text-[var(--clay)]">{err}</p>}
-      <div className="mt-3 flex flex-wrap gap-2">
-        {order.status === "onay_bekliyor" && (
-          <>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void act("accept")}
-              className="k-press k-cta rounded-full bg-[var(--teal)] px-3 py-1.5 text-xs text-white"
-            >
-              {busy ? "…" : "Kabul"}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void act("reject")}
-              className="k-press rounded-full px-3 py-1.5 text-xs ring-1 ring-[var(--line)]"
-            >
-              Red
-            </button>
-          </>
-        )}
-        {next && order.status !== "onay_bekliyor" && order.status !== "hazir" && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void act("advance")}
-            className="k-press k-cta rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs text-[var(--paper)]"
-          >
-            {busy ? "…" : food && next === "hazir" ? "Hazır" : LABEL[next]}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => onOpenMessages?.(order.id)}
-          className="k-press rounded-full px-3 py-1.5 text-xs ring-1 ring-[var(--line)]"
-        >
-          Mesajlar
-          <MessageBadge count={unread} />
-        </button>
-        {canAddPhotos(order.status) && (
-          <PhotoAdd
-            label="İş fotoğrafı"
-            busy={busy}
-            onPick={(file) => {
-              void (async () => {
-                setBusy(true);
-                setErr("");
-                try {
-                  await uploadOrderPhoto(order.id, file);
-                  await onChanged();
-                } catch (e) {
-                  setErr(e instanceof Error ? e.message : "Fotoğraf yüklenemedi.");
-                } finally {
-                  setBusy(false);
-                }
-              })();
-            }}
-          />
-        )}
-      </div>
-      {order.status === "hazir" && (
-        <form
-          className="mt-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void act("deliver");
-          }}
-        >
-          <p className="text-xs text-[var(--muted)]">
-            Müşterinin 6 haneli teslim kodunu gir. Doğruysa ödeme cüzdana geçer.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <input
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="••••••"
-              className="w-28 rounded-full bg-[var(--paper)] px-3 py-1.5 text-center font-[family-name:var(--font-display)] text-lg tabular-nums tracking-[0.2em] ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
-              aria-label="Teslim kodu"
-            />
-            <button
-              type="submit"
-              disabled={busy || code.length !== 6}
-              className="k-press k-cta rounded-full bg-[var(--teal)] px-3 py-1.5 text-xs text-white disabled:opacity-50"
-            >
-              {busy ? "…" : "Doğrula · tahsil et"}
-            </button>
-          </div>
-        </form>
-      )}
-    </li>
-  );
-}

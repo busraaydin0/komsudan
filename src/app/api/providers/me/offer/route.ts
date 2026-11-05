@@ -1,4 +1,4 @@
-import { fail, ok } from "@/server/http";
+import { fail, ok } from "@/lib/http/response";
 import { parseBody } from "@/lib/validation/parse";
 import { serviceOfferSchema } from "@/lib/validation/provider.schema";
 import { requireAuth } from "@/lib/auth/middleware";

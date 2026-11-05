@@ -1,83 +1,64 @@
-import { PACKAGES } from "./data";
-import type { PackageId, Provider } from "./types";
+import { isoDateInIstanbul } from "./capacity/istanbul";
+import { addonKey, machineUnitsFor, type LaundrySize, type OrderAddonLine } from "./laundryModel";
+import type { PackageId } from "./types";
 
-export const MIN_ORDER = 100;
 export const COMMISSION = 0.1;
-export const EXPRESS_BUMP = 0.25;
+export const EXPRESS_BUMP = 0.4;
 
-/** Pilot slotlar “Bugün 18:00–19:00” / “Yarın …” — gün önekinden aynı gün. */
-export function isSameDaySlot(slot: string) {
-  return slot.trim().toLocaleLowerCase("tr-TR").startsWith("bugün");
+export function isSameDayPickup(pickupDate: string, now = new Date()) {
+  return pickupDate === isoDateInIstanbul(now);
 }
 
-/** Aynı gün zamı kutudan değil slottan: bugün seçildiyse +%25, yarınsa yok. */
-export function resolveExpress(providerOffersExpress: boolean, slot: string) {
-  return Boolean(providerOffersExpress && isSameDaySlot(slot));
+/** Zam yalnız sipariş `express=true` iken. Aynı gün otomatik zam yok (K-008). */
+export function resolveExpress(requested: boolean) {
+  return Boolean(requested);
 }
 
-export function pickSlotForDay(slots: string[], sameDay: boolean, fallback = "") {
-  return slots.find((s) => isSameDaySlot(s) === sameDay) ?? fallback;
-}
-export const PIECES_MIN = 1;
-export const PIECES_MAX = 80;
-export const GUESTS_MIN = 1;
-export const GUESTS_MAX = 80;
+export type LaundryQuote = {
+  total: number;
+  before: number;
+  commission: number;
+  providerNet: number;
+  subtotal: number;
+  machineUnits: number;
+  sizePrice: number;
+  addonTotal: number;
+};
 
-export function clampPieces(n: number, remaining?: number) {
-  const cap = remaining && remaining > 0 ? Math.min(PIECES_MAX, remaining) : PIECES_MAX;
-  if (!Number.isFinite(n)) return PIECES_MIN;
-  return Math.min(cap, Math.max(PIECES_MIN, Math.round(n)));
-}
-
-export function estimate(pieces: number, packageId: PackageId, express: boolean, loyaltyRate = 0) {
-  const base = PACKAGES.find((p) => p.id === packageId)?.pricePerPiece ?? 0;
-  return quote(pieces, base, express, loyaltyRate);
-}
-
-export function estimateFor(
-  provider: Provider,
-  pieces: number,
-  packageId: PackageId,
-  express: boolean,
-  loyaltyRate = 0,
-) {
-  const base =
-    provider.packages.find((p) => p.id === packageId)?.pricePerPiece ??
-    PACKAGES.find((p) => p.id === packageId)?.pricePerPiece ??
-    0;
-  return quote(pieces, base, express, loyaltyRate);
-}
-
-function quote(pieces: number, base: number, express: boolean, loyaltyRate = 0) {
-  const raw = pieces * base * (express ? 1 + EXPRESS_BUMP : 1);
-  const before = Math.max(MIN_ORDER, Math.round(raw));
-  const rate = Math.min(0.2, Math.max(0, loyaltyRate));
-  const total = Math.max(1, Math.round(before * (1 - rate)));
+export function quoteLaundry(input: {
+  packageId: PackageId;
+  size: LaundrySize;
+  addons: OrderAddonLine[];
+  express: boolean;
+  sizePrice: number;
+  addonUnitPrices: Record<string, number>;
+}): LaundryQuote {
+  const sizePrice = input.sizePrice;
+  let addonTotal = 0;
+  for (const a of input.addons) {
+    if (a.qty < 1) continue;
+    const key = addonKey(a.addon, a.variant);
+    const unit = input.addonUnitPrices[key];
+    if (unit == null) {
+      throw new Error(`ADDON_PRICE:${key}`);
+    }
+    addonTotal += unit * a.qty;
+  }
+  const subtotal = sizePrice + addonTotal;
+  const bumped = Math.round(subtotal * (input.express ? 1 + EXPRESS_BUMP : 1));
+  const before = bumped;
+  const total = Math.max(1, before);
   const commission = Math.round(total * COMMISSION);
+  const machineUnits = machineUnitsFor(input.size, input.addons);
   return {
     total,
     before,
-    loyaltyRate: rate,
     commission,
     providerNet: total - commission,
-    perPiece: base,
-  };
-}
-
-/** Davet: kişi × kişi başı. Çamaşır MIN_ORDER 100 buraya girmez. */
-export function estimateFood(guests: number, pricePerPerson: number, loyaltyRate = 0) {
-  const count = Math.max(GUESTS_MIN, Math.round(guests));
-  const before = Math.max(1, Math.round(count * pricePerPerson));
-  const rate = Math.min(0.2, Math.max(0, loyaltyRate));
-  const total = Math.max(1, Math.round(before * (1 - rate)));
-  const commission = Math.round(total * COMMISSION);
-  return {
-    total,
-    before,
-    loyaltyRate: rate,
-    commission,
-    providerNet: total - commission,
-    perPiece: pricePerPerson,
+    subtotal,
+    machineUnits,
+    sizePrice,
+    addonTotal,
   };
 }
 

@@ -1,35 +1,75 @@
 import { describe, expect, it } from "vitest";
-import { CATALOG_CATEGORY_IDS } from "@/lib/categories/registry";
-import { nextStatus, trackSteps } from "./status";
+import {
+  ALLOWED_TRANSITIONS,
+  canTransition,
+  nextOperationalStatus,
+  trackSteps,
+} from "./status";
 
-const FOOD_STEPS = ["onay_bekliyor", "teslim_alindi", "hazir", "teslim_edildi"] as const;
+describe("ALLOWED_TRANSITIONS", () => {
+  it("pending çıkışları", () => {
+    expect(ALLOWED_TRANSITIONS.pending).toEqual(["accepted", "rejected", "dropped_off"]);
+  });
+});
 
-describe("Tip A kısaltılmış state machine", () => {
-  it("onay_bekliyor → teslim_alindi → hazir → teslim_edildi", () => {
-    expect(nextStatus("onay_bekliyor", "davet")).toBe("teslim_alindi");
-    expect(nextStatus("teslim_alindi", "davet")).toBe("hazir");
-    expect(nextStatus("hazir", "davet")).toBe("teslim_edildi");
-    expect(nextStatus("teslim_edildi", "davet")).toBeNull();
+describe("canTransition", () => {
+  it("admin tüm grafik geçişlerini yapabilir (paket kuralları hariç)", () => {
+    expect(canTransition("pending", "accepted", "admin", { packageId: "katlama" })).toBe(true);
+    expect(canTransition("washing", "ready", "admin", { packageId: "katlama" })).toBe(true);
   });
 
-  it("14 katalog kategorisinde yıkama/ütü adımı yok", () => {
-    for (const id of CATALOG_CATEGORY_IDS) {
-      expect(trackSteps(id)).toEqual([...FOOD_STEPS]);
-      expect(nextStatus("teslim_alindi", id)).toBe("hazir");
-      expect(nextStatus("teslim_alindi", id)).not.toBe("yikaniyor");
-    }
+  it("provider kabul ve operasyon adımları", () => {
+    expect(canTransition("pending", "accepted", "provider", { packageId: "yikama" })).toBe(true);
+    expect(canTransition("accepted", "dropped_off", "provider", { packageId: "yikama" })).toBe(true);
+    expect(canTransition("ready", "completed", "provider", { packageId: "yikama", isOrderParty: true })).toBe(
+      true,
+    );
   });
 
-  it("çamaşır tam pakette ütü basamağını korur", () => {
+  it("müşteri completed yapamaz (taraf değilse)", () => {
+    expect(canTransition("ready", "completed", "customer", { packageId: "yikama", isOrderParty: false })).toBe(
+      false,
+    );
+    expect(canTransition("ready", "completed", "customer", { packageId: "yikama", isOrderParty: true })).toBe(
+      true,
+    );
+  });
+
+  it("müşteri accepted yapamaz", () => {
+    expect(canTransition("pending", "accepted", "customer", { packageId: "katlama" })).toBe(false);
+  });
+
+  it("tam pakette yıkama → hazır yasak", () => {
+    expect(canTransition("washing", "ready", "provider", { packageId: "tam" })).toBe(false);
+    expect(canTransition("washing", "ironing", "provider", { packageId: "tam" })).toBe(true);
+  });
+
+  it("ütü olmayan pakette ironing yasak", () => {
+    expect(canTransition("washing", "ironing", "provider", { packageId: "katlama" })).toBe(false);
+  });
+
+  it("grafik dışı geçiş", () => {
+    expect(canTransition("completed", "pending", "admin", { packageId: "katlama" })).toBe(false);
+    expect(canTransition("pending", "washing", "provider", { packageId: "katlama" })).toBe(false);
+  });
+
+  it("accepted → cancelled müşteri veya provider", () => {
+    expect(canTransition("accepted", "cancelled", "customer", { packageId: "katlama" })).toBe(true);
+  });
+});
+
+describe("operasyon adımları", () => {
+  it("tam pakette ütü basamağı", () => {
     expect(trackSteps("tam")).toEqual([
-      "onay_bekliyor",
-      "teslim_alindi",
-      "yikaniyor",
-      "utuleniyor",
-      "hazir",
-      "teslim_edildi",
+      "pending",
+      "accepted",
+      "washing",
+      "ironing",
+      "ready",
+      "completed",
     ]);
-    expect(nextStatus("teslim_alindi", "yikama")).toBe("yikaniyor");
-    expect(nextStatus("yikaniyor", "tam")).toBe("utuleniyor");
+    expect(nextOperationalStatus("accepted", "yikama")).toBe("dropped_off");
+    expect(nextOperationalStatus("washing", "tam")).toBe("ironing");
+    expect(nextOperationalStatus("washing", "katlama")).toBe("ready");
   });
 });

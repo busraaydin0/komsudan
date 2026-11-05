@@ -46,8 +46,12 @@ export function getPaymentByOrderId(orderId: string): PaymentRow | undefined {
   return db().prepare("SELECT * FROM payments WHERE order_id = ?").get(orderId) as PaymentRow | undefined;
 }
 
-export function getPaymentById(id: string): PaymentRow | undefined {
-  return db().prepare("SELECT * FROM payments WHERE id = ?").get(id) as PaymentRow | undefined;
+export function listPaymentsByOrderIds(orderIds: string[]): PaymentRow[] {
+  if (orderIds.length === 0) return [];
+  const ph = orderIds.map(() => "?").join(",");
+  return db()
+    .prepare(`SELECT * FROM payments WHERE order_id IN (${ph})`)
+    .all(...orderIds) as PaymentRow[];
 }
 
 export function getPaymentByReference(ref: string): PaymentRow | undefined {
@@ -60,5 +64,15 @@ export function updatePaymentStatus(orderId: string, status: string, at: string)
   const result = db()
     .prepare("UPDATE payments SET status = ?, updated_at = ? WHERE order_id = ?")
     .run(status, at, orderId);
+  return result.changes;
+}
+
+export function updatePaymentAmounts(orderId: string, amount: number, commission: number, at: string) {
+  const result = db()
+    .prepare(
+      `UPDATE payments SET amount = ?, commission = ?, updated_at = ?
+       WHERE order_id = ? AND status = 'authorized'`,
+    )
+    .run(amount, commission, at, orderId);
   return result.changes;
 }

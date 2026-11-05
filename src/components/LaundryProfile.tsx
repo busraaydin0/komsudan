@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { isCatalogCategoryId } from "@/lib/categories/registry";
-import { PACKAGES, trustLabel } from "@/lib/data";
+import { LAUNDRY_PACKAGES } from "@/lib/laundry/packages";
+import { trustLabel } from "@/lib/laundry/pilot";
 import { DRYING_OPTIONS, dryingFromProvider } from "@/lib/drying";
 import { patchMyProviderProfile } from "@/lib/api";
 import { tl } from "@/lib/pricing";
-import { seatTone } from "@/lib/seat";
+import { providerLoadDisplay } from "@/lib/capacity/display";
 import { Avatar } from "@/components/Avatar";
 import { PhotoStrip, ReviewList } from "@/components/Photos";
-import type { DropMethod, DryingType, PackageId, Provider } from "@/lib/types";
+import type { DryingType, PackageId, Provider } from "@/lib/types";
 
 export function LaundryProfile({
   me,
@@ -21,7 +21,6 @@ export function LaundryProfile({
   const [bio, setBio] = useState("");
   const [dryingType, setDryingType] = useState<DryingType>("makine");
   const [express, setExpress] = useState(false);
-  const [drops, setDrops] = useState<DropMethod[]>(["nokta"]);
   const [offered, setOffered] = useState<PackageId[]>(["yikama", "katlama", "tam"]);
   const [prices, setPrices] = useState<Record<PackageId, number>>({
     yikama: 9,
@@ -33,11 +32,10 @@ export function LaundryProfile({
   const [ok, setOk] = useState("");
 
   useEffect(() => {
-    if (!me || isCatalogCategoryId(me.categoryId)) return;
+    if (!me || (me.categoryId && me.categoryId !== "camasir")) return;
     setBio(me.bio);
     setDryingType(dryingFromProvider(me));
     setExpress(me.express);
-    setDrops(me.drops.length ? me.drops : ["nokta"]);
     const ids = me.packages.map((p) => p.id);
     setOffered(ids.length ? ids : ["katlama"]);
     setPrices({
@@ -47,22 +45,15 @@ export function LaundryProfile({
     });
   }, [me]);
 
-  if (!me || isCatalogCategoryId(me.categoryId)) return null;
+  if (!me || (me.categoryId && me.categoryId !== "camasir")) return null;
 
-  const tone = seatTone(me.remaining, me.capacity);
+  const loadMeta = providerLoadDisplay(me);
+  const tone = loadMeta.tone;
 
   function togglePack(id: PackageId) {
     setOffered((prev) => {
       if (prev.includes(id)) return prev.length === 1 ? prev : prev.filter((x) => x !== id);
-      return [...PACKAGES.map((p) => p.id).filter((x) => x === id || prev.includes(x))];
-    });
-    setOk("");
-  }
-
-  function toggleDrop(d: DropMethod) {
-    setDrops((prev) => {
-      if (prev.includes(d)) return prev.length === 1 ? prev : prev.filter((x) => x !== d);
-      return d === "kapi" ? ["kapi", ...prev.filter((x) => x !== "kapi")] : [...prev, "nokta"];
+      return [...LAUNDRY_PACKAGES.map((p) => p.id).filter((x) => x === id || prev.includes(x))];
     });
     setOk("");
   }
@@ -81,7 +72,7 @@ export function LaundryProfile({
         dryingType,
         hasDryer: dryingType !== "ip",
         express,
-        drops,
+        drops: ["kapi"],
         packages: offered.map((id) => ({ id, pricePerPiece: prices[id] })),
       });
       setOk("Müşterinin göreceği profil kaydedildi.");
@@ -113,7 +104,7 @@ export function LaundryProfile({
                     : ""
               }
             >
-              {me.remaining <= 0 ? "bugün dolu" : `bugün ${me.remaining} parça yer`}
+              {loadMeta.deliveryLine ?? loadMeta.loadLabel ?? "Kapasite"}
             </span>
           </p>
         </div>
@@ -140,7 +131,7 @@ export function LaundryProfile({
       )}
 
       <div className="mt-4 grid gap-2">
-        {PACKAGES.map((pack) => {
+        {LAUNDRY_PACKAGES.map((pack) => {
           const on = offered.includes(pack.id);
           return (
             <div
@@ -154,13 +145,13 @@ export function LaundryProfile({
               <button type="button" onClick={() => togglePack(pack.id)} className="flex w-full justify-between text-left font-medium">
                 {pack.title}
                 <span className="tabular-nums text-sm font-normal text-[var(--muted)]">
-                  {on ? `${tl(prices[pack.id])}/parça` : "kapalı"}
+                  {on ? `${tl(prices[pack.id])}/orta` : "kapalı"}
                 </span>
               </button>
               <span className="mt-0.5 block text-xs text-[var(--muted)]">{pack.blurb}</span>
               {on && (
                 <label className="mt-2 flex items-center gap-2 text-xs text-[var(--muted)]">
-                  ₺/parça
+                  ₺/orta boy · 3–5 makine = orta × adet
                   <input
                     inputMode="numeric"
                     value={prices[pack.id]}
@@ -204,20 +195,11 @@ export function LaundryProfile({
             express ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
           }`}
         >
-          Aynı gün
+          Acil teslim
         </button>
-        {(["kapi", "nokta"] as const).map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => toggleDrop(d)}
-            className={`k-chip rounded-full px-3 py-1.5 text-sm ring-1 ${
-              drops.includes(d) ? "bg-[var(--teal)] text-white ring-[var(--teal)]" : "ring-[var(--line)]"
-            }`}
-          >
-            {d === "kapi" ? "Kapı" : "Gel al noktası"}
-          </button>
-        ))}
+        <span className="k-chip rounded-full px-3 py-1.5 text-sm ring-1 bg-[var(--teal)] text-white ring-[var(--teal)]">
+          Kapı teslim
+        </span>
       </div>
 
       {err && <p className="mt-3 text-sm text-[var(--clay)]">{err}</p>}
