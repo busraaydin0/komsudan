@@ -57,13 +57,13 @@ function writeFile(buf: Buffer) {
   if (!kind) throw new ApiError(400, "Yalnızca JPEG, PNG veya WebP.");
   if (buf.length > PHOTO_BYTES) throw new ApiError(400, "Fotoğraf 2,5 MB’ı geçemesin.");
   const id = randomUUID().slice(0, 12);
-  fs.writeFileSync(path.join(uploadsDir(), `${id}.${kind.ext}`), buf);
+  fs.writeFileSync(path.join(/*turbopackIgnore: true*/ uploadsDir(), `${id}.${kind.ext}`), buf);
   return { id, ...kind, now: new Date().toISOString() };
 }
 
 function unlinkPhotoFile(id: string, ext: string) {
-  const file = path.join(uploadsDir(), `${id}.${ext}`);
-  if (fs.existsSync(file)) fs.unlinkSync(file);
+  const file = path.join(/*turbopackIgnore: true*/ uploadsDir(), `${id}.${ext}`);
+  if (fs.existsSync(/*turbopackIgnore: true*/ file)) fs.unlinkSync(/*turbopackIgnore: true*/ file);
 }
 
 export async function parsePhotoUpload(req: Request) {
@@ -253,7 +253,7 @@ export function readPhoto(id: string): { buf: Buffer; mime: string } | undefined
     : (db().prepare("SELECT * FROM gallery_photos WHERE id = ?").get(id) as GalleryRow | undefined);
   const row = order ?? gallery;
   if (!row) return undefined;
-  const file = path.join(uploadsDir(), `${row.id}.${row.ext}`);
-  if (!fs.existsSync(file)) return undefined;
-  return { buf: fs.readFileSync(file), mime: row.mime };
+  const file = path.join(/*turbopackIgnore: true*/ uploadsDir(), `${row.id}.${row.ext}`);
+  if (!fs.existsSync(/*turbopackIgnore: true*/ file)) return undefined;
+  return { buf: fs.readFileSync(/*turbopackIgnore: true*/ file), mime: row.mime };
 }

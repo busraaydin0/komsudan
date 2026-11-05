@@ -198,22 +198,26 @@ describe("demo bekleyen süre", () => {
   const prevWait = process.env.WALLET_PENDING_WAIT_MS;
   const prevEnv = process.env.NODE_ENV;
 
+  function setNodeEnv(value: string | undefined) {
+    (process.env as { NODE_ENV?: string }).NODE_ENV = value;
+  }
+
   afterEach(() => {
     if (prevWait === undefined) delete process.env.WALLET_PENDING_WAIT_MS;
     else process.env.WALLET_PENDING_WAIT_MS = prevWait;
-    process.env.NODE_ENV = prevEnv;
+    setNodeEnv(prevEnv);
   });
 
   it("WALLET_PENDING_WAIT_MS saniye; production'da yok sayılır", () => {
-    process.env.NODE_ENV = "test";
+    setNodeEnv("test");
     process.env.WALLET_PENDING_WAIT_MS = "60";
     expect(pendingEarningWaitMs()).toBe(60_000);
-    process.env.NODE_ENV = "production";
+    setNodeEnv("production");
     expect(pendingEarningWaitMs()).toBe(PENDING_EARNING_WAIT_MS);
   });
 
   it("60 sn sonra pending→balance", async () => {
-    process.env.NODE_ENV = "test";
+    setNodeEnv("test");
     process.env.WALLET_PENDING_WAIT_MS = "60";
     const userId = await userFrom("5550000891");
     stubOrder("k-demo-wait");

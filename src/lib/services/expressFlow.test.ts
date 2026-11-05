@@ -157,7 +157,6 @@ describe("acil teslim (Adım 3a)", () => {
       scheduled_window_start: now,
       size: "kucuk",
       machine_units: 1,
-      promised_delivery_date: addCalendarDaysIso(isoDateInIstanbul(new Date()), 1),
     });
     const provider = loadUser("elif")!;
     expect(() => delayOrder(provider, "ord-delay-express", "Yoğunluk", 12)).toThrow(ApiError);
