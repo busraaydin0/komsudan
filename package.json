@@ -11,7 +11,8 @@
     "knip": "knip --max-issues 0",
     "check": "npm run lint && npm run typecheck && npm test && npm run knip",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "demo:reset": "node scripts/demo-reset.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

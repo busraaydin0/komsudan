@@ -6,6 +6,15 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-05 – Adım 5: Demo hazırlığı
+- **Doğrulama:** `data/komsudan.db` kopyasında (orijinale dokunulmadı, backup API) 0005 sonrası users/orders/payments/wallets/wallet_ledger/reviews/messages satır sayıları aynı; FK check boş; passkey ve sessions/refresh join duruyor. Vitest: eski şema fixture → migrate.
+- **Duman:** OTP→yükle→sipariş→teslim→pending→balance→yorum; acil 15 dk EXPIRED + rezerv iade; iptal/red reserved+kapasite; service_admin KPI/askı.
+- **Düzeltme:** TabBar 6. sekme 390px (`text-[9px]`, truncate, ikon 18). Lint: `CustomerApp` `home` useMemo, `MapCanvas` init `modeRef`. Keşif: `onboardingCompletedAt` varsa atlanır (demo hesap). `createOrder` rezervi sipariş satırından önce yazıyordu (`wallet_ledger.order_id` FK) — satır sonrası hold.
+- **Demo:** `npm run demo:reset` (production yasak); README Demo bölümü. `WALLET_PENDING_WAIT_MS=60` önerisi.
+- **Bulunan hata / kayıp:** 0005 kopyada veri kaybı yok; yeni migration gerekmedi. Seed `availability_slots` 1 saatlik vitrin penceresi yazıyordu, takvim 2 saate böldüğü için seçilebilir pencere boştu — seed gün boyu 08:00–20:00 (Pzt–Cmt). `npm test` `.next` yokken `pageRootMainKb` null; raporu yine yazar.
+- **Bilinen sınırlar:** 3b yok (acil kontenjan, 18:00, iade/risk); kapıda renk grubu onayı yok; gerçek ödeme/çekim yok; otomatik askı yok.
+- Tarayıcı: computerUse ile 390px tur. Konsolda uygulama JS exception yok (yalnız MapLibre WebGL/sürücü uyarısı). 6 sekme sığdı (Harita…Yönetim…Hesap). Harita karolarında “API KEY REQUIRED” (harita sağlayıcı, demo). Ekran görüntüleri: `/opt/cursor/artifacts/adim5-*.png`.
+
 ## 2026-11-01 – Adım 4: Hizmet Admini
 - **K-009:** rol `service_admin`; yönetim API (`/api/admin/providers`, `.../monthly`, `/api/admin/kpi`, `.../suspend`); askı bayrağı + `admin_audit`; aylık profil ve KPI İstanbul ayı; "dikkat" rozeti DEMO eşiği (BR-029, otomatik askı yok).
 - Migration `0005_service_admin.sql`. Seed: Hizmet Admini `5321100099` (üretimde demo sipariş yok).

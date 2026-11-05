@@ -90,12 +90,12 @@ export function MapCanvas({
         zoom: PILOT_AREA.zoom,
         minZoom: 13.2,
         maxZoom: 18,
-        pitch: mode === "3d" ? 58 : 0,
-        bearing: mode === "3d" ? -18 : 0,
+        pitch: modeRef.current === "3d" ? 58 : 0,
+        bearing: modeRef.current === "3d" ? -18 : 0,
         maxPitch: 75,
         pitchWithRotate: true,
         canvasContextAttributes: { antialias: true },
-        ...(mode === "3d" ? {} : { maxBounds: tightBounds() }),
+        ...(modeRef.current === "3d" ? {} : { maxBounds: tightBounds() }),
         attributionControl: { compact: true },
       });
       mapRef.current = map;

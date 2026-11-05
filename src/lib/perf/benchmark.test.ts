@@ -179,6 +179,10 @@ describe("performans ölçümü (rapor)", () => {
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, JSON.stringify(report, null, 2));
 
-    expect(build.pageRootMainKb).toBeGreaterThan(0);
+    if (typeof build.pageRootMainKb === "number") {
+      expect(build.pageRootMainKb).toBeGreaterThan(0);
+    } else {
+      expect(build.pageRootMainKb).toBeNull();
+    }
   });
 });

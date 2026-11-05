@@ -44,8 +44,10 @@ export function AppShell() {
   useEffect(() => {
     if (!account?.identityVerified || !account.passkeyEnabled) {
       setDiscoveryDone(false);
+    } else if (account.onboardingCompletedAt) {
+      setDiscoveryDone(true);
     }
-  }, [account?.identityVerified, account?.passkeyEnabled]);
+  }, [account?.identityVerified, account?.passkeyEnabled, account?.onboardingCompletedAt]);
 
   useEffect(() => {
     if (!ready || !account?.identityVerified || !account.passkeyEnabled) return;

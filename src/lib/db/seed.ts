@@ -67,21 +67,17 @@ function seedProviderDirectory() {
     }
     ensureProviderPriceGrid(p.id);
     if (countSlots(p.id) === 0) {
-      const windows = [...new Set(p.slots.map((s) => s.replace(/^(Bugün|Yarın) /, "")))];
-      for (const day of [1, 2, 3, 4, 5]) {
-        for (const window of windows) {
-          const [start, end] = window.split("–");
-          if (!start || !end) continue;
-          insertSlotRow({
-            id: `${p.id}:${day}:${start}`,
-            provider_id: p.id,
-            day_of_week: day,
-            start_time: start,
-            end_time: end,
-            delivery_mode: "door",
-            is_active: 1,
-          });
-        }
+      // 1 saatlik vitrin metinleri 2 saatlik takvime bölünmez; gün boyu slot gerekir.
+      for (const day of [1, 2, 3, 4, 5, 6]) {
+        insertSlotRow({
+          id: `${p.id}:${day}:gun`,
+          provider_id: p.id,
+          day_of_week: day,
+          start_time: "08:00",
+          end_time: "20:00",
+          delivery_mode: "door",
+          is_active: 1,
+        });
       }
     }
   }

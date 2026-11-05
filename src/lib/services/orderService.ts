@@ -281,7 +281,6 @@ function insertPendingOrder(args: {
   const now = new Date().toISOString();
   const id = `k-${randomUUID().slice(0, 8)}`;
   runOrderTx(() => {
-    holdForOrder(args.userId, id, args.quote.total);
     insertOrderRow({
       id,
       provider_id: args.providerId,
@@ -354,6 +353,8 @@ function insertPendingOrder(args: {
       windowEnd: args.delivery.windowEnd,
       at: now,
     });
+    // ledger.order_id → orders: rezerv sipariş satırından sonra (FK).
+    holdForOrder(args.userId, id, args.quote.total);
   });
   return id;
 }

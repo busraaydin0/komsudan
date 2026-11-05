@@ -83,8 +83,10 @@ export function CustomerApp({
   const [placing, setPlacing] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
-  const home =
-    homeLat != null && homeLng != null ? { lat: homeLat, lng: homeLng } : null;
+  const home = useMemo(
+    () => (homeLat != null && homeLng != null ? { lat: homeLat, lng: homeLng } : null),
+    [homeLat, homeLng],
+  );
   const origin = user ?? home ?? PILOT_AREA.center;
   const units = machineUnitsFor(size, addons);
   const ranked = useMemo(() => {
@@ -131,7 +133,7 @@ export function CustomerApp({
     const unsub = subscribeLocation(apply);
     void readLocationIfGranted().then(apply);
     return unsub;
-  }, [homeLat, homeLng]);
+  }, [home]);
 
   useEffect(() => {
     if (pane === "map") {
