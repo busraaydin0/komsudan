@@ -105,9 +105,16 @@ describe("0005 users rebuild (eski şema fixture)", () => {
         .get() as { n: number }
     ).n;
     expect(d.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
-    expect(before.users).toBe(2);
-    expect(before.orders).toBe(1);
-    expect(before.messages).toBe(1);
+    const expected = {
+      users: 2,
+      orders: 1,
+      payments: 1,
+      wallets: 1,
+      wallet_ledger: 1,
+      reviews: 1,
+      messages: 1,
+    };
+    expect(before).toEqual(expected);
     expect(passkeys).toEqual([
       { id: "u-fix-c", passkey_id: "pk-ayse" },
       { id: "u-fix-p", passkey_id: "pk-elif" },

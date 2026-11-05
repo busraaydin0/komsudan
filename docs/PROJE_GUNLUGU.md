@@ -6,8 +6,23 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-05 – Adım 5b: Yönetim sekmesi (tarayıcı raporu)
+- service_admin 4. sekme **Yönetim** (etiket + pano ikonu). Müşteri/veren sırası aynı (4. Hizmet). `tabBarItems.test.ts`.
+
 ## 2026-11-05 – Adım 5: Demo hazırlığı
-- **Doğrulama:** `data/komsudan.db` kopyasında (orijinale dokunulmadı, backup API) 0005 sonrası users/orders/payments/wallets/wallet_ledger/reviews/messages satır sayıları aynı; FK check boş; passkey ve sessions/refresh join duruyor. Vitest: eski şema fixture → migrate.
+- **Doğrulama:** `data/komsudan.db` kopyasında (orijinale dokunulmadı, backup API) 0005 sonrası satırlar aynı; FK check boş; passkey ve sessions/refresh join duruyor. Vitest: eski şema fixture → migrate.
+
+| tablo | 0004 öncesi | 0005 sonrası |
+|-------|-------------|--------------|
+| users | 2 | 2 |
+| orders | 1 | 1 |
+| payments | 1 | 1 |
+| wallets | 1 | 1 |
+| wallet_ledger | 1 | 1 |
+| reviews | 1 | 1 |
+| messages | 1 | 1 |
+
+Canlı kopya (Adım 5 başı, orijinal dosyaya dokunulmadı): users 9, orders 0, payments 0, wallets 1, wallet_ledger 0, reviews 8, messages 0 — kayıp yok. Passkey 2 satır, session/refresh join 1.
 - **Duman:** OTP→yükle→sipariş→teslim→pending→balance→yorum; acil 15 dk EXPIRED + rezerv iade; iptal/red reserved+kapasite; service_admin KPI/askı.
 - **Düzeltme:** TabBar 6. sekme 390px (`text-[9px]`, truncate, ikon 18). Lint: `CustomerApp` `home` useMemo, `MapCanvas` init `modeRef`. Keşif: `onboardingCompletedAt` varsa atlanır (demo hesap). `createOrder` rezervi sipariş satırından önce yazıyordu (`wallet_ledger.order_id` FK) — satır sonrası hold.
 - **Demo:** `npm run demo:reset` (production yasak); README Demo bölümü. `WALLET_PENDING_WAIT_MS=60` önerisi.
