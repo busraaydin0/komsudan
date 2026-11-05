@@ -6,6 +6,7 @@ export type CapacitySettingsRow = {
   half_units_per_day: number;
   working_days: string;
   max_units_per_order: number;
+  express_quota: number;
 };
 
 export function parseWorkingDays(raw: string): number[] {
@@ -36,12 +37,19 @@ export function listCapacityDaysForProviders(
   providerIds: string[],
   fromDate: string,
   toDate: string,
-): { providerId: string; date: string; maxUnits: number; usedUnits: number }[] {
+): {
+  providerId: string;
+  date: string;
+  maxUnits: number;
+  usedUnits: number;
+  usedExpressUnits: number;
+}[] {
   if (providerIds.length === 0) return [];
   const ph = providerIds.map(() => "?").join(",");
   const rows = db()
     .prepare(
-      `SELECT provider_id AS providerId, date, max_units AS maxUnits, used_units AS usedUnits
+      `SELECT provider_id AS providerId, date, max_units AS maxUnits, used_units AS usedUnits,
+              used_express_units AS usedExpressUnits
        FROM provider_capacity_days
        WHERE provider_id IN (${ph}) AND date >= ? AND date <= ?
        ORDER BY provider_id, date`,
@@ -51,6 +59,7 @@ export function listCapacityDaysForProviders(
     date: string;
     maxUnits: number;
     usedUnits: number;
+    usedExpressUnits: number;
   }[];
   return rows;
 }
@@ -60,30 +69,36 @@ export function upsertCapacitySettings(input: {
   halfUnitsPerDay: number;
   workingDays: number[];
   maxUnitsPerOrder: number;
+  expressQuota?: number;
 }) {
   if (input.workingDays.length < 1) throw new Error("WORKING_DAYS");
   db()
     .prepare(
-      `INSERT INTO provider_capacity_settings (provider_id, half_units_per_day, working_days, max_units_per_order)
-       VALUES (@provider_id, @half_units_per_day, @working_days, @max_units_per_order)
+      `INSERT INTO provider_capacity_settings (
+         provider_id, half_units_per_day, working_days, max_units_per_order, express_quota
+       ) VALUES (
+         @provider_id, @half_units_per_day, @working_days, @max_units_per_order, COALESCE(@express_quota, 0)
+       )
        ON CONFLICT(provider_id) DO UPDATE SET
          half_units_per_day = excluded.half_units_per_day,
          working_days = excluded.working_days,
-         max_units_per_order = excluded.max_units_per_order`,
+         max_units_per_order = excluded.max_units_per_order,
+         express_quota = COALESCE(excluded.express_quota, provider_capacity_settings.express_quota)`,
     )
     .run({
       provider_id: input.providerId,
       half_units_per_day: input.halfUnitsPerDay,
       working_days: JSON.stringify(input.workingDays),
       max_units_per_order: input.maxUnitsPerOrder,
+      express_quota: input.expressQuota ?? null,
     });
 }
 
 export function ensureCapacityDay(providerId: string, date: string, maxUnits: number) {
   db()
     .prepare(
-      `INSERT INTO provider_capacity_days (provider_id, date, max_units, used_units)
-       VALUES (?, ?, ?, 0)
+      `INSERT INTO provider_capacity_days (provider_id, date, max_units, used_units, used_express_units)
+       VALUES (?, ?, ?, 0, 0)
        ON CONFLICT(provider_id, date) DO UPDATE SET max_units = excluded.max_units
        WHERE provider_capacity_days.used_units <= excluded.max_units`,
     )
@@ -93,23 +108,54 @@ export function ensureCapacityDay(providerId: string, date: string, maxUnits: nu
 export function listCapacityDays(providerId: string, fromDate: string, toDate: string) {
   return db()
     .prepare(
-      `SELECT date, max_units AS maxUnits, used_units AS usedUnits
+      `SELECT date, max_units AS maxUnits, used_units AS usedUnits,
+              used_express_units AS usedExpressUnits
        FROM provider_capacity_days
        WHERE provider_id = ? AND date >= ? AND date <= ?
        ORDER BY date`,
     )
-    .all(providerId, fromDate, toDate) as { date: string; maxUnits: number; usedUnits: number }[];
+    .all(providerId, fromDate, toDate) as {
+    date: string;
+    maxUnits: number;
+    usedUnits: number;
+    usedExpressUnits: number;
+  }[];
 }
 
-export function tryReserveUnits(providerId: string, date: string, units: number, maxUnits: number): boolean {
+export function tryReserveUnits(
+  providerId: string,
+  date: string,
+  units: number,
+  maxUnits: number,
+  expressQuota = 0,
+): boolean {
   ensureCapacityDay(providerId, date, maxUnits);
+  const normalCap = Math.max(0, maxUnits - expressQuota);
   const res = db()
     .prepare(
       `UPDATE provider_capacity_days
        SET used_units = used_units + ?
-       WHERE provider_id = ? AND date = ? AND used_units + ? <= max_units`,
+       WHERE provider_id = ? AND date = ? AND used_units + ? <= ?`,
     )
-    .run(units, providerId, date, units);
+    .run(units, providerId, date, units, normalCap);
+  return res.changes === 1;
+}
+
+export function tryReserveExpressUnits(
+  providerId: string,
+  date: string,
+  units: number,
+  maxUnits: number,
+  expressQuota: number,
+): boolean {
+  ensureCapacityDay(providerId, date, maxUnits);
+  const res = db()
+    .prepare(
+      `UPDATE provider_capacity_days
+       SET used_express_units = used_express_units + ?
+       WHERE provider_id = ? AND date = ? AND used_express_units + ? <= ?`,
+    )
+    .run(units, providerId, date, units, expressQuota);
   return res.changes === 1;
 }
 
@@ -123,15 +169,43 @@ export function releaseUnits(providerId: string, date: string, units: number) {
     .run(units, units, providerId, date);
 }
 
+export function releaseExpressUnits(providerId: string, date: string, units: number) {
+  db()
+    .prepare(
+      `UPDATE provider_capacity_days
+       SET used_express_units = CASE WHEN used_express_units > ? THEN used_express_units - ? ELSE 0 END
+       WHERE provider_id = ? AND date = ?`,
+    )
+    .run(units, units, providerId, date);
+}
+
 export function reserveAllocations(
   providerId: string,
   allocations: ScheduleAllocation[],
   halfUnitsPerDay: number,
+  expressQuota = 0,
 ): boolean {
   const applied: ScheduleAllocation[] = [];
   for (const a of allocations) {
-    if (!tryReserveUnits(providerId, a.date, a.units, halfUnitsPerDay)) {
+    if (!tryReserveUnits(providerId, a.date, a.units, halfUnitsPerDay, expressQuota)) {
       releaseAllocations(providerId, applied);
+      return false;
+    }
+    applied.push(a);
+  }
+  return true;
+}
+
+export function reserveExpressAllocations(
+  providerId: string,
+  allocations: ScheduleAllocation[],
+  halfUnitsPerDay: number,
+  expressQuota: number,
+): boolean {
+  const applied: ScheduleAllocation[] = [];
+  for (const a of allocations) {
+    if (!tryReserveExpressUnits(providerId, a.date, a.units, halfUnitsPerDay, expressQuota)) {
+      releaseExpressAllocations(providerId, applied);
       return false;
     }
     applied.push(a);
@@ -142,6 +216,12 @@ export function reserveAllocations(
 export function releaseAllocations(providerId: string, allocations: ScheduleAllocation[]) {
   for (const a of allocations) {
     releaseUnits(providerId, a.date, a.units);
+  }
+}
+
+export function releaseExpressAllocations(providerId: string, allocations: ScheduleAllocation[]) {
+  for (const a of allocations) {
+    releaseExpressUnits(providerId, a.date, a.units);
   }
 }
 

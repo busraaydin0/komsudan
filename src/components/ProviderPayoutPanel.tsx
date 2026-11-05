@@ -14,6 +14,7 @@ function kindLabel(kind: string) {
   if (kind === "topup") return "Yükleme";
   if (kind === "hold") return "Sipariş";
   if (kind === "release") return "İade";
+  if (kind === "express_refund") return "Acil iade";
   if (kind === "capture") return "Tahsil";
   return kind;
 }

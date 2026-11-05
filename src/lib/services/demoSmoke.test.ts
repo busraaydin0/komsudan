@@ -80,6 +80,7 @@ function openCapacity(providerId: string) {
     halfUnitsPerDay: 80,
     workingDays: [1, 2, 3, 4, 5, 6],
     maxUnitsPerOrder: 10,
+    expressQuota: 20,
   });
   db()
     .prepare(`UPDATE availability_slots SET start_time = '08:00', end_time = '20:00' WHERE provider_id = ?`)

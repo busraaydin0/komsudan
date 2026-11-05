@@ -8,7 +8,7 @@ import {
 import {
   assertCanServeOrder,
   planOrder,
-  remainingUnitsOnDate,
+  remainingExpressQuotaOnDate,
   releaseOrderCapacity,
   reserveOrderCapacity,
   scheduleLine,
@@ -384,9 +384,12 @@ function createLaundryOrder(input: CreateOrderInput, userId: string, provider: N
     if (start.getTime() < now.getTime() + 60 * 60 * 1000) {
       throw new ApiError(400, "Acil alım için pencere başlangıcına en az 1 saat kalmalı.", "EXPRESS_LEAD_TIME");
     }
-    const free = remainingUnitsOnDate(provider.id, input.pickup.date);
-    if (units > free) {
-      throw new ApiError(409, "Bugünün kalan kapasitesi bu acil sipariş için yetmiyor.", "CAPACITY");
+    const quotaLeft = remainingExpressQuotaOnDate(provider.id, input.pickup.date);
+    if (quotaLeft <= 0) {
+      throw new ApiError(409, "Bu komşuda acil kontenjan yok.", "EXPRESS_QUOTA");
+    }
+    if (units > quotaLeft) {
+      throw new ApiError(409, "Bugünün acil kontenjanı bu sipariş için yetmiyor.", "EXPRESS_QUOTA");
     }
   }
   const line = scheduleLine({
@@ -548,7 +551,11 @@ export function applyStatus(
       at: now,
     });
     if (voidPay) {
-      releaseOrderCapacity(row.provider_id, parseAllocations(row.capacity_allocations));
+      releaseOrderCapacity(
+        row.provider_id,
+        parseAllocations(row.capacity_allocations),
+        Boolean(row.express),
+      );
     }
     if (capture) capturePayment(id, now);
     if (voidPay) voidPayment(id, now);

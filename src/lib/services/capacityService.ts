@@ -17,7 +17,9 @@ import {
   listCapacitySettings,
   parseWorkingDays,
   releaseAllocations,
+  releaseExpressAllocations,
   reserveAllocations,
+  reserveExpressAllocations,
 } from "@/lib/db/providerCapacity";
 import type { PackageId, ProviderCapacitySummary } from "@/lib/types";
 import { ApiError } from "@/lib/errors";
@@ -27,6 +29,7 @@ export function settingsFromRow(row: NonNullable<ReturnType<typeof getCapacitySe
     halfUnitsPerDay: row.half_units_per_day,
     workingDays: parseWorkingDays(row.working_days),
     maxUnitsPerOrder: row.max_units_per_order,
+    expressQuota: row.express_quota ?? 0,
   };
 }
 
@@ -42,6 +45,7 @@ export function loadDayUsage(providerId: string, fromIso: string, days: number, 
       date: cursor,
       maxUnits: hit?.maxUnits ?? settings.halfUnitsPerDay,
       usedUnits: hit?.usedUnits ?? 0,
+      usedExpressUnits: hit?.usedExpressUnits ?? 0,
     });
     cursor = addCalendarDaysIso(cursor, 1);
   }
@@ -73,7 +77,20 @@ export function remainingUnitsOnDate(providerId: string, date: string): number {
   const settings = settingsFromRow(row);
   const usage = loadDayUsage(providerId, date, 1, settings)[0];
   if (!usage) return 0;
-  return Math.max(0, usage.maxUnits - usage.usedUnits);
+  const quota = settings.expressQuota ?? 0;
+  const normalCap = Math.max(0, usage.maxUnits - quota);
+  return Math.max(0, normalCap - usage.usedUnits);
+}
+
+export function remainingExpressQuotaOnDate(providerId: string, date: string): number {
+  const row = getCapacitySettings(providerId);
+  if (!row) return 0;
+  const settings = settingsFromRow(row);
+  const quota = settings.expressQuota ?? 0;
+  if (quota <= 0) return 0;
+  const usage = loadDayUsage(providerId, date, 1, settings)[0];
+  if (!usage) return 0;
+  return Math.max(0, quota - (usage.usedExpressUnits ?? 0));
 }
 
 export function planOrder(
@@ -111,16 +128,30 @@ export function reserveOrderCapacity(
   if (!schedule) {
     throw new ApiError(409, "Seçilen tarihte kapasite yeterli değil.", "CAPACITY");
   }
-  const ok = reserveAllocations(providerId, schedule.allocations, settings.halfUnitsPerDay);
+  const quota = settings.expressQuota ?? 0;
+  const ok = line.express
+    ? reserveExpressAllocations(providerId, schedule.allocations, settings.halfUnitsPerDay, quota)
+    : reserveAllocations(providerId, schedule.allocations, settings.halfUnitsPerDay, quota);
   if (!ok) {
-    throw new ApiError(409, "Kapasite başka siparişle doldu; tekrar deneyin.", "CAPACITY_CONFLICT");
+    throw new ApiError(
+      409,
+      line.express
+        ? "Acil kontenjan başka siparişle doldu; tekrar deneyin."
+        : "Kapasite başka siparişle doldu; tekrar deneyin.",
+      "CAPACITY_CONFLICT",
+    );
   }
   return { schedule, allocations: schedule.allocations };
 }
 
-export function releaseOrderCapacity(providerId: string, allocations: ScheduleAllocation[]) {
+export function releaseOrderCapacity(
+  providerId: string,
+  allocations: ScheduleAllocation[],
+  express = false,
+) {
   if (!allocations.length) return;
-  releaseAllocations(providerId, allocations);
+  if (express) releaseExpressAllocations(providerId, allocations);
+  else releaseAllocations(providerId, allocations);
 }
 
 function loadDayUsageFromRows(
@@ -128,7 +159,13 @@ function loadDayUsageFromRows(
   fromIso: string,
   days: number,
   settings: CapacitySettings,
-  rows: { providerId: string; date: string; maxUnits: number; usedUnits: number }[],
+  rows: {
+    providerId: string;
+    date: string;
+    maxUnits: number;
+    usedUnits: number;
+    usedExpressUnits?: number;
+  }[],
 ): DayUsage[] {
   const map = new Map(rows.filter((r) => r.providerId === providerId).map((r) => [r.date, r]));
   const out: DayUsage[] = [];
@@ -139,6 +176,7 @@ function loadDayUsageFromRows(
       date: cursor,
       maxUnits: hit?.maxUnits ?? settings.halfUnitsPerDay,
       usedUnits: hit?.usedUnits ?? 0,
+      usedExpressUnits: hit?.usedExpressUnits ?? 0,
     });
     cursor = addCalendarDaysIso(cursor, 1);
   }
@@ -148,7 +186,13 @@ function loadDayUsageFromRows(
 function capacitySummaryFromSettings(
   providerId: string,
   row: NonNullable<ReturnType<typeof getCapacitySettings>>,
-  dayRows: { providerId: string; date: string; maxUnits: number; usedUnits: number }[],
+  dayRows: {
+    providerId: string;
+    date: string;
+    maxUnits: number;
+    usedUnits: number;
+    usedExpressUnits?: number;
+  }[],
   now: Date,
 ): ProviderCapacitySummary {
   const settings = settingsFromRow(row);
@@ -168,6 +212,11 @@ function capacitySummaryFromSettings(
     now,
   );
   const freeRatios = week.map((w) => w.freeRatio);
+  const quota = settings.expressQuota ?? 0;
+  const todayMax = usage7[0]?.maxUnits ?? 0;
+  const todayUsed = usage7[0]?.usedUnits ?? 0;
+  const todayUsedExpress = usage7[0]?.usedExpressUnits ?? 0;
+  const normalCap = Math.max(0, todayMax - quota);
   return {
     configured: true,
     maxUnitsPerOrder: settings.maxUnitsPerOrder,
@@ -175,7 +224,9 @@ function capacitySummaryFromSettings(
     earliestDeliveryLabel: probe ? formatDeliveryDayTr(probe.deliveryDate) : null,
     weekLoad: week.map((w) => ({ date: w.date, freeRatio: w.freeRatio, usedRatio: w.usedRatio })),
     weekTone: weekTone(freeRatios),
-    todayFreeUnits: Math.max(0, (usage7[0]?.maxUnits ?? 0) - (usage7[0]?.usedUnits ?? 0)),
+    todayFreeUnits: Math.max(0, normalCap - todayUsed),
+    todayExpressFreeUnits: Math.max(0, quota - todayUsedExpress),
+    expressQuota: quota,
   };
 }
 
@@ -198,6 +249,8 @@ export function capacitySummariesForProviders(
     weekLoad: [],
     weekTone: "full",
     todayFreeUnits: 0,
+    todayExpressFreeUnits: 0,
+    expressQuota: 0,
   };
   for (const id of providerIds) {
     const row = settingsById.get(id);

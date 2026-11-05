@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   COMMISSION,
+  expressBumpPortion,
   isSameDayPickup,
   quoteLaundry,
   resolveExpress,
@@ -69,6 +70,7 @@ describe("Boy + ek fiyat", () => {
     expect(base.total).toBe(100);
     expect(express.total).toBe(140);
     expect(express.commission).toBe(Math.round(140 * COMMISSION));
+    expect(expressBumpPortion(140)).toBe(40);
   });
 
   it("express=false iken bugün alım olsa da zam yok", () => {

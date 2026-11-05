@@ -40,6 +40,7 @@ export type ProviderMonthlyProfile = {
   cancelled: number;
   unanswered: number;
   delayed: number;
+  delayedExpress: number;
   averageRating: number;
   disputeCount: number;
   revenue: number;
@@ -137,6 +138,7 @@ export function getProviderMonthlyProfile(
     cancelled: counts.cancelled,
     unanswered: counts.unanswered,
     delayed: counts.delayed,
+    delayedExpress: counts.delayed_express,
     averageRating: rating == null ? 0 : round1(rating),
     disputeCount: getDisputeCountInRange(providerId, range.startIso, range.endIso),
     revenue: pay.revenue,

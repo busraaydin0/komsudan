@@ -61,7 +61,7 @@ Paket `tam` için ütü adımı (`ironing`) takip çizgisinde görünür.
 | Ölçek | İleride Turso/Postgres; SQL yalnız `src/lib/db/`. |
 | Kategori | Sabit çamaşır; `/api/categories` ve `service_categories` tablosu yok. |
 | Fiyat | Sunucuda `provider_prices` + `quoteLaundry`; istemci tutar göndermez. Acil zam `EXPRESS_BUMP` (0.40) yalnız `orders.express`; paket `express_surcharge_pct` fiyatı etkilemez. |
-| Acil (3a) | Müşteri anahtarı; katalog `express`; alım bugün; teslim alım+24 sa; cevap 15 dk; takvim `express` query. Kontenjan/18:00/iade 3b. |
+| Acil (3a + 3b-lite) | Müşteri anahtarı; katalog `express`; alım bugün; teslim alım+24 sa; cevap 15 dk. Kota `express_quota` / `used_express_units` (K-010). Liste ve create: kalan kota. Geciken acilde zam iadesi (`express_refund`). 18:00 dönüşü (BR-025) uygulanmaz. |
 | Keşif | Harita + `/api/catalog`; onboarding rol/konum/offer. |
 | Roller | `customer` / `provider` / `admin` / `service_admin`. `admin` mevcut bypass’ı korur; `service_admin` provider rotasını geçemez. Cüzdan yazma: `service_admin` 403 (süper admin bayrağı yoksa). |
 | Yönetim | `GET /api/admin/providers`, `GET /api/admin/providers/[id]/monthly?month=`, `GET /api/admin/kpi?month=`, `POST /api/admin/providers/[id]/suspend`. Yetki `requireStaffAdmin`. |

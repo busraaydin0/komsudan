@@ -177,6 +177,7 @@ export function AdminDesk() {
               <Stat label="İptal" value={profile.cancelled} />
               <Stat label="Cevapsız" value={profile.unanswered} />
               <Stat label="Gecikme" value={profile.delayed} />
+              <Stat label="Geciken acil" value={profile.delayedExpress} />
               <Stat label="Puan" value={profile.averageRating || "—"} />
               <Stat label="Şikayet" value={profile.disputeCount} />
               <Stat label="Gelir" value={tl(profile.revenue)} />

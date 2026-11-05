@@ -106,6 +106,8 @@ export type ProviderCapacitySummary = {
   weekLoad: { date: string; freeRatio: number; usedRatio: number }[];
   weekTone: "ok" | "low" | "full";
   todayFreeUnits: number;
+  todayExpressFreeUnits: number;
+  expressQuota: number;
 };
 
 export type PaymentStatus = "authorized" | "captured" | "voided";

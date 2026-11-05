@@ -257,8 +257,16 @@ export function remainingReservedForOrder(orderId: string): number {
   const held = absKindSum(orderId, "hold");
   const released = absKindSum(orderId, "release");
   const captured = absKindSum(orderId, "capture");
-  const left = held - released - captured;
+  const refunded = absKindSum(orderId, "express_refund");
+  const left = held - released - captured - refunded;
   return left > 0 ? left : 0;
+}
+
+export function hasExpressRefundForOrder(orderId: string): boolean {
+  const row = db()
+    .prepare("SELECT id FROM wallet_ledger WHERE order_id = ? AND kind = 'express_refund' LIMIT 1")
+    .get(orderId) as { id: string } | undefined;
+  return Boolean(row);
 }
 
 export function hasHoldForOrder(orderId: string): boolean {

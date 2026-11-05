@@ -10,12 +10,15 @@ export type CapacitySettings = {
   halfUnitsPerDay: number;
   workingDays: number[];
   maxUnitsPerOrder: number;
+  /** Yarım-makine; 0 = acil yok (K-010). */
+  expressQuota?: number;
 };
 
 export type DayUsage = {
   date: string;
   maxUnits: number;
   usedUnits: number;
+  usedExpressUnits?: number;
 };
 
 export type ScheduleOrderLine = {
@@ -49,7 +52,7 @@ const HORIZON_DAYS = 90;
 function usageFor(daysUsage: DayUsage[], date: string, settings: CapacitySettings): DayUsage {
   const hit = daysUsage.find((d) => d.date === date);
   if (hit) return hit;
-  return { date, maxUnits: settings.halfUnitsPerDay, usedUnits: 0 };
+  return { date, maxUnits: settings.halfUnitsPerDay, usedUnits: 0, usedExpressUnits: 0 };
 }
 
 function isWorkingDay(iso: string, workingDays: number[]) {
@@ -90,10 +93,12 @@ export function computeSchedule(
   if (line.machineUnits < 1) return null;
   if (line.machineUnits > settings.maxUnitsPerOrder) return null;
 
+  const quota = settings.expressQuota ?? 0;
+
   if (line.express) {
     const pickupDate = line.pickupDate;
     const day = usageFor(daysUsage, pickupDate, settings);
-    const free = Math.max(0, day.maxUnits - day.usedUnits);
+    const free = Math.max(0, quota - (day.usedExpressUnits ?? 0));
     if (line.machineUnits > free) return null;
     const deliveryDate = expressDeliveryDate(pickupDate, line.pickupWindowStart);
     return {
@@ -113,8 +118,9 @@ export function computeSchedule(
   for (let guard = 0; guard < HORIZON_DAYS && unitsLeft > 0; guard++) {
     if (isWorkingDay(cursor, settings.workingDays)) {
       const day = usageFor(daysUsage, cursor, settings);
-      const free = Math.max(0, day.maxUnits - day.usedUnits);
-      const take = Math.min(unitsLeft, free, settings.halfUnitsPerDay);
+      const normalCap = Math.max(0, day.maxUnits - quota);
+      const free = Math.max(0, normalCap - day.usedUnits);
+      const take = Math.min(unitsLeft, free, normalCap);
       if (take > 0) {
         allocationMap.set(cursor, (allocationMap.get(cursor) ?? 0) + take);
         unitsLeft -= take;
@@ -143,7 +149,8 @@ export function weekLoadRatios(
   let cursor = fromIso;
   for (let i = 0; i < 7; i++) {
     const day = usageFor(daysUsage, cursor, settings);
-    const max = day.maxUnits || settings.halfUnitsPerDay;
+    const quota = settings.expressQuota ?? 0;
+    const max = Math.max(0, (day.maxUnits || settings.halfUnitsPerDay) - quota);
     const usedRatio = max > 0 ? Math.min(1, day.usedUnits / max) : 1;
     out.push({ date: cursor, usedRatio, freeRatio: 1 - usedRatio });
     cursor = addCalendarDaysIso(cursor, 1);

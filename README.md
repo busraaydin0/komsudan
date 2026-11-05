@@ -6,9 +6,9 @@ Klasör adı `katla`, npm paketi `komsudan`. Kod İngilizce, arayüz Türkçe.
 
 ## Kapsam
 
-**MVP içi:** yalnız çamaşır (`yikama` / `katlama` / `tam` + boy + ekler). Kapı alım/teslim. Cüzdan simülasyonu. Acil teslim (zam, 24 sa, 15 dk cevap). Hizmet Admini (KPI, askı).
+**MVP içi:** yalnız çamaşır (`yikama` / `katlama` / `tam` + boy + ekler). Kapı alım/teslim. Cüzdan simülasyonu. Acil teslim (zam, 24 sa, 15 dk cevap, kota, geciken acil iadesi). Hizmet Admini (KPI, askı).
 
-**MVP dışı:** gel al noktası, QR/torba, tartım, sadakat, gerçek ödeme/çekim, halı ve kuru temizleme, eve giriş. Acil 3b (kontenjan, 18:00 dönüşü, iade/risk). Otomatik askı. Kapıda renk grubu onayı.
+**MVP dışı:** gel al noktası, QR/torba, tartım, sadakat, gerçek ödeme/çekim, halı ve kuru temizleme, eve giriş. Acil 18:00 kota dönüşü (BR-025, bilinçli uygulanmadı). Otomatik askı. Kapıda renk grubu onayı.
 
 Tutar ve sipariş durumu istemciden gelmez; sunucu hesaplar.
 
@@ -73,7 +73,7 @@ Kimlik + cihaz kilidi demo hesaplarda işaretli. İzin penceresinde “şimdilik
 
 | Komut | Açıklama |
 |--------|----------|
-| `npm test` | Vitest (120 test) |
+| `npm test` | Vitest |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `next typegen` + `tsc --noEmit` |
 | `npm run knip` | Kullanılmayan dosya/export |
@@ -83,9 +83,9 @@ Kimlik + cihaz kilidi demo hesaplarda işaretli. İzin penceresinde “şimdilik
 
 ## Bilinen sınırlar
 
-- **3b yok:** acil kontenjan, 18:00 dönüşü, iade/risk.
+- Acil 18:00 kota dönüşü (BR-025) yok: acil yalnız bugün alım olduğu için dönüş kuralı kotayı sıfırlardı.
+- Geciken acil iadesi var; otomatik askı yok (Hizmet Admini elle askıya alır). Aylık profilde geciken acil sayısı görünür.
 - Gerçek ödeme ve çekim yok (cüzdan simülasyon).
-- Otomatik askı yok (Hizmet Admini elle askıya alır).
 - Kapıda renk grubu onayı yok.
 - Harita karoları demo anahtarsızsa “API KEY REQUIRED” filigranı gösterebilir.
 - Üretim OTP: `demoCode` alanı yok; `sms` metninde simülasyon kodu hâlâ durur.

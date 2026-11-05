@@ -6,6 +6,18 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-05 – Adım 8: Acil 3b-lite (K-010)
+- Dal: `feat/express-quota-refund` (`main`'den). Push yok.
+- **K-010:** `express_quota` (varsayılan 0) + gün satırında `used_express_units`. Normal görünen kapasite = `max_units − kota`. Acil yalnız kotadan. Kota 0 / yetersiz → `EXPRESS_QUOTA`. Kabul edilmiş tarih kaymaz.
+- BR-021 ve sunucu: bugünün kalan **kotası** birime yeter (K-008 kapasite kuralının yerine).
+- **BR-025 18:00 dönüşü uygulanmadı.** Gerekçe: K-008 acil yalnız bugün alım; önceki akşam kota kullanılmamış olacağından dönüş acili sıfırlardı.
+- BR-024: geciken acilde zam iadesi (`express_refund`); capture/komisyon net üzerinden. Zamanında iade yok. Çift iade yok. Hold yoksa yalnız payments + `orders.express_refund`.
+- Aylık profil: geciken acil sayısı. Otomatik askı yok.
+- UI: veren kapasite “Acil kontenjan (makine/gün)”; müşteri acil kartı kota yetmezse gizlenir.
+- Seed: elif kota 2. `demo:reset`: geciken acil + iade satırı.
+- Migration `0006_express_quota.sql`. `npm test` 133; lint ve `next build` yeşil.
+- Açık / risk: otomatik askı yok (ÖNERİ); 18:00 dönüşü bilinçli yok; simüle hold'suz siparişte cüzdan hareketi yok (yalnız kayıt).
+
 ## 2026-11-05 – Adım 7: main'e birleştirme
 - Eski `main` etiketi: `legacy-multi-category` (`f8d30e0`).
 - PR **#1** merge commit ile birleşti (squash yok): `be5a593`.

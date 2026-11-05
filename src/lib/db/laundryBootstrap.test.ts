@@ -24,6 +24,7 @@ describe("çamaşır DB ayağa kalkışı", () => {
       "0003_laundry_legacy_category_cleanup.sql",
       "0004_wallet_tiers.sql",
       "0005_service_admin.sql",
+      "0006_express_quota.sql",
     ]);
 
     const providers = d.prepare("SELECT id FROM providers ORDER BY id").all() as { id: string }[];
@@ -50,5 +51,17 @@ describe("çamaşır DB ayağa kalkışı", () => {
     expect(tables.map((t) => t.name)).not.toContain("order_events");
     expect(tables.map((t) => t.name)).not.toContain("drop_points");
     expect(tables.map((t) => t.name)).not.toContain("service_categories");
+
+    const settingCols = (
+      d.prepare(`PRAGMA table_info(provider_capacity_settings)`).all() as { name: string }[]
+    ).map((c) => c.name);
+    const dayCols = (
+      d.prepare(`PRAGMA table_info(provider_capacity_days)`).all() as { name: string }[]
+    ).map((c) => c.name);
+    const orderCols = (d.prepare(`PRAGMA table_info(orders)`).all() as { name: string }[]).map((c) => c.name);
+    expect(settingCols).toContain("express_quota");
+    expect(dayCols).toContain("used_express_units");
+    expect(orderCols).toContain("completed_at");
+    expect(orderCols).toContain("express_refund");
   });
 });

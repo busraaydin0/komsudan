@@ -26,8 +26,8 @@ const SEED_PHONES: Record<string, string> = {
   leyla: "5321100011",
 };
 
-const SEED_CAPACITY: Record<string, { half: number; maxOrder: number; days?: number[] }> = {
-  elif: { half: 8, maxOrder: 10 },
+const SEED_CAPACITY: Record<string, { half: number; maxOrder: number; days?: number[]; quota?: number }> = {
+  elif: { half: 8, maxOrder: 10, quota: 2 },
   ayse: { half: 6, maxOrder: 10 },
   merve: { half: 4, maxOrder: 10 },
   zeynep: { half: 10, maxOrder: 10 },
@@ -110,6 +110,7 @@ export function seedCatalog(database: Database.Database) {
         halfUnitsPerDay: cap.half,
         workingDays: cap.days ?? [1, 2, 3, 4, 5, 6],
         maxUnitsPerOrder: cap.maxOrder,
+        expressQuota: cap.quota ?? 0,
       });
     }
     for (const r of SEED_REVIEWS) {

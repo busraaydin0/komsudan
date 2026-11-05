@@ -39,6 +39,8 @@ export type OrderRow = {
   pickup_summary_approved_at: string | null;
   admin_hold: number;
   dispute_window_end: string | null;
+  completed_at: string | null;
+  express_refund: number;
 };
 
 export type InsertOrderInput = {
@@ -257,6 +259,26 @@ export function updateOrderPriceChange(id: string, priceChange: PriceChangeStatu
 
 export function updateOrderCancelReason(id: string, reason: string, at: string) {
   db().prepare(`UPDATE orders SET cancel_reason = ?, updated_at = ? WHERE id = ?`).run(reason, at, id);
+}
+
+export function markOrderCompletedAt(id: string, at: string) {
+  db()
+    .prepare(
+      `UPDATE orders SET completed_at = COALESCE(completed_at, ?), updated_at = ? WHERE id = ?`,
+    )
+    .run(at, at, id);
+}
+
+/** 1 = yazıldı; 0 = zaten iade var (idempotent). */
+export function markExpressRefund(id: string, amount: number, completedAt: string): number {
+  const result = db()
+    .prepare(
+      `UPDATE orders
+       SET express_refund = ?, completed_at = COALESCE(completed_at, ?), updated_at = ?
+       WHERE id = ? AND express_refund = 0`,
+    )
+    .run(amount, completedAt, completedAt, id);
+  return result.changes;
 }
 
 export function updateOrderCapacityCommit(input: {

@@ -226,6 +226,7 @@ describe("Hizmet Admini (K-009)", () => {
     expect(profile.cancelled).toBe(1);
     expect(profile.unanswered).toBe(1);
     expect(profile.delayed).toBe(1);
+    expect(profile.delayedExpress).toBe(0);
     expect(profile.averageRating).toBe(4);
     expect(profile.disputeCount).toBe(1);
     expect(profile.revenue).toBe(280);
@@ -242,6 +243,7 @@ describe("Hizmet Admini (K-009)", () => {
     expect(empty.cancelled).toBe(0);
     expect(empty.unanswered).toBe(0);
     expect(empty.delayed).toBe(0);
+    expect(empty.delayedExpress).toBe(0);
     expect(empty.averageRating).toBe(0);
     expect(empty.disputeCount).toBe(0);
     expect(empty.revenue).toBe(0);

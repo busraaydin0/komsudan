@@ -8,7 +8,8 @@ import { insertOrderItem } from "./orderItems";
 import { getOrderRow, insertOrderRow, updateOrderCancelReason } from "./orders";
 import { insertPayment } from "./payments";
 import { DEMO_SERVICE_ADMIN_PHONE } from "./seed";
-import { ensureWalletRow, getWalletRow } from "./wallets";
+import { addBalance, ensureWalletRow, getWalletRow, insertLedger } from "./wallets";
+import { expressBumpPortion } from "@/lib/pricing";
 import { topupWallet } from "@/lib/services/walletService";
 
 export const DEMO_CUSTOMER_PHONE = "5321100090";
@@ -57,9 +58,13 @@ function putOrder(input: {
   deliveryDate: string;
   total: number;
   createdAt: string;
+  commission?: number;
+  paymentAmount?: number;
+  expressRefund?: number;
+  completedAt?: string;
 }) {
   if (getOrderRow(input.id)) return;
-  const commission = Math.round(input.total * 0.1);
+  const commission = input.commission ?? Math.round(input.total * 0.1);
   insertOrderRow({
     id: input.id,
     provider_id: "elif",
@@ -112,12 +117,22 @@ function putOrder(input: {
     input.status === "completed" ? "captured" : input.status === "rejected" ? "voided" : "authorized";
   insertPayment({
     orderId: input.id,
-    amount: input.total,
+    amount: input.paymentAmount ?? input.total,
     commission,
     status: payStatus,
     providerReference: `demo-${input.id}`,
     at: input.createdAt,
   });
+  if (input.completedAt) {
+    db()
+      .prepare(`UPDATE orders SET completed_at = ?, updated_at = ? WHERE id = ?`)
+      .run(input.completedAt, input.completedAt, input.id);
+  }
+  if (input.expressRefund && input.expressRefund > 0) {
+    db()
+      .prepare(`UPDATE orders SET express_refund = ? WHERE id = ?`)
+      .run(input.expressRefund, input.id);
+  }
   if (input.status === "accepted" || input.status === "washing") {
     upsertHandoffCode({ orderId: input.id, kind: "pickup", code: "1234" });
   }
@@ -201,6 +216,41 @@ export function seedDemoScenario() {
     total: 250,
     createdAt: now,
   });
+
+  const latePickup = addCalendarDaysIso(today, -2);
+  const latePickupStart = `${latePickup}T10:00:00+03:00`;
+  const lateCompletedAt = new Date(Date.parse(latePickupStart) + 25 * 3_600_000).toISOString();
+  const lateTotal = 140;
+  const lateBump = expressBumpPortion(lateTotal);
+  const lateNet = lateTotal - lateBump;
+  putOrder({
+    id: "demo-live-express-late",
+    status: "completed",
+    express: true,
+    pickupDate: latePickup,
+    deliveryDate: addCalendarDaysIso(latePickup, 1),
+    total: lateTotal,
+    commission: Math.round(lateNet * 0.1),
+    paymentAmount: lateNet,
+    expressRefund: lateBump,
+    completedAt: lateCompletedAt,
+    createdAt: inMonth,
+  });
+  const alreadyRefunded = db()
+    .prepare(
+      `SELECT id FROM wallet_ledger WHERE order_id = 'demo-live-express-late' AND kind = 'express_refund' LIMIT 1`,
+    )
+    .get() as { id: string } | undefined;
+  if (!alreadyRefunded && lateBump > 0) {
+    addBalance(DEMO_CUSTOMER_ID, lateBump, lateCompletedAt);
+    insertLedger({
+      userId: DEMO_CUSTOMER_ID,
+      amount: lateBump,
+      kind: "express_refund",
+      orderId: "demo-live-express-late",
+      at: lateCompletedAt,
+    });
+  }
 }
 
 export const DEMO_PHONES = {
