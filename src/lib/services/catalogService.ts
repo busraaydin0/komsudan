@@ -14,6 +14,7 @@ import { listRatingAggregates, roundRating } from "@/lib/db/reviews";
 import { listAvatarUrls } from "@/lib/db/providers";
 import { listSuspendedProviderIds } from "@/lib/db/admin";
 import { capacitySummariesForProviders } from "@/lib/services/capacityService";
+import { isSelfOrder, selfOrderAllowed } from "@/lib/orders/selfOrder";
 
 type PriceBundle = {
   sizeByProvider: Map<string, ProviderPriceRow[]>;
@@ -113,7 +114,7 @@ export function getProvider(id: string): Provider | undefined {
   return hydrate(p, listAvatarUrls(), true, { prices, ratings, capacities });
 }
 
-export function providersLive(): Provider[] {
+export function providersLive(viewerId?: string | null): Provider[] {
   const avatars = listAvatarUrls();
   const rows = db()
     .prepare(`SELECT id, payload FROM providers`)
@@ -127,5 +128,6 @@ export function providersLive(): Provider[] {
   const suspended = new Set(listSuspendedProviderIds());
   return providers
     .map((p) => hydrate(p, avatars, false, ctx))
-    .filter((p) => p.capacity?.configured && !suspended.has(p.id));
+    .filter((p) => p.capacity?.configured && !suspended.has(p.id))
+    .filter((p) => !viewerId || !isSelfOrder(viewerId, p.id) || selfOrderAllowed());
 }

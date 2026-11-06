@@ -28,6 +28,7 @@ import { listSlots } from "@/lib/db/providers";
 import { computeRespondBy } from "@/lib/scheduling/respondBy";
 import { pickupInstantIso, windowLabel } from "@/lib/scheduling/windows";
 import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
+import { assertNotSelfOrder } from "@/lib/orders/selfOrder";
 import { assertCalendarWindow } from "@/lib/services/calendarService";
 import { laundryDeliveryStrategy } from "@/lib/fulfillment";
 import {
@@ -223,6 +224,7 @@ export function listOrdersFor(user: AuthUser, limit = 100, offset = 0): Order[] 
 export function createOrder(input: CreateOrderInput, userId: string): Order {
   const provider = getProvider(input.providerId);
   if (!provider) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
+  assertNotSelfOrder(userId, provider.id);
   const profile = getProfile(input.providerId);
   if (profile?.suspended) {
     throw new ApiError(409, "Bu hizmet veren askıda; yeni sipariş alınamaz.", "PROVIDER_SUSPENDED");

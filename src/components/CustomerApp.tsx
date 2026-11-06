@@ -38,6 +38,7 @@ type Props = {
   pane?: "map" | "orders";
   mapActive?: boolean;
   meAvatar?: string | null;
+  viewerId?: string | null;
   homeLat?: number | null;
   homeLng?: number | null;
   onOpenOrders?: () => void;
@@ -51,6 +52,7 @@ export function CustomerApp({
   pane = "map",
   mapActive = true,
   meAvatar,
+  viewerId,
   homeLat,
   homeLng,
   onOpenOrders,
@@ -93,9 +95,10 @@ export function CustomerApp({
     return providers
       .filter((p) => (dryerOnly ? p.hasDryer : true))
       .filter((p) => (expressWanted ? canListForExpress(p, units) : true))
+      .filter((p) => !viewerId || p.id !== viewerId)
       .map((p) => ({ p, km: kmBetween(origin, p.loc) }))
       .sort((a, b) => a.km - b.km);
-  }, [origin, dryerOnly, expressWanted, providers, units]);
+  }, [origin, dryerOnly, expressWanted, providers, units, viewerId]);
   const available = ranked.filter(({ p }) => p.capacity?.configured && p.capacity.weekTone !== "full").length;
 
   const selected = selectedId ? ranked.find(({ p }) => p.id === selectedId)?.p : undefined;

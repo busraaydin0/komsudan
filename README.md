@@ -60,6 +60,8 @@ Geliştirmede OTP yanıtında ve giriş ekranında `demoCode` görünür (5 dk).
 
 Kimlik + cihaz kilidi demo hesaplarda işaretli. İzin penceresinde “şimdilik geç”. Keşif yeniden sorulursa “hizmet almak” + Çukurambar.
 
+**K-011:** kendine sipariş kapalı (`user_id === provider_id` → `SELF_ORDER`). Keşif listesinde kendi kartın müşteri olarak çıkmaz. Tek cihazla aynı hesabı hem veren hem müşteri diye denemek için `.env` içine `ALLOW_SELF_ORDER=1` (yalnız `NODE_ENV !== production`; production’da bayrak yok sayılır).
+
 ### 8–10 dk senaryo
 
 1. Müşteri `5321100090` — OTP’yi ekrandan yaz. Harita: Çukurambar iğneleri.

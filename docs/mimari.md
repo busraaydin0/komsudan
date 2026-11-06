@@ -63,6 +63,7 @@ Paket `tam` için ütü adımı (`ironing`) takip çizgisinde görünür.
 | Fiyat | Sunucuda `provider_prices` + `quoteLaundry`; istemci tutar göndermez. Acil zam `EXPRESS_BUMP` (0.40) yalnız `orders.express`; paket `express_surcharge_pct` fiyatı etkilemez. |
 | Acil (3a + 3b-lite) | Müşteri anahtarı; katalog `express`; alım bugün; teslim alım+24 sa; cevap 15 dk. Kota `express_quota` / `used_express_units` (K-010). Liste ve create: kalan kota. Geciken acilde zam iadesi (`express_refund`). 18:00 dönüşü (BR-025) uygulanmaz. |
 | Keşif | Harita + `/api/catalog`; onboarding rol/konum/offer. |
+| Kendine sipariş (K-011) | `createOrder`: `user_id === provider_id` → 403 `SELF_ORDER`. Keşif `providersLive(viewerId)` kendi kartını gizler. `ALLOW_SELF_ORDER=1` yalnız `NODE_ENV !== production`. |
 | Roller | `customer` / `provider` / `admin` / `service_admin`. `admin` mevcut bypass’ı korur; `service_admin` provider rotasını geçemez. Cüzdan yazma: `service_admin` 403 (süper admin bayrağı yoksa). |
 | Yönetim | `GET /api/admin/providers`, `GET /api/admin/providers/[id]/monthly?month=`, `GET /api/admin/kpi?month=`, `POST /api/admin/providers/[id]/suspend`. Yetki `requireStaffAdmin`. |
 | OTP | Geliştirmede `demoCode`; prod’da gerçek SMS henüz yok. |

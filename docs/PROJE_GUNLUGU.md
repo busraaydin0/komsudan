@@ -6,6 +6,10 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-07 – K-011: kendine sipariş engeli
+- Dal: `fix/kendine-siparis`. Önce kural yoktu: `createOrder` `user_id === provider_id` kabul ediyordu; `REQUIRE_PROVIDER_TO_MUTATE = false` ile aynı hesap kabul/red/kod da yapabiliyordu.
+- `createOrder` 403 `SELF_ORDER`. Katalog girişli izleyicide kendi kartı yok. `ALLOW_SELF_ORDER=1` yalnız yerel/test; production’da bayrak okunmaz.
+
 ## 2026-11-07 – Adım 9: Acil 3b-lite main'e alındı
 - PR **#2** merge commit ile birleşti (squash yok): `fdf920d`.
 - Etiket: `sunum-v1` (`fdf920d`).
