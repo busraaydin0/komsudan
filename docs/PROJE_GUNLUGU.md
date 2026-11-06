@@ -6,6 +6,11 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-07 – Adım 9: Acil 3b-lite main'e alındı
+- PR **#2** merge commit ile birleşti (squash yok): `fdf920d`.
+- Etiket: `sunum-v1` (`fdf920d`).
+- `npm ci` + `npm test` **135**; lint ve `next build` yeşil. Temiz klon: `demo:reset`, `npm run dev`; GET `/` ve GET `/api/catalog` 200.
+
 ## 2026-11-06 – Adım 8d: seed/ekran aynı birim (makine/gün)
 - Seed `ELIF_EXPRESS_QUOTA_MACHINES = 1`; DB `express_quota = 2` yarım-makine birimi. Ekran `halfUnitsToMachines` ile **1 makine/gün**. Demo siparişi kotayı düşürmez (ayar alanı).
 - Duman: `acil kota: iki sipariş, üçüncü hata, geç teslimde zam iadesi`. Fixture: `migrate0005.test.ts` 0006 kayıpsız.
