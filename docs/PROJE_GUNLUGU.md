@@ -6,6 +6,11 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-07 – Oturum çerezi HTTP'de düşüyordu
+- Dal: `fix/oturum-kaybi`. `next start` (NODE_ENV=production) `Secure` çerez yazıyordu; HTTP LAN IP'de tarayıcı `komsu_sid/at/rt` reddediyordu → her yenilemede giriş.
+- Secure yalnız production + HTTPS. `JWT_SECRET` yoksa durur, rastgele üretilmez.
+- Takvim düğmesi ayrı: calendar GET kimlik istemez; oturum kaybı LoginGate'e düşürür, checkout'a gelinmez.
+
 ## 2026-11-07 – Adım 9: Acil 3b-lite main'e alındı
 - PR **#2** merge commit ile birleşti (squash yok): `fdf920d`.
 - Etiket: `sunum-v1` (`fdf920d`).
