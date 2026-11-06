@@ -13,6 +13,8 @@ const TABLES = [
   "wallet_ledger",
   "reviews",
   "messages",
+  "provider_capacity_settings",
+  "provider_capacity_days",
 ] as const;
 
 let dir = "";
@@ -76,6 +78,10 @@ function seedFixture(db: Database.Database) {
     VALUES ('con-fix-1', 'ord-fix-1', 'open', '${now}', '${now}', NULL);
     INSERT INTO messages (id, conversation_id, sender_id, body, client_message_id, moderation_status, created_at)
     VALUES ('msg-fix-1', 'con-fix-1', 'u-fix-c', 'Merhaba', 'c-1', 'ok', '${now}');
+    INSERT INTO provider_capacity_settings (provider_id, half_units_per_day, working_days, max_units_per_order)
+    VALUES ('u-fix-p', 8, '[1,2,3,4,5,6]', 10);
+    INSERT INTO provider_capacity_days (provider_id, date, max_units, used_units)
+    VALUES ('u-fix-p', '2026-03-01', 8, 2);
   `);
 }
 
@@ -113,6 +119,8 @@ describe("0005 users rebuild (eski şema fixture)", () => {
       wallet_ledger: 1,
       reviews: 1,
       messages: 1,
+      provider_capacity_settings: 1,
+      provider_capacity_days: 1,
     };
     expect(before).toEqual(expected);
     expect(passkeys).toEqual([
@@ -142,6 +150,26 @@ describe("0005 users rebuild (eski şema fixture)", () => {
       (d.prepare(`SELECT COUNT(*) AS n FROM schema_migrations WHERE id = '0005_service_admin.sql'`).get() as { n: number })
         .n,
     ).toBe(1);
+    expect(
+      (d.prepare(`SELECT COUNT(*) AS n FROM schema_migrations WHERE id = '0006_express_quota.sql'`).get() as { n: number })
+        .n,
+    ).toBe(1);
+    const cap = d
+      .prepare(`SELECT express_quota AS q FROM provider_capacity_settings WHERE provider_id = 'u-fix-p'`)
+      .get() as { q: number };
+    expect(cap.q).toBe(0);
+    const day = d
+      .prepare(
+        `SELECT used_units AS u, used_express_units AS e FROM provider_capacity_days WHERE provider_id = 'u-fix-p'`,
+      )
+      .get() as { u: number; e: number };
+    expect(day.u).toBe(2);
+    expect(day.e).toBe(0);
+    const ord = d
+      .prepare(`SELECT completed_at AS c, express_refund AS r FROM orders WHERE id = 'ord-fix-1'`)
+      .get() as { c: string | null; r: number };
+    expect(ord.c).toBeNull();
+    expect(ord.r).toBe(0);
     d.close();
   });
 });

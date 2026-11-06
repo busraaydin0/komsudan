@@ -18,10 +18,23 @@ export type CalendarWindow = {
 const TODAY_LEAD_MS = 2 * 3_600_000;
 const EXPRESS_TODAY_LEAD_MS = 1 * 3_600_000;
 
-function dayStatus(providerId: string, date: string, settings: ReturnType<typeof settingsFromRow>) {
+function dayStatus(
+  providerId: string,
+  date: string,
+  settings: ReturnType<typeof settingsFromRow>,
+  express: boolean,
+) {
   const usage = loadDayUsage(providerId, date, 1, settings)[0];
   if (!usage) return "full" as WindowStatus;
-  const free = usage.maxUnits > 0 ? (usage.maxUnits - usage.usedUnits) / usage.maxUnits : 0;
+  const quota = settings.expressQuota ?? 0;
+  if (express) {
+    if (quota <= 0) return "full" as WindowStatus;
+    const free = Math.max(0, quota - (usage.usedExpressUnits ?? 0)) / quota;
+    return loadToneFromFreeRatio(free);
+  }
+  const cap = Math.max(0, usage.maxUnits - quota);
+  if (cap <= 0) return "full" as WindowStatus;
+  const free = Math.max(0, cap - usage.usedUnits) / cap;
   return loadToneFromFreeRatio(free);
 }
 
@@ -41,7 +54,7 @@ export function buildProviderCalendar(
     const date = addCalendarDaysIso(today, i);
     const dow = isoWeekdayFromIsoDate(date);
     const daySlots = slots.filter((s) => s.day_of_week === dow);
-    const status = settings ? dayStatus(providerId, date, settings) : ("ok" as WindowStatus);
+    const status = settings ? dayStatus(providerId, date, settings, express) : ("ok" as WindowStatus);
 
     for (const slot of daySlots) {
       for (const w of splitTwoHourWindows(slot.start_time, slot.end_time)) {

@@ -7,11 +7,22 @@ import { MAX_UNITS_PER_ORDER } from "@/lib/laundryModel";
 
 export const dynamic = "force-dynamic";
 
-const capacitySchema = z.object({
-  halfUnitsPerDay: z.number().int().min(2).max(24),
-  workingDays: z.array(z.number().int().min(1).max(7)).min(1),
-  maxUnitsPerOrder: z.number().int().min(1).max(MAX_UNITS_PER_ORDER),
-});
+const capacitySchema = z
+  .object({
+    halfUnitsPerDay: z.number().int().min(2).max(24),
+    workingDays: z.array(z.number().int().min(1).max(7)).min(1),
+    maxUnitsPerOrder: z.number().int().min(1).max(MAX_UNITS_PER_ORDER),
+    expressQuota: z.number().int().min(0, "Acil kontenjan negatif olamaz.").optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.expressQuota != null && val.expressQuota > val.halfUnitsPerDay) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["expressQuota"],
+        message: "Acil kontenjan günlük makine kapasitesini aşamaz.",
+      });
+    }
+  });
 
 export async function GET(req: Request) {
   try {

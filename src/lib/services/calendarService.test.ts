@@ -10,6 +10,7 @@ describe("provider calendar", () => {
       halfUnitsPerDay: 8,
       workingDays: [1, 2, 3, 4, 5, 6, 7],
       maxUnitsPerOrder: 4,
+      expressQuota: 2,
     });
     insertSlotRow({
       id: "cal-test-wed",

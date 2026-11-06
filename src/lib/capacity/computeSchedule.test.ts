@@ -122,7 +122,7 @@ describe("computeSchedule", () => {
   it("acil +24 sa; paket ve yorgan ezilir, güne yayılmaz", () => {
     const now = new Date("2026-10-08T10:00:00+03:00");
     const r = computeSchedule(
-      settings,
+      { ...settings, expressQuota: 4 },
       emptyUsage("2026-10-08", 14),
       {
         packageId: "tam",
@@ -138,9 +138,9 @@ describe("computeSchedule", () => {
     expect(r!.allocations).toEqual([{ date: "2026-10-08", units: 2 }]);
 
     const full = emptyUsage("2026-10-08", 14);
-    full[0]!.usedUnits = 3;
+    full[0]!.usedExpressUnits = 2;
     const noFit = computeSchedule(
-      settings,
+      { ...settings, expressQuota: 2 },
       full,
       {
         packageId: "katlama",
@@ -153,5 +153,27 @@ describe("computeSchedule", () => {
       now,
     );
     expect(noFit).toBeNull();
+  });
+
+  it("acil kota normal kapasiteyi tüketmez", () => {
+    const now = new Date("2026-10-08T10:00:00+03:00");
+    const usage = emptyUsage("2026-10-08", 14);
+    for (const day of usage) day.usedUnits = 4;
+    const withQuota = { ...settings, expressQuota: 2 };
+    const express = computeSchedule(
+      withQuota,
+      usage,
+      {
+        packageId: "katlama",
+        machineUnits: 2,
+        hasHeavyAddon: false,
+        pickupDate: "2026-10-08",
+        express: true,
+        pickupWindowStart: "10:00",
+      },
+      now,
+    );
+    expect(express).not.toBeNull();
+    expect(express!.allocations).toEqual([{ date: "2026-10-08", units: 2 }]);
   });
 });

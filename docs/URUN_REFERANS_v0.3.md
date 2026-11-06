@@ -66,16 +66,22 @@ Kaynak: MVP Tanım Dokümanı v0.3 ve Karar Kaydı v0.3 (`docs/kaynak/`). Çeli�
 - Gerçek fon tutma lisans gerektirir (R-013/Q-009): projede simüle, raporda "gelecek çalışma".
 
 ## 7. Acil teslim (ONAYLI)
-- Anahtar açılınca 24 saat teslim, normal fiyatın **+%40**'ı (ek ücret hizmet verene, komisyon toplam üzerinden). Yalnız acil desteği açık ve kapasitesi uygun hizmet verenler listelenir (BR-021).
-- Aynı gün alım; cevap süresi 15 dk. Acil sipariş boş kapasiteye girer, kabul edilmişlerin tarihi kaymaz (BR-022).
-- Acil kontenjan: hizmet veren günlük kapasiteden ayırabilir (varsayılan 0); kullanılmayan, önceki gün 18:00'de normal kapasiteye döner (BR-025).
-- 24 saat kaçarsa acil ücret iade edilir, risk skoru etkilenir (BR-024).
+- Anahtar açılınca 24 saat teslim, normal fiyatın **+%40**'ı (ek ücret hizmet verene, komisyon toplam üzerinden). Yalnız acil desteği açık ve **bugünün kalan acil kotası** sipariş birimine yeten hizmet verenler listelenir (BR-021).
+- Aynı gün alım; cevap süresi 15 dk. Acil sipariş kotadan düşer, kabul edilmişlerin tarihi kaymaz (BR-022).
+- Acil kontenjan: hizmet veren günlük kapasiteden ayırır (`express_quota`, varsayılan 0, birim = yarım-makine). Kota 0 ise acil seçilemez. Normal görünen kapasite = `max_units − express_quota`. Acil yalnız kotadan düşer.
+- 24 saat kaçarsa acil zam kısmı iade edilir; aylık profilde geciken acil sayısı görünür. Otomatik askı yok.
 
 **K-008 (ONAYLI, Adım 3a):**
-- Müşteri sipariş ekranında "Acil teslim" anahtarı. Açıkken liste: katalog `express=true` ve bugünün kalan kapasitesi yeten verenler (BR-021 kaynağı katalog `express`).
-- `createOrderSchema.express`; sunucu doğrular: veren acil açık, alım bugün (İstanbul), pencere ≥1 sa, birimler bugüne sığar. Zam yalnız `express=true` siparişte (`EXPRESS_BUMP=0.40`); komisyon zamlı toplamdan %10. Paket `express_available` / `express_surcharge_pct` fiyatı etkilemez.
+- Müşteri sipariş ekranında "Acil teslim" anahtarı. Zam yalnız `express=true` siparişte (`EXPRESS_BUMP=0.40`); komisyon zamlı toplamdan %10. Paket `express_available` / `express_surcharge_pct` fiyatı etkilemez.
 - 24 sa = alım penceresi başlangıcı + 24 sa; paket 48/72 ve yorgan +24 ezilir, güne yayma yok. Acilsiz aynı gün alım kalır (≥2 sa). Acilde `respond_by` 15 dk (hatırlatma yarıda). `delayOrder` acilde yasak.
-- **3b bekliyor (ÖNERİ değil, henüz uygulanmadı):** acil kontenjan varsayılan 0, 18:00 dönüşü (BR-025), 24 sa kaçınca iade + risk (BR-024). ÖNERİ acil red 30 dk uygulanmaz.
+
+**K-010 (ONAYLI, Adım 8 / 3b-lite):**
+- `provider_capacity_settings.express_quota` (INTEGER, DEFAULT 0, 0..günlük `half_units_per_day`). Gün satırında `used_express_units`.
+- BR-021 ve `createOrder` acil kuralı: bugünün kalan **kotası** birime yeter (K-008'deki “kalan kapasiteye sığma” yerine). Kota 0 veya yetersiz → `EXPRESS_QUOTA`.
+- **18:00 dönüşü (BR-025) uygulanmaz.** Gerekçe: K-008'de acil yalnız bugün alım; önceki akşam kota hiç kullanılmamış olacağından dönüş kuralı acili sıfırlar.
+- İade (BR-024): teslim kodu ile `completed` olurken, `completed_at` > (alım penceresi başlangıcı + 24 sa) ve sipariş express ise zam kısmı `total − round(total/1.4)` müşteriye `wallet_ledger.kind = express_refund` ile döner. Capture net tutar üzerinden; komisyon netin %10'u; veren pending = net − komisyon. Idempotent. Hold yoksa (simüle) yalnız `payments` ve `orders.express_refund`. Zamanında teslimde iade yok.
+- Risk: aylık profil `delayedExpress` (orders'tan). **Otomatik askıya alma yok.**
+- ÖNERİ acil red 30 dk uygulanmaz.
 
 ## 8. Roller
 - Müşteri / Hizmet veren: tek hesap, çift rol.

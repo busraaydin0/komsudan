@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { PROVIDERS, SEED_REVIEWS } from "@/lib/db/seedCatalogData";
 import { EXPRESS_BUMP } from "@/lib/pricing";
+import { machinesToHalfUnits } from "@/lib/laundryModel";
 import { ensureProviderPriceGrid } from "./providerPrices";
 import { upsertCapacitySettings } from "./providerCapacity";
 import {
@@ -26,8 +27,11 @@ const SEED_PHONES: Record<string, string> = {
   leyla: "5321100011",
 };
 
-const SEED_CAPACITY: Record<string, { half: number; maxOrder: number; days?: number[] }> = {
-  elif: { half: 8, maxOrder: 10 },
+/** Elif acil kota: 1 makine/gün. DB’ye 2 yarım-makine birimi yazılır. */
+export const ELIF_EXPRESS_QUOTA_MACHINES = 1;
+
+const SEED_CAPACITY: Record<string, { half: number; maxOrder: number; days?: number[]; quotaMachines?: number }> = {
+  elif: { half: 8, maxOrder: 10, quotaMachines: ELIF_EXPRESS_QUOTA_MACHINES },
   ayse: { half: 6, maxOrder: 10 },
   merve: { half: 4, maxOrder: 10 },
   zeynep: { half: 10, maxOrder: 10 },
@@ -110,6 +114,7 @@ export function seedCatalog(database: Database.Database) {
         halfUnitsPerDay: cap.half,
         workingDays: cap.days ?? [1, 2, 3, 4, 5, 6],
         maxUnitsPerOrder: cap.maxOrder,
+        expressQuota: machinesToHalfUnits(cap.quotaMachines ?? 0),
       });
     }
     for (const r of SEED_REVIEWS) {

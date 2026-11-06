@@ -5,6 +5,12 @@ import type { PackageId } from "./types";
 export const COMMISSION = 0.1;
 export const EXPRESS_BUMP = 0.4;
 
+/** Zam kısmı: total − round(total / 1.4). Geciken acilde müşteriye iade (K-010). */
+export function expressBumpPortion(total: number): number {
+  if (total <= 0) return 0;
+  return total - Math.round(total / (1 + EXPRESS_BUMP));
+}
+
 export function isSameDayPickup(pickupDate: string, now = new Date()) {
   return pickupDate === isoDateInIstanbul(now);
 }

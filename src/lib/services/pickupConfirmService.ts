@@ -141,7 +141,11 @@ export function respondPriceChange(user: AuthUser, orderId: string, action: "app
       note: "size_rejected",
       at: now,
     });
-    releaseOrderCapacity(row.provider_id, parseAllocations(row.capacity_allocations));
+    releaseOrderCapacity(
+      row.provider_id,
+      parseAllocations(row.capacity_allocations),
+      Boolean(row.express),
+    );
     voidPayment(orderId, now);
   });
 

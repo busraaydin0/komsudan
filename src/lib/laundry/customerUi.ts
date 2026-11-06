@@ -90,7 +90,7 @@ export function quoteForProvider(
 export function canListForExpress(p: Provider, machineUnits: number): boolean {
   if (!p.express) return false;
   if (!p.capacity?.configured) return false;
-  return (p.capacity.todayFreeUnits ?? 0) >= machineUnits;
+  return (p.capacity.todayExpressFreeUnits ?? 0) >= machineUnits;
 }
 
 export function placeBlockReason(p: Provider, machineUnits?: number): string | null {

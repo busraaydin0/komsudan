@@ -579,6 +579,7 @@ export type AdminMonthlyProfile = {
   cancelled: number;
   unanswered: number;
   delayed: number;
+  delayedExpress: number;
   averageRating: number;
   disputeCount: number;
   revenue: number;

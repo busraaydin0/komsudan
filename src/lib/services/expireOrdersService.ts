@@ -44,7 +44,11 @@ function expireOne(orderId: string, now: string) {
       note: "expired",
       at: now,
     });
-    releaseOrderCapacity(row.provider_id, parseAllocations(row.capacity_allocations));
+    releaseOrderCapacity(
+      row.provider_id,
+      parseAllocations(row.capacity_allocations),
+      Boolean(row.express),
+    );
     voidPayment(orderId, now);
     bumpExpiredCount(row.provider_id);
   });

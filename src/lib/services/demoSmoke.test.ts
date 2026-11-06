@@ -3,6 +3,9 @@ import { insertUser, setUserRole } from "@/lib/db/auth";
 import { db } from "@/lib/db/client";
 import { getOrderRow } from "@/lib/db/orders";
 import { listCapacityDays, upsertCapacitySettings } from "@/lib/db/providerCapacity";
+import { remainingExpressQuotaOnDate } from "@/lib/services/capacityService";
+import { expressBumpPortion } from "@/lib/pricing";
+import { pickupInstantIso } from "@/lib/scheduling/windows";
 import { insertSlotRow } from "@/lib/db/providers";
 import { getWalletRow } from "@/lib/db/wallets";
 import { ApiError } from "@/lib/errors";
@@ -80,6 +83,7 @@ function openCapacity(providerId: string) {
     halfUnitsPerDay: 80,
     workingDays: [1, 2, 3, 4, 5, 6],
     maxUnitsPerOrder: 10,
+    expressQuota: 20,
   });
   db()
     .prepare(`UPDATE availability_slots SET start_time = '08:00', end_time = '20:00' WHERE provider_id = ?`)
@@ -304,5 +308,109 @@ describe("uçtan uca duman (Adım 5)", () => {
         )
         .run();
     }
+  });
+
+  it("acil kota: iki sipariş, üçüncü hata, geç teslimde zam iadesi", async () => {
+    upsertCapacitySettings({
+      providerId: "elif",
+      halfUnitsPerDay: 8,
+      workingDays: [1, 2, 3, 4, 5, 6],
+      maxUnitsPerOrder: 10,
+      expressQuota: 2,
+    });
+    db()
+      .prepare(
+        `UPDATE provider_capacity_days SET used_units = 0, used_express_units = 0 WHERE provider_id = 'elif'`,
+      )
+      .run();
+
+    const a = await login("5550005110");
+    const b = await login("5550005111");
+    const c = await login("5550005112");
+    const provider = loadUser("elif")!;
+    topupWallet(a.id, "kart", 1000);
+    topupWallet(b.id, "kart", 1000);
+    topupWallet(c.id, "kart", 1000);
+    const topupA = 1000;
+    const w = windowsFor("elif", true, new Date());
+
+    const first = createOrder(
+      {
+        providerId: "elif",
+        packageId: "katlama",
+        size: "kucuk",
+        addons: [],
+        drop: "kapi",
+        note: "",
+        express: true,
+        pickup: w.pickup,
+        delivery: w.delivery,
+      },
+      a.id,
+    );
+    applyOrderAction(first.id, "accept", provider);
+    const second = createOrder(
+      {
+        providerId: "elif",
+        packageId: "katlama",
+        size: "kucuk",
+        addons: [],
+        drop: "kapi",
+        note: "",
+        express: true,
+        pickup: w.pickup,
+        delivery: w.delivery,
+      },
+      b.id,
+    );
+    applyOrderAction(second.id, "accept", provider);
+    expect(remainingExpressQuotaOnDate("elif", w.pickup.date)).toBe(0);
+    const day = listCapacityDays("elif", w.pickup.date, w.pickup.date)[0]!;
+    expect(day.usedExpressUnits).toBe(2);
+    expect(day.usedUnits).toBe(0);
+
+    try {
+      createOrder(
+        {
+          providerId: "elif",
+          packageId: "katlama",
+          size: "kucuk",
+          addons: [],
+          drop: "kapi",
+          note: "",
+          express: true,
+          pickup: w.pickup,
+          delivery: w.delivery,
+        },
+        c.id,
+      );
+      expect.fail("üçüncü acil geçmemeliydi");
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiError);
+      expect((e as ApiError).code).toBe("EXPRESS_QUOTA");
+    }
+
+    addPhoto(first.id, MINI_PNG, "dropoff");
+    confirmPickupAtDoor(provider, first.id, { confirmedSize: "kucuk", addons: [], colorGroups: 1 });
+    approvePickupSummary(a, first.id);
+    applyOrderAction(first.id, "advance", provider, getHandoffCode(first.id, "pickup")!.code);
+    applyOrderAction(first.id, "advance", provider);
+    applyOrderAction(first.id, "advance", provider);
+    expect(getOrderRow(first.id)!.status).toBe("ready");
+    addPhoto(first.id, MINI_PNG, "delivery");
+
+    const start = pickupInstantIso(w.pickup.date, w.pickup.windowStart);
+    vi.setSystemTime(new Date(start.getTime() + 25 * 3_600_000));
+    applyOrderAction(first.id, "deliver", provider, getHandoffCode(first.id, "return")!.code);
+
+    const row = getOrderRow(first.id)!;
+    const bump = expressBumpPortion(first.total);
+    const net = first.total - bump;
+    expect(row.express_refund).toBe(bump);
+    expect(paymentForOrder(first.id)?.amount).toBe(net);
+    expect(paymentForOrder(first.id)?.commission).toBe(Math.round(net * 0.1));
+    expect(getWalletRow(a.id)!.reserved).toBe(0);
+    expect(getWalletRow(a.id)!.balance).toBe(topupA - net);
+    expect(conserved(a.id, first.id, topupA)).toBe(true);
   });
 });

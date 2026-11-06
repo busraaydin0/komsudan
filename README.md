@@ -6,9 +6,9 @@ Klasör adı `katla`, npm paketi `komsudan`. Kod İngilizce, arayüz Türkçe.
 
 ## Kapsam
 
-**MVP içi:** yalnız çamaşır (`yikama` / `katlama` / `tam` + boy + ekler). Kapı alım/teslim. Cüzdan simülasyonu. Acil teslim (zam, 24 sa, 15 dk cevap). Hizmet Admini (KPI, askı).
+**MVP içi:** yalnız çamaşır (`yikama` / `katlama` / `tam` + boy + ekler). Kapı alım/teslim. Cüzdan simülasyonu. Acil teslim (zam, 24 sa, 15 dk cevap, kota, geciken acil iadesi). Hizmet Admini (KPI, askı).
 
-**MVP dışı:** gel al noktası, QR/torba, tartım, sadakat, gerçek ödeme/çekim, halı ve kuru temizleme, eve giriş. Acil 3b (kontenjan, 18:00 dönüşü, iade/risk). Otomatik askı. Kapıda renk grubu onayı.
+**MVP dışı:** gel al noktası, QR/torba, tartım, sadakat, gerçek ödeme/çekim, halı ve kuru temizleme, eve giriş. Acil 18:00 kota dönüşü (BR-025, bilinçli uygulanmadı). Otomatik askı. Kapıda renk grubu onayı.
 
 Tutar ve sipariş durumu istemciden gelmez; sunucu hesaplar.
 
@@ -63,17 +63,17 @@ Kimlik + cihaz kilidi demo hesaplarda işaretli. İzin penceresinde “şimdilik
 ### 8–10 dk senaryo
 
 1. Müşteri `5321100090` — OTP’yi ekrandan yaz. Harita: Çukurambar iğneleri.
-2. **Acil teslim** aç; karta bas → sipariş sheet (paket, boy, pencere, tutar).
-3. **Sipariş** sekmesi; **Hesap** → cüzdan.
-4. Çıkış. Elif `5321100001` — **Hizmet**: kabul / yıkama / hazır. Hazır teslim kodu müşteride `5678`.
-5. Çıkış. Hizmet Admini `5321100099` — 4. sekme **Yönetim**: KPI, veren listesi, Elif “dikkat”. Askıya al → listeden düşer; açınca döner.
+2. **Acil teslim** aç; kota 0 olan verenler (Merve, Gülşen, Burak) listeden düşer, Elif (1 makine/gün) kalır. Karta bas → sipariş sheet (paket, boy, pencere, tutar).
+3. **Sipariş** sekmesi; **Hesap** → cüzdan. Demo’da geciken acil satırı **Acil iade** (+zam kısmı) görünür.
+4. Çıkış. Elif `5321100001` — **Hizmet**: kapasite kartında **Acil kontenjan (makine/gün)** (0…günlük makine). Kabul / yıkama / hazır. Hazır teslim kodu müşteride `5678`.
+5. Çıkış. Hizmet Admini `5321100099` — 4. sekme **Yönetim**: KPI, veren listesi, Elif “dikkat”, aylık profilde **Geciken acil**. Askıya al → listeden düşer; açınca döner.
 6. İsteğe bağlı: yeni sipariş → teslim → bekleyen kazanç `WALLET_PENDING_WAIT_MS` sonra bakiye.
 
 ## Test komutları
 
 | Komut | Açıklama |
 |--------|----------|
-| `npm test` | Vitest (120 test) |
+| `npm test` | Vitest |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `next typegen` + `tsc --noEmit` |
 | `npm run knip` | Kullanılmayan dosya/export |
@@ -83,9 +83,9 @@ Kimlik + cihaz kilidi demo hesaplarda işaretli. İzin penceresinde “şimdilik
 
 ## Bilinen sınırlar
 
-- **3b yok:** acil kontenjan, 18:00 dönüşü, iade/risk.
+- Acil 18:00 kota dönüşü (BR-025) yok: acil yalnız bugün alım olduğu için dönüş kuralı kotayı sıfırlardı.
+- Geciken acil iadesi var; otomatik askı yok (Hizmet Admini elle askıya alır). Aylık profilde geciken acil sayısı görünür.
 - Gerçek ödeme ve çekim yok (cüzdan simülasyon).
-- Otomatik askı yok (Hizmet Admini elle askıya alır).
 - Kapıda renk grubu onayı yok.
 - Harita karoları demo anahtarsızsa “API KEY REQUIRED” filigranı gösterebilir.
 - Üretim OTP: `demoCode` alanı yok; `sms` metninde simülasyon kodu hâlâ durur.

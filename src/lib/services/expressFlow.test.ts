@@ -3,7 +3,7 @@ import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
 import { addCalendarDaysIso } from "@/lib/capacity/istanbul";
 import { insertOrderItem } from "@/lib/db/orderItems";
 import { getOrderRow, insertOrderRow } from "@/lib/db/orders";
-import { tryReserveUnits, upsertCapacitySettings } from "@/lib/db/providerCapacity";
+import { upsertCapacitySettings } from "@/lib/db/providerCapacity";
 import { ApiError } from "@/lib/errors";
 import { quoteForProviderOrder } from "@/lib/pricingServer";
 import { addPhoto } from "@/lib/services/photoService";
@@ -66,19 +66,26 @@ describe("acil teslim (Adım 3a)", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    upsertCapacitySettings({
+      providerId: "elif",
+      halfUnitsPerDay: 8,
+      workingDays: [1, 2, 3, 4, 5, 6],
+      maxUnitsPerOrder: 10,
+      expressQuota: 2,
+    });
   });
 
-  it("kapasiteye sığmayan acil → hata", async () => {
+  it("kota 0 → acil hata", async () => {
     vi.useFakeTimers({ now: new Date("2026-06-15T10:00:00+03:00") });
     const user = await customer("5550000922");
     const today = isoDateInIstanbul(new Date());
     upsertCapacitySettings({
       providerId: "elif",
-      halfUnitsPerDay: 2,
+      halfUnitsPerDay: 8,
       workingDays: [1, 2, 3, 4, 5, 6, 7],
       maxUnitsPerOrder: 10,
+      expressQuota: 0,
     });
-    tryReserveUnits("elif", today, 2, 2);
     try {
       createOrder(
         {
@@ -89,10 +96,10 @@ describe("acil teslim (Adım 3a)", () => {
         },
         user.id,
       );
-      expect.fail("dolu günde acil geçmemeliydi");
+      expect.fail("kota 0 iken acil geçmemeliydi");
     } catch (e) {
       expect(e).toBeInstanceOf(ApiError);
-      expect((e as ApiError).code).toBe("CAPACITY");
+      expect((e as ApiError).code).toBe("EXPRESS_QUOTA");
     }
   });
 

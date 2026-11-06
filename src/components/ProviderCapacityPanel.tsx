@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readJson, unwrapEnvelope } from "@/lib/http/client";
+import { halfUnitsToMachines, machinesToHalfUnits } from "@/lib/laundryModel";
 
 const DAY_LABELS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
@@ -8,29 +10,37 @@ type CapacityForm = {
   halfUnitsPerDay: number;
   workingDays: number[];
   maxUnitsPerOrder: number;
+  expressQuota: number;
 };
 
 async function fetchCapacity(): Promise<CapacityForm> {
-  const res = await fetch("/api/providers/me/capacity", { credentials: "same-origin" });
-  const data = (await res.json()) as { capacity?: CapacityForm & { configured?: boolean }; error?: string };
-  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Kapasite alınamadı.");
-  const c = data.capacity!;
+  const data = unwrapEnvelope(
+    await readJson<{
+      data?: { capacity: CapacityForm & { configured?: boolean } };
+      capacity?: CapacityForm & { configured?: boolean };
+    }>(await fetch("/api/providers/me/capacity", { credentials: "same-origin" })),
+  );
+  const c = data.capacity;
+  if (!c) throw new Error("Kapasite alınamadı.");
   return {
     halfUnitsPerDay: c.halfUnitsPerDay,
     workingDays: c.workingDays,
     maxUnitsPerOrder: c.maxUnitsPerOrder,
+    expressQuota: c.expressQuota ?? 0,
   };
 }
 
 async function saveCapacity(body: CapacityForm) {
-  const res = await fetch("/api/providers/me/capacity", {
-    method: "PUT",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = (await res.json()) as { error?: string };
-  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Kaydedilemedi.");
+  unwrapEnvelope(
+    await readJson<{ data?: { capacity: CapacityForm } }>(
+      await fetch("/api/providers/me/capacity", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
 }
 
 export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
@@ -38,6 +48,7 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
     halfUnitsPerDay: 6,
     workingDays: [1, 2, 3, 4, 5, 6],
     maxUnitsPerOrder: 10,
+    expressQuota: 0,
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -72,7 +83,7 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
     }
   }
 
-  const machinesPerDay = form.halfUnitsPerDay / 2;
+  const machinesPerDay = halfUnitsToMachines(form.halfUnitsPerDay);
 
   return (
     <div className="k-rise mt-6 rounded-3xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]">
@@ -91,7 +102,10 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
           onChange={(e) => {
             const m = Number(e.target.value);
             if (!Number.isFinite(m)) return;
-            setForm((f) => ({ ...f, halfUnitsPerDay: Math.round(m * 2) }));
+            setForm((f) => {
+              const half = machinesToHalfUnits(m);
+              return { ...f, halfUnitsPerDay: half, expressQuota: Math.min(f.expressQuota, half) };
+            });
           }}
           className="mt-1 w-full rounded-xl bg-[var(--paper)] px-3 py-2 ring-1 ring-[var(--line)]"
         />
@@ -113,6 +127,30 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
           );
         })}
       </div>
+      <label className="mt-4 block text-sm">
+        Acil kontenjan (makine/gün)
+        <input
+          type="number"
+          min={0}
+          max={machinesPerDay}
+          step={0.5}
+          value={halfUnitsToMachines(form.expressQuota)}
+          onChange={(e) => {
+            const m = Number(e.target.value);
+            if (!Number.isFinite(m)) return;
+            const units = machinesToHalfUnits(m);
+            setForm((f) => ({
+              ...f,
+              expressQuota: Math.max(0, Math.min(units, f.halfUnitsPerDay)),
+            }));
+          }}
+          className="mt-1 w-full rounded-xl bg-[var(--paper)] px-3 py-2 ring-1 ring-[var(--line)]"
+        />
+      </label>
+      <p className="mt-1 text-xs text-[var(--muted)]">
+        Bu kadar makine günlük acil siparişlere ayrılır. Normal siparişler kalan kapasiteyi görür.
+        Kullanılmayan kota akşam normale dönmez. 0 ise acil seçilemez.
+      </p>
       <label className="mt-4 block text-sm">
         Tek sipariş üst sınırı
         <select

@@ -17,6 +17,7 @@ export type ProviderMonthCounts = {
   cancelled: number;
   unanswered: number;
   delayed: number;
+  delayed_express: number;
 };
 
 export type PaymentMonthSums = {
@@ -148,7 +149,11 @@ export function getProviderMonthCounts(
                  AND promised_delivery_date IS NOT NULL
                  AND date(updated_at, '+3 hours') > promised_delivery_date
                 THEN 1 ELSE 0 END
-         ), 0) AS delayed
+         ), 0) AS delayed,
+         COALESCE(SUM(
+           CASE WHEN status = 'completed' AND express = 1 AND express_refund > 0
+                THEN 1 ELSE 0 END
+         ), 0) AS delayed_express
        FROM orders
        WHERE provider_id = ? AND created_at >= ? AND created_at < ?`,
     )
@@ -159,6 +164,7 @@ export function getProviderMonthCounts(
     cancelled: Number(row.cancelled),
     unanswered: Number(row.unanswered),
     delayed: Number(row.delayed),
+    delayed_express: Number(row.delayed_express),
   };
 }
 
@@ -175,7 +181,11 @@ export function getMonthCountsAll(startIso: string, endIso: string): ProviderMon
                  AND promised_delivery_date IS NOT NULL
                  AND date(updated_at, '+3 hours') > promised_delivery_date
                 THEN 1 ELSE 0 END
-         ), 0) AS delayed
+         ), 0) AS delayed,
+         COALESCE(SUM(
+           CASE WHEN status = 'completed' AND express = 1 AND express_refund > 0
+                THEN 1 ELSE 0 END
+         ), 0) AS delayed_express
        FROM orders
        WHERE created_at >= ? AND created_at < ?`,
     )
@@ -186,6 +196,7 @@ export function getMonthCountsAll(startIso: string, endIso: string): ProviderMon
     cancelled: Number(row.cancelled),
     unanswered: Number(row.unanswered),
     delayed: Number(row.delayed),
+    delayed_express: Number(row.delayed_express),
   };
 }
 

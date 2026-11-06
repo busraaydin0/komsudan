@@ -11,12 +11,16 @@ import {
   type PaymentRow,
 } from "@/lib/db/payments";
 import { db } from "@/lib/db/client";
-import { getOrderRow } from "@/lib/db/orders";
+import { getAppointment } from "@/lib/db/appointments";
+import { getOrderRow, markExpressRefund, markOrderCompletedAt } from "@/lib/db/orders";
 import { hasHoldForOrder } from "@/lib/db/wallets";
+import { COMMISSION, expressBumpPortion } from "@/lib/pricing";
+import { pickupInstantIso } from "@/lib/scheduling/windows";
 import {
   adjustHoldForOrder,
   captureHold,
   creditOnCapture,
+  refundExpressBump,
   releaseHold,
 } from "@/lib/services/walletService";
 
@@ -104,17 +108,44 @@ export function capturePayment(orderId: string, at: string) {
   }
   return db().transaction(() => {
     const order = getOrderRow(orderId);
-    let collected = row.amount;
-    if (order?.user_id) {
-      const taken = captureHold(order.user_id, orderId, row.amount, at);
+    let captureAmount = row.amount;
+    let commission = row.commission;
+
+    if (order?.express && (order.express_refund ?? 0) === 0) {
+      const pickup = getAppointment(orderId, "pickup");
+      if (pickup) {
+        const start = pickupInstantIso(pickup.date, pickup.window_start);
+        const completedMs = Date.parse(at);
+        if (Number.isFinite(completedMs) && completedMs > start.getTime() + 24 * 3_600_000) {
+          const bump = expressBumpPortion(row.amount);
+          if (bump > 0) {
+            const netPay = Math.max(0, row.amount - bump);
+            commission = Math.round(netPay * COMMISSION);
+            captureAmount = netPay;
+            if (order.user_id && hasHoldForOrder(orderId)) {
+              refundExpressBump(order.user_id, orderId, bump, at);
+            }
+            updatePaymentAmounts(orderId, captureAmount, commission, at);
+            markExpressRefund(orderId, bump, at);
+          }
+        }
+      }
+    }
+
+    markOrderCompletedAt(orderId, at);
+
+    let collected = captureAmount;
+    const live = getOrderRow(orderId);
+    if (live?.user_id) {
+      const taken = captureHold(live.user_id, orderId, captureAmount, at);
       // Hold varken taken === amount (aksi halde captureHold atar). Hold yoksa kart/simüle: cüzdan düşmez.
       if (hasHoldForOrder(orderId) && taken > 0) collected = taken;
     }
     // Gerekçe: kısmi tahsilde payment.amount ve komisyon yalan söylemesin diye
     // hold varken remaining !== amount hata. Hold yoksa kazanç payment.amount - commission.
-    const net = Math.max(0, collected - row.commission);
+    const net = Math.max(0, collected - commission);
     updatePaymentStatus(orderId, "captured", at);
-    if (order) creditOnCapture(order.provider_id, orderId, net, at);
+    if (live) creditOnCapture(live.provider_id, orderId, net, at);
     return paymentForOrder(orderId)!;
   })();
 }

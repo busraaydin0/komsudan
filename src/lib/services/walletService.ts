@@ -10,6 +10,7 @@ import {
   getWalletRow,
   hasCaptureForOrder,
   hasEarnForOrder,
+  hasExpressRefundForOrder,
   hasHoldForOrder,
   hasReleaseForOrder,
   holdFromBalance,
@@ -141,6 +142,19 @@ export function releaseHold(userId: string, orderId: string, amount: number, at?
  * Hold yoksa 0 (kart/simüle — rezerv oynatılmaz).
  * Hold varken remaining !== amount ise hata: kısmi tahsil sessizce geçilmez.
  */
+/** Geciken acil zamını reserved → balance. Ledger kind `express_refund`. */
+export function refundExpressBump(userId: string, orderId: string, amount: number, at?: string) {
+  if (amount <= 0) return;
+  if (hasExpressRefundForOrder(orderId)) return;
+  const when = nowIso(at);
+  ensureWalletRow(userId, when);
+  const remaining = remainingReservedForOrder(orderId);
+  const take = Math.min(amount, remaining);
+  if (take <= 0) return;
+  if (releaseToBalance(userId, take, when) === 0) return;
+  insertLedger({ userId, amount: take, kind: "express_refund", orderId, at: when });
+}
+
 export function captureHold(userId: string, orderId: string, amount: number, at?: string): number {
   if (amount <= 0) return 0;
   if (hasCaptureForOrder(orderId)) return amount;
