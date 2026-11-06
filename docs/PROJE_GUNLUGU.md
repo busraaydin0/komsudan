@@ -6,6 +6,9 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-07 – Takvim zarfı: sipariş penceresi görünmüyordu
+- Dal: `fix/pencere-butonu`. `AppointmentCalendar` `{ data: { windows } }` açmıyordu; takvim boş kalıyordu. `parseCalendarWindows` + test.
+
 ## 2026-11-07 – Adım 9: Acil 3b-lite main'e alındı
 - PR **#2** merge commit ile birleşti (squash yok): `fdf920d`.
 - Etiket: `sunum-v1` (`fdf920d`).

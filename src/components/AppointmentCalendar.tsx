@@ -1,15 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readJson } from "@/lib/http/client";
+import { parseCalendarWindows, type CalendarWindowDto } from "@/lib/calendar/parseCalendarResponse";
 import type { AppointmentWindow } from "@/lib/types";
 
-type CalWindow = {
-  date: string;
-  start: string;
-  end: string;
-  status: "ok" | "low" | "full";
-  selectable: boolean;
-};
+type CalWindow = CalendarWindowDto;
 
 export function AppointmentCalendar({
   providerId,
@@ -37,8 +33,8 @@ export function AppointmentCalendar({
       try {
         const qs = express ? "?express=1" : "";
         const res = await fetch(`/api/providers/${encodeURIComponent(providerId)}/calendar${qs}`);
-        const data = (await res.json()) as { windows?: CalWindow[] };
-        if (!cancelled) setWindows(data.windows ?? []);
+        const windows = parseCalendarWindows(await readJson(res));
+        if (!cancelled) setWindows(windows);
       } finally {
         if (!cancelled) setReady(true);
       }

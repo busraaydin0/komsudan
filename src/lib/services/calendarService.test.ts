@@ -32,6 +32,14 @@ describe("provider calendar", () => {
     expect(ok?.selectable).toBe(true);
   });
 
+  it("elif 7 günde seçilebilir pencere döner (normal ve acil)", () => {
+    const now = new Date("2026-10-07T11:00:00+03:00");
+    const normal = buildProviderCalendar("elif", now, false);
+    const express = buildProviderCalendar("elif", now, true);
+    expect(normal.some((w) => w.selectable)).toBe(true);
+    expect(express.some((w) => w.selectable)).toBe(true);
+  });
+
   it("acil bugün penceresi ≥1 saat eşiği", () => {
     const now = new Date("2026-10-07T11:00:00+03:00");
     const windows = buildProviderCalendar("elif", now, true).filter((w) => w.date === "2026-10-07");
