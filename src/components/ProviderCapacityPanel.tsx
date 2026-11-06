@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { readJson, unwrapEnvelope } from "@/lib/http/client";
+import { halfUnitsToMachines, machinesToHalfUnits } from "@/lib/laundryModel";
 
 const DAY_LABELS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
@@ -82,7 +83,7 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
     }
   }
 
-  const machinesPerDay = form.halfUnitsPerDay / 2;
+  const machinesPerDay = halfUnitsToMachines(form.halfUnitsPerDay);
 
   return (
     <div className="k-rise mt-6 rounded-3xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]">
@@ -102,7 +103,7 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
             const m = Number(e.target.value);
             if (!Number.isFinite(m)) return;
             setForm((f) => {
-              const half = Math.round(m * 2);
+              const half = machinesToHalfUnits(m);
               return { ...f, halfUnitsPerDay: half, expressQuota: Math.min(f.expressQuota, half) };
             });
           }}
@@ -133,11 +134,11 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
           min={0}
           max={machinesPerDay}
           step={0.5}
-          value={form.expressQuota / 2}
+          value={halfUnitsToMachines(form.expressQuota)}
           onChange={(e) => {
             const m = Number(e.target.value);
             if (!Number.isFinite(m)) return;
-            const units = Math.round(m * 2);
+            const units = machinesToHalfUnits(m);
             setForm((f) => ({
               ...f,
               expressQuota: Math.max(0, Math.min(units, f.halfUnitsPerDay)),

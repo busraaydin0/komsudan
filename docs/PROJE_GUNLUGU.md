@@ -6,6 +6,10 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-06 – Adım 8d: seed/ekran aynı birim (makine/gün)
+- Seed `ELIF_EXPRESS_QUOTA_MACHINES = 1`; DB `express_quota = 2` yarım-makine birimi. Ekran `halfUnitsToMachines` ile **1 makine/gün**. Demo siparişi kotayı düşürmez (ayar alanı).
+- Duman: `acil kota: iki sipariş, üçüncü hata, geç teslimde zam iadesi`. Fixture: `migrate0005.test.ts` 0006 kayıpsız.
+
 ## 2026-11-05 – Adım 8c: 390px tarayıcı turu
 - `feat/express-quota-refund`. Kapasite GET `{ data: { capacity } }` zarfı panoda açılmıyordu; kayıtlı kota 0 görünüyordu. `unwrapEnvelope` ile düzeltildi.
 - 390px: Elif **Acil kontenjan = 1** (kota 2 birim); 99 günlük makineye (4) kırpılır. Müşteri **Acil teslim** açıkken yalnız Elif Y. listede (Merve/Gülşen/Burak yok). Cüzdan **Acil iade +₺40**. Yönetim Elif aylık **Geciken acil 1**.
@@ -20,7 +24,7 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 - BR-024: geciken acilde zam iadesi (`express_refund`); capture/komisyon net üzerinden. Zamanında iade yok. Çift iade yok. Hold yoksa yalnız payments + `orders.express_refund`.
 - Aylık profil: geciken acil sayısı. Otomatik askı yok.
 - UI: veren kapasite “Acil kontenjan (makine/gün)”; müşteri acil kartı kota yetmezse gizlenir.
-- Seed: elif kota 2. `demo:reset`: geciken acil + iade satırı.
+- Seed: elif 1 makine/gün (DB 2 birim). `demo:reset`: geciken acil + iade satırı.
 - Migration `0006_express_quota.sql`. Kontrol turu: `npm test` **134**; lint ve `next build` yeşil.
 - **Kontrol (Adım 8b):** Canlı `data/komsudan.db` kopyası (backup API, WAL dahil) zaten 0006’lıydı. Satırlar aynı, FK boş, kayıp yok: users 13, orders 11, payments 9, wallets 4, wallet_ledger 1, reviews 9, provider_capacity_settings 8, provider_capacity_days 1. Vitest eski şema fixture (0004+veri → migrate 0005+0006) aynı sayıları korudu; `express_quota`/`used_express_units`/`express_refund` varsayılan 0.
 - Duman: kota 2 → iki acil kabul → üçüncü `EXPRESS_QUOTA` → geç teslimde zam iadesi + para değişmezi (geçti).

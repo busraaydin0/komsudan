@@ -14,6 +14,8 @@ import { getWalletRow, remainingReservedForOrder } from "@/lib/db/wallets";
 import { ApiError } from "@/lib/errors";
 import { COMMISSION, expressBumpPortion } from "@/lib/pricing";
 import { canListForExpress } from "@/lib/laundry/customerUi";
+import { ELIF_EXPRESS_QUOTA_MACHINES } from "@/lib/db/seed";
+import { halfUnitsToMachines, machinesToHalfUnits } from "@/lib/laundryModel";
 import { providersLive } from "@/lib/services/catalogService";
 import { remainingExpressQuotaOnDate, remainingUnitsOnDate } from "@/lib/services/capacityService";
 import { loadUser, requestOtp, verifyOtp } from "./authService";
@@ -59,12 +61,16 @@ afterEach(() => {
 });
 
 describe("acil kota ve iade (Adım 8 / K-010)", () => {
-  it("seed elif acil kotası 2", () => {
+  it("seed elif acil kotası 1 makine/gün (DB 2 birim)", () => {
     restoreElif();
+    expect(ELIF_EXPRESS_QUOTA_MACHINES).toBe(1);
+    expect(machinesToHalfUnits(ELIF_EXPRESS_QUOTA_MACHINES)).toBe(2);
+    expect(halfUnitsToMachines(2)).toBe(1);
     const row = db()
       .prepare(`SELECT express_quota AS q FROM provider_capacity_settings WHERE provider_id = 'elif'`)
       .get() as { q: number };
     expect(row.q).toBe(2);
+    expect(halfUnitsToMachines(row.q)).toBe(ELIF_EXPRESS_QUOTA_MACHINES);
   });
 
   it("kota 0 → acil hata", async () => {

@@ -11,7 +11,17 @@ export type LaundrySize = (typeof LAUNDRY_SIZES)[number];
 
 /** 5 makine = 10 yarım-makine birimi. Tek sipariş tavanı. */
 export const MAX_ORDER_MACHINES = 5;
-export const MAX_UNITS_PER_ORDER = MAX_ORDER_MACHINES * 2;
+export const HALF_UNITS_PER_MACHINE = 2;
+export const MAX_UNITS_PER_ORDER = MAX_ORDER_MACHINES * HALF_UNITS_PER_MACHINE;
+
+/** Ekran/seed makine; DB/API yarım-makine birimi (küçük=1, orta=2). */
+export function machinesToHalfUnits(machines: number): number {
+  return Math.round(machines * HALF_UNITS_PER_MACHINE);
+}
+
+export function halfUnitsToMachines(units: number): number {
+  return units / HALF_UNITS_PER_MACHINE;
+}
 
 export const EXTRA_MACHINE_COUNT: Record<ExtraMachineSize, number> = {
   makine3: 3,

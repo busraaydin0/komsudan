@@ -63,7 +63,7 @@ Kimlik + cihaz kilidi demo hesaplarda işaretli. İzin penceresinde “şimdilik
 ### 8–10 dk senaryo
 
 1. Müşteri `5321100090` — OTP’yi ekrandan yaz. Harita: Çukurambar iğneleri.
-2. **Acil teslim** aç; kota 0 olan verenler (Merve, Gülşen, Burak) listeden düşer, Elif (kota 2) kalır. Karta bas → sipariş sheet (paket, boy, pencere, tutar).
+2. **Acil teslim** aç; kota 0 olan verenler (Merve, Gülşen, Burak) listeden düşer, Elif (1 makine/gün) kalır. Karta bas → sipariş sheet (paket, boy, pencere, tutar).
 3. **Sipariş** sekmesi; **Hesap** → cüzdan. Demo’da geciken acil satırı **Acil iade** (+zam kısmı) görünür.
 4. Çıkış. Elif `5321100001` — **Hizmet**: kapasite kartında **Acil kontenjan (makine/gün)** (0…günlük makine). Kabul / yıkama / hazır. Hazır teslim kodu müşteride `5678`.
 5. Çıkış. Hizmet Admini `5321100099` — 4. sekme **Yönetim**: KPI, veren listesi, Elif “dikkat”, aylık profilde **Geciken acil**. Askıya al → listeden düşer; açınca döner.

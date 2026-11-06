@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   LAUNDRY_SIZES,
   MAX_UNITS_PER_ORDER,
+  HALF_UNITS_PER_MACHINE,
+  halfUnitsToMachines,
   machineUnitsFor,
+  machinesToHalfUnits,
   resolveSizePrice,
   scaledSizePrice,
   sizeRank,
@@ -12,6 +15,13 @@ describe("çamaşır boyu 3–5 makine", () => {
   it("boy listesi küçük-ortadan 5 makineye kadar", () => {
     expect([...LAUNDRY_SIZES]).toEqual(["kucuk", "orta", "buyuk", "makine3", "makine4", "makine5"]);
     expect(MAX_UNITS_PER_ORDER).toBe(10);
+  });
+
+  it("makine ↔ yarım-makine birimi", () => {
+    expect(HALF_UNITS_PER_MACHINE).toBe(2);
+    expect(machinesToHalfUnits(1)).toBe(2);
+    expect(halfUnitsToMachines(2)).toBe(1);
+    expect(halfUnitsToMachines(machinesToHalfUnits(1))).toBe(1);
   });
 
   it("5 makine 10 birim; 3 makine orta × 3 fiyat", () => {
