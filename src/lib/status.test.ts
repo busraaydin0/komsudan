@@ -8,7 +8,7 @@ import {
 
 describe("ALLOWED_TRANSITIONS", () => {
   it("pending çıkışları", () => {
-    expect(ALLOWED_TRANSITIONS.pending).toEqual(["accepted", "rejected", "dropped_off"]);
+    expect(ALLOWED_TRANSITIONS.pending).toEqual(["accepted", "rejected", "dropped_off", "cancelled"]);
   });
 });
 
@@ -21,18 +21,11 @@ describe("canTransition", () => {
   it("provider kabul ve operasyon adımları", () => {
     expect(canTransition("pending", "accepted", "provider", { packageId: "yikama" })).toBe(true);
     expect(canTransition("accepted", "dropped_off", "provider", { packageId: "yikama" })).toBe(true);
-    expect(canTransition("ready", "completed", "provider", { packageId: "yikama", isOrderParty: true })).toBe(
-      true,
-    );
+    expect(canTransition("ready", "completed", "provider", { packageId: "yikama" })).toBe(true);
   });
 
-  it("müşteri completed yapamaz (taraf değilse)", () => {
-    expect(canTransition("ready", "completed", "customer", { packageId: "yikama", isOrderParty: false })).toBe(
-      false,
-    );
-    expect(canTransition("ready", "completed", "customer", { packageId: "yikama", isOrderParty: true })).toBe(
-      true,
-    );
+  it("müşteri teslim kodu / completed yapamaz", () => {
+    expect(canTransition("ready", "completed", "customer", { packageId: "yikama" })).toBe(false);
   });
 
   it("müşteri accepted yapamaz", () => {
@@ -53,8 +46,9 @@ describe("canTransition", () => {
     expect(canTransition("pending", "washing", "provider", { packageId: "katlama" })).toBe(false);
   });
 
-  it("accepted → cancelled müşteri veya provider", () => {
+  it("accepted → cancelled yalnız müşteri", () => {
     expect(canTransition("accepted", "cancelled", "customer", { packageId: "katlama" })).toBe(true);
+    expect(canTransition("accepted", "cancelled", "provider", { packageId: "katlama" })).toBe(false);
   });
 });
 

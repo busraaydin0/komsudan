@@ -237,14 +237,16 @@ export function LoginGate({
               >
                 {busy ? "Bekleniyor…" : "Yüz veya parmak izi"}
               </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void lockDevice("pilot")}
-                className="mt-3 w-full text-xs text-[var(--muted)]"
-              >
-                Bu cihazda Face ID yok — pilot onay
-              </button>
+              {process.env.NODE_ENV !== "production" && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void lockDevice("pilot")}
+                  className="mt-3 w-full text-xs text-[var(--muted)]"
+                >
+                  Bu cihazda Face ID yok — pilot onay
+                </button>
+              )}
             </>
           )}
 

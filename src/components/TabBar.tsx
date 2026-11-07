@@ -23,7 +23,7 @@ export function TabBar({
       className="k-tabbar absolute inset-x-0 bottom-0 z-40 mx-auto max-w-lg border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--card)_92%,transparent)] backdrop-blur-md"
       aria-label="Ana menü"
     >
-      <ul className={showAdmin ? "grid grid-cols-6" : "grid grid-cols-5"}>
+      <ul className={showAdmin ? "grid grid-cols-2" : "grid grid-cols-5"}>
         {items.map((item) => {
           const on = tab === item.id;
           const badge =

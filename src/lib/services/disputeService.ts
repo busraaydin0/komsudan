@@ -12,7 +12,7 @@ import {
   type DisputeOpenerRole,
   type DisputeRow,
 } from "@/lib/db/disputes";
-import { isOrderParty } from "@/lib/services/orderService";
+import { assertCustomerAction, isAdminActor, isOrderParty } from "@/lib/orders/orderAuth";
 import { ApiError } from "@/lib/errors";
 
 export type PublicDispute = {
@@ -48,13 +48,15 @@ function requireOrderParty(user: AuthUser, orderId: string) {
 }
 
 function openerRoleFor(user: AuthUser, order: { user_id: string | null; provider_id: string }): DisputeOpenerRole {
-  if (user.role === "admin") return "admin";
+  if (isAdminActor(user)) return "admin";
   if (order.provider_id === user.id) return "provider";
   return "customer";
 }
 
 export function openDispute(user: AuthUser, orderId: string, reason: string): PublicDispute {
-  const order = requireOrderParty(user, orderId);
+  const order = getOrderRow(orderId);
+  if (!order) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
+  assertCustomerAction(user, order);
   if (getOpenDisputeForOrder(orderId)) {
     throw new ApiError(409, "Bu siparişte açık itiraz zaten var.", "CONFLICT");
   }
@@ -79,7 +81,7 @@ export function listDisputesOnOrder(user: AuthUser, orderId: string): PublicDisp
 }
 
 export function listMyDisputes(user: AuthUser): PublicDispute[] {
-  const rows = user.role === "admin" ? listDisputesAll() : listDisputesForParty(user.id);
+  const rows = isAdminActor(user) ? listDisputesAll() : listDisputesForParty(user.id);
   return rows.map(toPublic);
 }
 

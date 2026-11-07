@@ -3,6 +3,7 @@ import { LAUNDRY_PACKAGES } from "@/lib/laundry/packages";
 import { PILOT_AREA } from "@/lib/laundry/pilot";
 import { dryingBlurb, hasDryerFrom } from "@/lib/drying";
 import { haversineKm } from "@/lib/geo/distance";
+import { isStaffRole, isSuperAdminUser } from "@/lib/auth/staff";
 import { setUserRole } from "@/lib/db/auth";
 import {
   catalogProviderExists,
@@ -123,10 +124,17 @@ export function listProviderPackages(id: string) {
   return listPackages(id).map(toPackage);
 }
 
+function assertNotStaffProvider(user: AuthUser) {
+  if (isStaffRole(user.role) || isSuperAdminUser(user)) {
+    throw new ApiError(403, "Yönetim hesabı hizmet veren olamaz.", "FORBIDDEN");
+  }
+}
+
 export function requireProvider(user: AuthUser) {
+  assertNotStaffProvider(user);
   const row = getProfile(user.id);
   if (!row) throw new ApiError(403, "Hizmet veren profilin yok.", "FORBIDDEN");
-  if (user.role !== "provider" && user.role !== "admin") {
+  if (user.role !== "provider") {
     setUserRole(user.id, "provider");
   }
   return row;
@@ -227,9 +235,8 @@ function ensureDirectoryEntry(
   },
 ) {
   const neighborhood = input.neighborhood.trim() || PILOT_AREA.label;
-  if (user.role !== "admin") {
-    setUserRole(user.id, "provider");
-  }
+  assertNotStaffProvider(user);
+  setUserRole(user.id, "provider");
   const existing = getProfile(user.id);
   const bio = existing?.bio?.trim() ? existing.bio : input.bio;
   if (!existing) {

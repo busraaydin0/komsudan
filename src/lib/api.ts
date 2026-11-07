@@ -284,7 +284,7 @@ export async function postPriceChange(orderId: string, action: "approve" | "reje
 
 export async function patchOrder(
   id: string,
-  action: "accept" | "reject" | "advance" | "deliver",
+  action: "accept" | "reject" | "advance" | "deliver" | "cancel",
   code?: string,
 ) {
   const data = unwrapEnvelope(

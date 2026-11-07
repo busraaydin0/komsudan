@@ -28,12 +28,14 @@ export function ProviderOrderCard({
   onChanged,
   delay,
   onOpenMessages,
+  actorId,
 }: {
   order: Order;
   providers: Provider[];
   onChanged: () => void;
   delay: number;
   onOpenMessages?: (orderId: string) => void;
+  actorId?: string | null;
 }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -66,6 +68,7 @@ export function ProviderOrderCard({
     pickupConfirmed: Boolean(order.pickupConfirmedAt),
     priceChangePending: order.priceChange === "pending",
   });
+  const isProvider = Boolean(actorId) && actorId === order.providerId;
 
   useEffect(() => {
     let alive = true;
@@ -132,7 +135,7 @@ export function ProviderOrderCard({
       </p>
       {err && <p className="k-rise mt-2 text-sm text-[var(--clay)]">{err}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
-        {st === "pending" && (
+        {isProvider && st === "pending" && (
           <>
             <button
               type="button"
@@ -152,10 +155,10 @@ export function ProviderOrderCard({
             </button>
           </>
         )}
-        {waitingSummary && (
+        {isProvider && waitingSummary && (
           <p className="w-full text-xs text-[var(--muted)]">Müşteri kapı özetini onaylayınca alım kodu açılır.</p>
         )}
-        {needsPickupCode && (
+        {isProvider && needsPickupCode && (
           <div className="w-full">
             <label className="text-xs text-[var(--muted)]">Müşterinin 4 haneli alım kodu</label>
             <input
@@ -167,7 +170,7 @@ export function ProviderOrderCard({
             />
           </div>
         )}
-        {advanceLabel && st !== "pending" && st !== "ready" && st !== "admin_pending" && (
+        {isProvider && advanceLabel && st !== "pending" && st !== "ready" && st !== "admin_pending" && (
           <button
             type="button"
             disabled={busy || (needsPickupCode && code.length !== 4)}
@@ -177,7 +180,7 @@ export function ProviderOrderCard({
             {busy ? "…" : advanceLabel}
           </button>
         )}
-        {needsPickup && (
+        {isProvider && needsPickup && (
           <div className="mt-3 w-full rounded-2xl bg-[var(--paper)] p-3 ring-1 ring-[var(--line)]">
             <p className="text-xs font-medium text-[var(--teal)]">Kapıda doğrula</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -243,7 +246,7 @@ export function ProviderOrderCard({
           Mesajlar
           <MessageBadge count={unread} />
         </button>
-        {canAddPhotos(order.status) && (
+        {isProvider && canAddPhotos(order.status) && (
           <PhotoAdd
             label="İş fotoğrafı"
             busy={busy}
@@ -264,7 +267,7 @@ export function ProviderOrderCard({
           />
         )}
       </div>
-      {st === "ready" && !order.adminHold && (
+      {isProvider && st === "ready" && !order.adminHold && (
         <form
           className="mt-3"
           onSubmit={(e) => {

@@ -18,6 +18,7 @@ import {
 } from "@/lib/db/orders";
 import type { AuthUser } from "@/lib/auth/types";
 import { ApiError } from "@/lib/errors";
+import { assertCustomerAction, assertProviderAction } from "@/lib/orders/orderAuth";
 import { quoteForProviderOrder } from "@/lib/pricingServer";
 import { isOrderStatus } from "@/lib/status";
 import type { PackageId } from "@/lib/types";
@@ -30,12 +31,6 @@ function normalizeAddons(raw: OrderAddonLine[]) {
   return raw.filter((a) => a.qty > 0);
 }
 
-function assertProviderAtDoor(user: AuthUser, row: NonNullable<ReturnType<typeof getOrderRow>>) {
-  if (user.role === "admin") return;
-  if (user.role === "provider" && row.provider_id === user.id) return;
-  throw new ApiError(403, "Kapı doğrulamasını hizmet veren yapar.", "FORBIDDEN");
-}
-
 export function confirmPickupAtDoor(
   user: AuthUser,
   orderId: string,
@@ -43,7 +38,7 @@ export function confirmPickupAtDoor(
 ) {
   const row = getOrderRow(orderId);
   if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  assertProviderAtDoor(user, row);
+  assertProviderAction(user, row);
   if (!isOrderStatus(row.status) || row.status !== "accepted") {
     throw new ApiError(409, "Kapı doğrulaması yalnızca kabul sonrası.", "INVALID_TRANSITION");
   }
@@ -111,9 +106,7 @@ export function confirmPickupAtDoor(
 export function respondPriceChange(user: AuthUser, orderId: string, action: "approve" | "reject") {
   const row = getOrderRow(orderId);
   if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  if (row.user_id !== user.id && user.role !== "admin") {
-    throw new ApiError(403, "Fiyat onayını müşteri verir.", "FORBIDDEN");
-  }
+  assertCustomerAction(user, row);
   if (row.price_change !== "pending") {
     throw new ApiError(409, "Bekleyen fiyat değişikliği yok.", "INVALID_TRANSITION");
   }

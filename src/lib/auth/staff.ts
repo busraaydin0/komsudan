@@ -28,10 +28,10 @@ export async function requireStaffAdmin(req?: Request): Promise<AuthUser> {
   return user;
 }
 
-/** Cüzdan yükleme/çekim: service_admin (süper admin bayrağı yoksa) yasak. */
+/** Cüzdan yükleme/çekim: yalnız müşteri/veren veya super_admin. */
 export function assertWalletWriteAllowed(userId: string) {
   const row = getUserById(userId);
-  if (row?.role === "service_admin" && !row.super_admin) {
+  if (row && isStaffRole(row.role) && !row.super_admin) {
     throw new ApiError(403, "Ödeme ve çekim yalnız süper admin.", "FORBIDDEN");
   }
 }

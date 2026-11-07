@@ -2,6 +2,7 @@ import { dateAtNoonIstanbul, isoDateInIstanbul } from "@/lib/capacity/istanbul";
 import { getOrderRow, updateOrderDelay } from "@/lib/db/orders";
 import type { AuthUser } from "@/lib/auth/types";
 import { ApiError } from "@/lib/errors";
+import { assertProviderAction } from "@/lib/orders/orderAuth";
 import { isOrderStatus, type OrderStatusId } from "@/lib/status";
 import { notifyOrderDelayed } from "./notificationService";
 
@@ -14,9 +15,7 @@ function canDelayStatus(status: OrderStatusId) {
 export function delayOrder(user: AuthUser, orderId: string, reason: string, extendHours: number) {
   const row = getOrderRow(orderId);
   if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  if (user.role !== "admin" && row.provider_id !== user.id) {
-    throw new ApiError(403, "Ertelemeyi hizmet veren yapar.", "FORBIDDEN");
-  }
+  assertProviderAction(user, row);
   if (!isOrderStatus(row.status) || !canDelayStatus(row.status)) {
     throw new ApiError(409, "Bu aşamada erteleme yok.", "INVALID_TRANSITION");
   }

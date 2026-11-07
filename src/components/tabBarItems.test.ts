@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CUSTOMER_PROVIDER_TABS, tabBarIconKind, tabBarItems } from "./tabBarItems";
+import { CUSTOMER_PROVIDER_TABS, STAFF_TABS, tabBarIconKind, tabBarItems } from "./tabBarItems";
 
 describe("TabBar maddeleri", () => {
   it("müşteri/veren sekmeleri değişmez; 4. Hizmet", () => {
@@ -10,21 +10,14 @@ describe("TabBar maddeleri", () => {
     expect(items.some((t) => t.id === "yonetim")).toBe(false);
   });
 
-  it("service_admin 4. sekme Yönetim etiketi ve admin ikonu", () => {
+  it("yönetim rolleri yalnız Yönetim ve Hesap görür", () => {
     const items = tabBarItems(true);
-    expect(items.map((t) => t.id)).toEqual([
-      "harita",
-      "siparis",
-      "mesaj",
-      "yonetim",
-      "hizmet",
-      "hesap",
-    ]);
-    expect(items[3]).toEqual({ id: "yonetim", label: "Yönetim" });
-    expect(items[3]?.label).not.toBe("Rotalar");
+    expect(items).toEqual(STAFF_TABS);
+    expect(items.map((t) => t.id)).toEqual(["yonetim", "hesap"]);
+    expect(items.some((t) => t.id === "harita" || t.id === "siparis" || t.id === "hizmet")).toBe(false);
+    expect(items[0]).toEqual({ id: "yonetim", label: "Yönetim" });
+    expect(items[0]?.label).not.toBe("Rotalar");
     expect(tabBarIconKind("yonetim")).toBe("admin");
     expect(tabBarIconKind("yonetim")).not.toBe("desk");
-    expect(tabBarIconKind("hizmet")).toBe("desk");
-    expect(items[4]).toEqual({ id: "hizmet", label: "Hizmet" });
   });
 });

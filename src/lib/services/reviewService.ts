@@ -15,6 +15,8 @@ import {
 } from "@/lib/db/reviews";
 import { photosForReview } from "@/lib/services/photoService";
 import { ApiError } from "@/lib/errors";
+import type { AuthUser } from "@/lib/auth/types";
+import { assertCustomerAction } from "@/lib/orders/orderAuth";
 
 export type ProviderRating = { rating: number; reviews: number };
 
@@ -108,9 +110,10 @@ export function reviewForOrder(orderId: string): Review | null {
   return row ? toReview(row) : null;
 }
 
-export function createReview(orderId: string, input: ReviewWriteInput, author: string): Review {
+export function createReview(user: AuthUser, orderId: string, input: ReviewWriteInput): Review {
   const order = getOrderRow(orderId);
   if (!order) throw new ApiError(404, "Sipariş yok.");
+  assertCustomerAction(user, order);
   if (!isOrderStatus(order.status) || !canReview(order.status)) {
     throw new ApiError(409, "Yorum ancak teslimden sonra.");
   }
@@ -122,7 +125,7 @@ export function createReview(orderId: string, input: ReviewWriteInput, author: s
   const body = input.body.trim().slice(0, 400);
   if (body.length < 8) throw new ApiError(400, "Yorum en az birkaç cümle olsun.");
 
-  const authorName = author.trim().slice(0, 40) || "Komşu";
+  const authorName = user.name.trim().slice(0, 40) || "Komşu";
   const now = new Date().toISOString();
   const id = `rev-${randomUUID().slice(0, 8)}`;
   const wouldRepeat = input.wouldRepeat == null ? null : input.wouldRepeat ? 1 : 0;

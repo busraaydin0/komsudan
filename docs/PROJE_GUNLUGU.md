@@ -6,6 +6,27 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-07 – K-013: admin yetkisi, self-promote kapanışı, admin:create
+- Dal: `fix/kendine-siparis` (PR #5 üzerine; main’e birleştirilmedi).
+- Önce: OTP/profil zod rol kabul etmiyordu; `insertUser` varsayılan `customer`. `requireAuth` `role===admin` her rolü geçiriyordu. `seedStaffUsers` (5321100099 + `demo-staff-passkey`) production’da da çalışıyordu. Admin `createOrder` yapabiliyordu.
+- Rol/super_admin yalnız DB. `requireAuth` bypass kaldırıldı. `service_admin` yalnız `/api/admin/*`. Sipariş mutasyonu / ödeme / çekim / kodsuz teslim: veren veya `super_admin`. Admin rolleri sipariş oluşturamaz (`ADMIN_CANNOT_ORDER`). UI: Yönetim + Hesap.
+- Demo admin ve seed passkey yalnız `NODE_ENV !== production`. `npm run admin:create -- <telefon> <service_admin|super_admin>` (production’da sunucu terminali; audit + cüzdan).
+- Kontrol: `npm test`, lint, `next build`. Main’e merge yok.
+
+## 2026-11-07 – K-012: işlem bazlı yetki, REQUIRE_PROVIDER_TO_MUTATE kaldırıldı
+- Dal: `fix/kendine-siparis` (PR #5 üzerine; main’e birleştirilmedi).
+- `REQUIRE_PROVIDER_TO_MUTATE=false` siparişi gören herkese kabul/red/kod veriyordu. Bayrak silindi; yetki işlem + kimlik (`user.id === provider_id` / `user_id`) ile.
+- Hizmet veren (veya admin): kabul, red, alım/teslim kodu, washing/ironing/ready, erteleme, alım/teslim fotoğrafı.
+- Müşteri (veya admin): alım özeti, boy artışı, iptal (`pending` → `cancelled`; mevcut SM zaman/durum kuralları), yorum, uyuşmazlık açma.
+- `PILOT_SEE_ALL_ORDERS` kapandı: üçüncü kişi GET 404, mutasyon 403 `FORBIDDEN` (“Bu işlemi yapma yetkiniz yok.”).
+- `ALLOW_SELF_ORDER` açıkken aynı hesap iki tarafı da oynar (kimlik her iki id ile örtüşür).
+- UI: müşteri ekranında veren düğmeleri, masada müşteri düğmeleri yok.
+- Kontrol: `npm test` **149**, lint ve `next build` yeşil. Main’e merge yok.
+
+## 2026-11-07 – K-011: kendine sipariş engeli
+- Dal: `fix/kendine-siparis`. Önce kural yoktu: `createOrder` `user_id === provider_id` kabul ediyordu; `REQUIRE_PROVIDER_TO_MUTATE = false` ile aynı hesap kabul/red/kod da yapabiliyordu.
+- `createOrder` 403 `SELF_ORDER`. Katalog girişli izleyicide kendi kartı yok. `ALLOW_SELF_ORDER=1` yalnız yerel/test; production’da bayrak okunmaz.
+
 ## 2026-11-07 – Takvim zarfı: sipariş penceresi görünmüyordu
 - Dal: `fix/pencere-butonu`. `AppointmentCalendar` `{ data: { windows } }` açmıyordu; takvim boş kalıyordu. `parseCalendarWindows` + test.
 

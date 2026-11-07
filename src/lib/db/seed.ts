@@ -132,13 +132,21 @@ export function seedCatalog(database: Database.Database) {
     writeProfileRatingsFromReviews();
   });
   tx();
-  seedStaffUsers(database);
+  if (demoSeedEnabled()) {
+    seedStaffUsers(database);
+  }
   if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
     seedAdminDemoMonth(database);
   }
 }
 
-function seedStaffUsers(database: Database.Database) {
+/** Demo admin ve seed passkey yalnız development/test. */
+export function demoSeedEnabled() {
+  return process.env.NODE_ENV !== "production";
+}
+
+export function seedStaffUsers(database: Database.Database) {
+  if (!demoSeedEnabled()) return;
   const now = new Date().toISOString();
   database
     .prepare(

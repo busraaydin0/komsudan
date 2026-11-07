@@ -2,6 +2,7 @@ import { insertDeliveryOverride, getDeliveryOverrideByOrder, resolveDeliveryOver
 import { getOrderRow, setOrderAdminHold } from "@/lib/db/orders";
 import type { AuthUser } from "@/lib/auth/types";
 import { ApiError } from "@/lib/errors";
+import { assertProviderAction } from "@/lib/orders/orderAuth";
 import { isOrderStatus } from "@/lib/status";
 import { photosForOrder } from "@/lib/services/photoService";
 import { notifyDeliveryOverrideOpened } from "@/lib/services/notificationService";
@@ -17,9 +18,7 @@ export function requestDeliveryOverride(
 ) {
   const row = getOrderRow(orderId);
   if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  if (user.role !== "admin" && row.provider_id !== user.id) {
-    throw new ApiError(403, "Kodsuz teslim talebini hizmet veren açar.", "FORBIDDEN");
-  }
+  assertProviderAction(user, row);
   if (!isOrderStatus(row.status) || row.status !== "ready") {
     throw new ApiError(409, "Talep yalnızca hazır siparişte.", "INVALID_TRANSITION");
   }

@@ -45,7 +45,7 @@ export function saveMyCapacitySettings(
     expressQuota?: number;
   },
 ) {
-  if (user.role !== "provider" && user.role !== "admin") {
+  if (user.role !== "provider") {
     throw new ApiError(403, "Kapasite ayarı hizmet verene ait.", "FORBIDDEN");
   }
   if (input.halfUnitsPerDay < 2 || input.halfUnitsPerDay > 24) {

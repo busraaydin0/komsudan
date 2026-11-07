@@ -31,7 +31,7 @@ export const ORDER_STATUSES: OrderStatusId[] = [
 ];
 
 export const ALLOWED_TRANSITIONS: Record<OrderStatusId, OrderStatusId[]> = {
-  pending: ["accepted", "rejected", "dropped_off"],
+  pending: ["accepted", "rejected", "dropped_off", "cancelled"],
   accepted: ["dropped_off", "washing", "cancelled"],
   dropped_off: ["washing", "cancelled"],
   washing: ["ironing", "ready"],
@@ -170,8 +170,6 @@ export function customerStatusHint(status: OrderStatusId): string {
 
 export type TransitionOpts = {
   packageId?: PackageId;
-  /** completed geçişi: müşteri veya hizmet vereni mi. */
-  isOrderParty?: boolean;
 };
 
 function packageAllowsTransition(from: OrderStatusId, to: OrderStatusId, packageId?: PackageId) {
@@ -202,9 +200,9 @@ export function canTransition(
   if (!ALLOWED_TRANSITIONS[from]?.includes(to)) return false;
   if (!packageAllowsTransition(from, to, opts?.packageId)) return false;
   if (role === "admin") return true;
-  if (to === "completed") return Boolean(opts?.isOrderParty);
+  if (to === "completed") return role === "provider";
   if (PROVIDER_TARGETS.includes(to)) return role === "provider";
-  if (to === "cancelled" || to === "disputed") return role === "customer" || role === "provider";
+  if (to === "cancelled" || to === "disputed") return role === "customer";
   if (to === "rejected") return role === "provider";
   return false;
 }

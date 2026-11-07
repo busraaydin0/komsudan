@@ -25,8 +25,10 @@ export async function getAuth(request?: Request): Promise<AuthUser | null> {
 export async function requireAuth(request?: Request, role?: UserRole): Promise<AuthUser> {
   const user = await getAuth(request);
   if (!user) throw new ApiError(401, "Giriş gerekli.", "UNAUTHORIZED");
-  if (role && user.role !== role && user.role !== "admin") {
-    if (role === "provider" && getProfile(user.id)) return user;
+  if (role && user.role !== role) {
+    if (role === "provider" && getProfile(user.id) && user.role !== "admin" && user.role !== "service_admin") {
+      return user;
+    }
     throw new ApiError(403, "Bu işlem için yetkin yok.", "FORBIDDEN");
   }
   return user;
