@@ -10,6 +10,7 @@ export default defineConfig({
     env: {
       KOMSU_DB_PATH: demoReset ? path.resolve(__dirname, "data/komsudan.db") : ":memory:",
       NODE_ENV: demoReset ? "development" : "test",
+      JWT_SECRET: process.env.JWT_SECRET || "test-jwt-secret-must-be-at-least-32-chars",
     },
   },
   resolve: {
