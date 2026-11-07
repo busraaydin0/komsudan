@@ -8,13 +8,18 @@ export type AccessPayload = {
   role: string;
 };
 
-function secretKey() {
-  const raw = process.env.JWT_SECRET;
-  if (raw && raw.length >= 32) return new TextEncoder().encode(raw);
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("JWT_SECRET en az 32 karakter olmalı.");
+export function requireJwtSecret() {
+  const raw = process.env.JWT_SECRET?.trim() ?? "";
+  if (raw.length < 32) {
+    throw new Error(
+      "JWT_SECRET yok veya 32 karakterden kısa. Rastgele üretilmez — .env dosyasına en az 32 karakter yazın (bkz. .env.example).",
+    );
   }
-  return new TextEncoder().encode("komsudan-dev-jwt-secret-change-me-32b");
+  return raw;
+}
+
+function secretKey() {
+  return new TextEncoder().encode(requireJwtSecret());
 }
 
 export async function signAccess(userId: string, role: string) {
