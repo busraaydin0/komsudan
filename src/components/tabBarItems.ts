@@ -13,17 +13,15 @@ export const CUSTOMER_PROVIDER_TABS: TabBarItem[] = [
   { id: "hesap", label: "Hesap" },
 ];
 
-/** Hizmet Admini: 4. sekme Yönetim (Rotalar değil). Hizmet 5., Hesap 6. */
+/** Yönetim rolleri: keşif/sipariş yok; yalnız Yönetim + Hesap. */
+export const STAFF_TABS: TabBarItem[] = [
+  { id: "yonetim", label: "Yönetim" },
+  { id: "hesap", label: "Hesap" },
+];
+
 export function tabBarItems(showAdmin: boolean): TabBarItem[] {
   if (!showAdmin) return CUSTOMER_PROVIDER_TABS;
-  return [
-    CUSTOMER_PROVIDER_TABS[0]!,
-    CUSTOMER_PROVIDER_TABS[1]!,
-    CUSTOMER_PROVIDER_TABS[2]!,
-    { id: "yonetim", label: "Yönetim" },
-    CUSTOMER_PROVIDER_TABS[3]!,
-    CUSTOMER_PROVIDER_TABS[4]!,
-  ];
+  return STAFF_TABS;
 }
 
 export function tabBarIconKind(id: AppTab): TabBarIconKind {

@@ -1,7 +1,8 @@
+import { isSuperAdminUser } from "@/lib/auth/staff";
 import type { AuthUser } from "@/lib/auth/types";
 import { ApiError } from "@/lib/errors";
 
-/** K-012: işlem bazlı yetki. Kimlik (`user.id`) esas; rol yalnızca admin bypass. */
+/** K-012/K-013: işlem bazlı yetki. Kimlik esas; sipariş mutasyonunda yalnız super_admin bayrağı. */
 export const ORDER_FORBIDDEN_MESSAGE = "Bu işlemi yapma yetkiniz yok.";
 
 export type OrderPartyRow = {
@@ -10,7 +11,7 @@ export type OrderPartyRow = {
 };
 
 export function isAdminActor(user: AuthUser) {
-  return user.role === "admin";
+  return isSuperAdminUser(user);
 }
 
 export function isOrderCustomer(user: AuthUser, row: OrderPartyRow) {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { insertUser } from "@/lib/db/auth";
+import { insertUser, setUserSuperAdmin } from "@/lib/db/auth";
 import { insertAppointment } from "@/lib/db/appointments";
 import { insertOrderItem } from "@/lib/db/orderItems";
 import { ensureProviderPriceGrid } from "@/lib/db/providerPrices";
@@ -137,9 +137,10 @@ describe("K-012 işlem bazlı yetki", () => {
     expectForbidden(() => delayOrder(customer, "ord-k012-photo", "Yoğunluk var", 12));
   });
 
-  it("admin tüm işlemleri yapabilir", async () => {
+  it("super_admin sipariş durumunu değiştirebilir", async () => {
     const customer = await login("5550008105");
     const adminRow = insertUser("5550008199", "admin");
+    setUserSuperAdmin(adminRow.id, true);
     const admin = loadUser(adminRow.id)!;
     seedPending("ord-k012-admin", customer.id);
     applyOrderAction("ord-k012-admin", "accept", admin);
@@ -154,6 +155,14 @@ describe("K-012 işlem bazlı yetki", () => {
     const pin = getHandoffCode("ord-k012-admin", "pickup")!.code;
     applyOrderAction("ord-k012-admin", "advance", admin, pin);
     expect(getOrderRow("ord-k012-admin")!.status).toBe("dropped_off");
+  });
+
+  it("service_admin sipariş durumu değiştiremez", async () => {
+    const customer = await login("5550008110");
+    const service = loadUser(insertUser("5550008111", "service_admin").id)!;
+    seedPending("ord-k013-svc", customer.id);
+    expectForbidden(() => applyOrderAction("ord-k013-svc", "accept", service));
+    expectForbidden(() => applyOrderAction("ord-k013-svc", "cancel", service));
   });
 
   it("ilgisiz üçüncü kullanıcı siparişi göremez / değiştiremez", async () => {

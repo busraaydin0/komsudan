@@ -19,3 +19,14 @@ export const mePatchSchema = z.object({
   fullName: z.string().min(2).max(80).optional(),
   name: z.string().min(2).max(80).optional(),
 });
+
+/** Hesap/kimlik: rol kabul edilmez, strip. */
+export const accountPatchSchema = z.object({
+  name: z.string().max(80).optional(),
+  identity: z.boolean().optional(),
+});
+
+export const passkeyBodySchema = z.object({
+  credentialId: z.string().min(1).max(512).optional(),
+  assert: z.boolean().optional(),
+});

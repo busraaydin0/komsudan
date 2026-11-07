@@ -12,7 +12,8 @@
     "check": "npm run lint && npm run typecheck && npm test && npm run knip",
     "test": "vitest run",
     "test:watch": "vitest",
-    "demo:reset": "node scripts/demo-reset.mjs"
+    "demo:reset": "node scripts/demo-reset.mjs",
+    "admin:create": "node scripts/admin-create.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

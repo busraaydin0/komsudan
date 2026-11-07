@@ -34,7 +34,25 @@ npm run build
 JWT_SECRET=en-az-otuz-iki-karakter-uzun-gizli npm start
 ```
 
-`NODE_ENV=production` iken `npm run demo:reset` çalışmaz. OTP yanıtında `demoCode` yoktur (`OTP_ECHO=1` ile açılır). Katalog seed’i verenleri kurar; jüri siparişleri ve aylık KPI örnekleri eklenmez.
+`NODE_ENV=production` iken `npm run demo:reset` çalışmaz; demo admin (5321100099) ve seed passkey yazılmaz. OTP yanıtında `demoCode` yoktur (`OTP_ECHO=1` ile açılır). Katalog seed’i verenleri kurar; jüri siparişleri ve aylık KPI örnekleri eklenmez.
+
+## Admin hesabı oluşturma
+
+Rol HTTP, OTP veya profil ile yazılmaz; yalnız veritabanı. Üretimde demo admin yoktur. Sunucuda, kalıcı process’in kullandığı DB’ye:
+
+```bash
+npm run admin:create -- 5XXXXXXXXX service_admin
+npm run admin:create -- 5XXXXXXXXX super_admin
+```
+
+| Rol | Ne yapar | Ne yapamaz |
+|-----|----------|------------|
+| `service_admin` | `/api/admin/*`: veren listesi, aylık profil, KPI, askı | Sipariş oluşturma, durum, kod, ödeme, çekim, kodsuz teslim |
+| `super_admin` | Yönetim + sipariş mutasyonu, ödeme/çekim, kodsuz teslim | Sipariş oluşturma (`ADMIN_CANNOT_ORDER`) |
+
+Komut kullanıcıyı oluşturur veya rolünü ayarlar, cüzdan satırını kurar, `admin_audit` yazar. Telefon `5XX…` olmalı; geçersiz rol hata verir. Arayüzde bu roller yalnız **Yönetim** (ve çıkış için Hesap) görür.
+
+**Güvenlik:** komutu yalnız sunucu terminalinden çalıştır. `JWT_SECRET` ve DB dosyası git’te yok. Production’da seed passkey (`demo-staff-passkey`, pilot onay) kapalı.
 
 Git’te yok: `data/*.db`, `data/uploads/`, `.env`.
 
@@ -56,13 +74,13 @@ Geliştirmede OTP yanıtında ve giriş ekranında `demoCode` görünür (5 dk).
 |-----|---------|------------|
 | Müşteri | `5321100090` | Harita, sipariş, cüzdan (~2500 ₺), örnek işler |
 | Hizmet veren (Elif) | `5321100001` | Hizmet masası, gelen işler |
-| Hizmet Admini | `5321100099` | **Yönetim** (4. sekme), KPI, askı |
+| Hizmet Admini | `5321100099` | **Yönetim** + Hesap, KPI, askı |
 
 Kimlik + cihaz kilidi demo hesaplarda işaretli. İzin penceresinde “şimdilik geç”. Keşif yeniden sorulursa “hizmet almak” + Çukurambar.
 
 **K-011:** kendine sipariş kapalı (`user_id === provider_id` → `SELF_ORDER`). Keşif listesinde kendi kartın müşteri olarak çıkmaz. Tek cihazla aynı hesabı hem veren hem müşteri diye denemek için `.env` içine `ALLOW_SELF_ORDER=1` (yalnız `NODE_ENV !== production`; production’da bayrak yok sayılır).
 
-**K-012:** sipariş işlemi kimliğe bağlı. Müşteri kabul/ilerletme/kod giremez; Elif masasında yalnız kendi işleri ve veren düğmeleri. Yanlış rol 403. Admin (`role=admin`) tüm işlemleri yapabilir; Hizmet Admini (`5321100099`) yönetim sekmesidir, sipariş ilerletmez.
+**K-012/K-013:** sipariş işlemi kimliğe bağlı. Müşteri kabul/ilerletme/kod giremez; Elif masasında yalnız kendi işleri. Yanlış rol 403. `super_admin` sipariş mutasyonu yapabilir; `service_admin` (`5321100099`) yalnız yönetim, sipariş/ödeme yok. Admin hesabı sipariş oluşturamaz.
 
 ### 8–10 dk senaryo
 
@@ -70,7 +88,7 @@ Kimlik + cihaz kilidi demo hesaplarda işaretli. İzin penceresinde “şimdilik
 2. **Acil teslim** aç; kota 0 olan verenler (Merve, Gülşen, Burak) listeden düşer, Elif (1 makine/gün) kalır. Karta bas → sipariş sheet (paket, boy, pencere, tutar).
 3. **Sipariş** sekmesi; **Hesap** → cüzdan. Demo’da geciken acil satırı **Acil iade** (+zam kısmı) görünür.
 4. Çıkış. Elif `5321100001` — **Hizmet**: kapasite kartında **Acil kontenjan (makine/gün)** (0…günlük makine). Kabul / yıkama / hazır. Hazır teslim kodu müşteride `5678`.
-5. Çıkış. Hizmet Admini `5321100099` — 4. sekme **Yönetim**: KPI, veren listesi, Elif “dikkat”, aylık profilde **Geciken acil**. Askıya al → listeden düşer; açınca döner.
+5. Çıkış. Hizmet Admini `5321100099` — **Yönetim**: KPI, veren listesi, Elif “dikkat”, aylık profilde **Geciken acil**. Askıya al → listeden düşer; açınca döner. Harita/sipariş sekmesi yok.
 6. İsteğe bağlı: yeni sipariş → teslim → bekleyen kazanç `WALLET_PENDING_WAIT_MS` sonra bakiye.
 
 ## Test komutları
@@ -84,6 +102,7 @@ Kimlik + cihaz kilidi demo hesaplarda işaretli. İzin penceresinde “şimdilik
 | `npm run check` | lint + typecheck + test + knip |
 | `npm run build` | Üretim derlemesi |
 | `npm run demo:reset` | Temiz demo DB (`NODE_ENV!=production`) |
+| `npm run admin:create` | Admin kullanıcısı oluştur / rol ayarla (production’da da) |
 
 ## Bilinen sınırlar
 

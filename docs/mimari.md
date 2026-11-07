@@ -64,10 +64,22 @@ Paket `tam` için ütü adımı (`ironing`) takip çizgisinde görünür.
 | Acil (3a + 3b-lite) | Müşteri anahtarı; katalog `express`; alım bugün; teslim alım+24 sa; cevap 15 dk. Kota `express_quota` / `used_express_units` (K-010). Liste ve create: kalan kota. Geciken acilde zam iadesi (`express_refund`). 18:00 dönüşü (BR-025) uygulanmaz. |
 | Keşif | Harita + `/api/catalog`; onboarding rol/konum/offer. |
 | Kendine sipariş (K-011) | `createOrder`: `user_id === provider_id` → 403 `SELF_ORDER`. Keşif `providersLive(viewerId)` kendi kartını gizler. `ALLOW_SELF_ORDER=1` yalnız `NODE_ENV !== production`. |
-| Sipariş yetkisi (K-012) | İşlem bazlı; `REQUIRE_PROVIDER_TO_MUTATE` yok. Kimlik: `user.id === orders.provider_id` veya `user_id` (admin bypass). Veren: kabul, red, alım/teslim kodu, washing/ironing/ready, erteleme, iş fotoğrafı. Müşteri: alım özeti, boy artışı, iptal, yorum, uyuşmazlık açma. Mesaj: iki taraf. Görme: yalnız taraf veya admin (pilot “herkes görsün” kapalı). Yanlış işlem 403 `FORBIDDEN` “Bu işlemi yapma yetkiniz yok.” `ALLOW_SELF_ORDER` açıkken aynı hesap her iki kimliği de taşır. |
-| Roller | `customer` / `provider` / `admin` / `service_admin`. `admin` mevcut bypass’ı korur; `service_admin` provider rotasını geçemez. Cüzdan yazma: `service_admin` 403 (süper admin bayrağı yoksa). |
-| Yönetim | `GET /api/admin/providers`, `GET /api/admin/providers/[id]/monthly?month=`, `GET /api/admin/kpi?month=`, `POST /api/admin/providers/[id]/suspend`. Yetki `requireStaffAdmin`. |
+| Sipariş yetkisi (K-012/K-013) | İşlem bazlı; `REQUIRE_PROVIDER_TO_MUTATE` yok. Kimlik: `user.id === orders.provider_id` veya `user_id`. Sipariş mutasyonu: hizmet veren **veya** `super_admin` bayrağı. Veren: kabul, red, alım/teslim kodu, washing/ironing/ready, erteleme, iş fotoğrafı. Müşteri: alım özeti, boy artışı, iptal, yorum, uyuşmazlık açma. Mesaj: iki taraf. Görme: yalnız taraf veya super_admin. Yanlış işlem 403 `FORBIDDEN` “Bu işlemi yapma yetkiniz yok.” `ALLOW_SELF_ORDER` açıkken aynı hesap her iki kimliği de taşır. |
+| Roller (K-013) | Aşağıdaki matris. Rol ve `super_admin` yalnız DB’den; HTTP/OTP/profil gövdesi rol yazamaz. `requireAuth` içinde `role===admin` bypass yok. |
+| Yönetim | `GET /api/admin/providers`, `GET /api/admin/providers/[id]/monthly?month=`, `GET /api/admin/kpi?month=`, `POST /api/admin/providers/[id]/suspend`. Yetki `requireStaffAdmin` (`service_admin` veya `super_admin`). Admin hesabı: `npm run admin:create` (production’da da, audit + cüzdan). Demo admin/passkey yalnız `NODE_ENV !== production`. |
 | OTP | Geliştirmede `demoCode`; prod’da gerçek SMS henüz yok. |
 | TypeScript | `strict: true`; `any` / `@ts-ignore` yok (knip + `npm run check`). |
+
+### Rol matrisi (K-013)
+
+| | Müşteri | Veren | `service_admin` | `super_admin` (`role=admin` + bayrak) |
+|--|---------|-------|-----------------|----------------------------------------|
+| Keşif / sipariş oluşturma | evet | evet (başkasına) | hayır `ADMIN_CANNOT_ORDER` | hayır `ADMIN_CANNOT_ORDER` |
+| `/api/admin/*` (liste, aylık, KPI, askı) | hayır | hayır | evet | evet |
+| Sipariş durumu, kod, foto, erteleme | hayır (kendi iptal/özet hariç) | kendi işi | hayır 403 | evet |
+| Ödeme yükleme / çekim | kendi cüzdanı | kendi cüzdanı | hayır 403 | evet |
+| Kodsuz teslim kararı | hayır | talep açar | hayır | evet |
+| `/api/providers/me/*` | hayır | evet | hayır | hayır |
+| UI | Harita/Sipariş/… | + Hizmet | yalnız Yönetim + Hesap | yalnız Yönetim + Hesap |
 
 Performans ölçümü: `docs/performans.md`, `npm test -- src/lib/perf/benchmark.test.ts`.

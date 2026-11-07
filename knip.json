@@ -10,6 +10,7 @@
     "src/app/**/apple-icon.tsx",
     "vitest.config.ts",
     "src/lib/db/demoReset.cli.ts",
+    "src/lib/db/adminCreate.cli.ts",
     "public/sw.js",
     "src/**/*.test.ts"
   ],

@@ -16,7 +16,16 @@ import { useSession } from "@/lib/api";
 import { permissionAsked } from "@/lib/permissions";
 import type { PreferredIntent } from "@/lib/types";
 
-function readTab(intent?: PreferredIntent | null): AppTab {
+function isStaffRole(role: string | null | undefined) {
+  return role === "service_admin" || role === "admin";
+}
+
+function readTab(intent?: PreferredIntent | null, staff = false): AppTab {
+  if (staff) {
+    if (typeof window === "undefined") return "yonetim";
+    const q = new URLSearchParams(window.location.search).get("tab");
+    return q === "hesap" ? "hesap" : "yonetim";
+  }
   if (typeof window === "undefined") return "harita";
   const q = new URLSearchParams(window.location.search).get("tab");
   if (q === "masa") return "hizmet";
@@ -35,11 +44,16 @@ export function AppShell() {
   const { account, ready, reload } = useSession();
 
   useEffect(() => {
-    setTab((prev) => prev ?? readTab(account?.preferredIntent));
+    const staff = isStaffRole(account?.role);
+    setTab((prev) => {
+      const next = prev ?? readTab(account?.preferredIntent, staff);
+      if (staff && next !== "yonetim" && next !== "hesap") return "yonetim";
+      return next;
+    });
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       void navigator.serviceWorker.register("/sw.js");
     }
-  }, [account?.preferredIntent]);
+  }, [account?.preferredIntent, account?.role]);
 
   useEffect(() => {
     if (!account?.identityVerified || !account.passkeyEnabled) {
@@ -55,13 +69,19 @@ export function AppShell() {
   }, [ready, account]);
 
   function go(next: AppTab) {
-    if (next !== "mesaj") setChatOrderId(null);
-    setTab(next);
-    const url = next === "harita" ? "/" : `/?tab=${next}`;
+    const staff = isStaffRole(account?.role);
+    const dest = staff && next !== "hesap" ? "yonetim" : next;
+    if (dest !== "mesaj") setChatOrderId(null);
+    setTab(dest);
+    const url = dest === "harita" ? "/" : `/?tab=${dest}`;
     window.history.replaceState(null, "", url);
   }
 
   function openNotice(n: { type: string }) {
+    if (isStaffRole(account?.role)) {
+      go("yonetim");
+      return;
+    }
     if (n.type === "nudge") go("harita");
     else if (n.type === "order_message") go("mesaj");
     else if (n.type.startsWith("order_") || n.type === "pickup_code") go("siparis");
@@ -77,7 +97,7 @@ export function AppShell() {
     return <LoginGate account={account} onReady={reload} />;
   }
 
-  const isStaff = account.role === "service_admin" || account.role === "admin";
+  const isStaff = isStaffRole(account.role);
   if ((!discoveryDone || editDiscovery) && !isStaff) {
     return (
       <OnboardingFlow
@@ -98,37 +118,39 @@ export function AppShell() {
     return <div className="h-dvh bg-[var(--paper)]" />;
   }
 
-  const staff = account.role === "service_admin" || account.role === "admin";
-  const hideMap = tab === "hizmet" || tab === "hesap" || tab === "mesaj" || tab === "yonetim";
+  const staff = isStaffRole(account.role);
+  const hideMap = staff || tab === "hizmet" || tab === "hesap" || tab === "mesaj" || tab === "yonetim";
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[var(--paper)]">
       {askPerms && <PermissionPrompt onDone={() => setAskPerms(false)} />}
       <NoticeCenter onOpen={openNotice} />
       <AppNotice onOpen={openNotice} />
-      <div
-        className={hideMap ? "absolute inset-0 hidden" : "h-full"}
-        aria-hidden={hideMap}
-        inert={hideMap ? true : undefined}
-      >
-        <CustomerApp
-          pane={tab === "siparis" ? "orders" : "map"}
-          mapActive={tab === "harita"}
-          meAvatar={account.avatarUrl}
-          viewerId={account.id}
-          homeLat={account.homeLat}
-          homeLng={account.homeLng}
-          onOpenOrders={() => go("siparis")}
-          onPlacedOrder={() => go("siparis")}
-          onBackToMap={() => go("harita")}
-          onEditDiscovery={() => setEditDiscovery(true)}
-          onOpenMessages={(orderId) => {
-            setChatOrderId(orderId);
-            go("mesaj");
-          }}
-        />
-      </div>
-      {tab === "mesaj" && (
+      {!staff && (
+        <div
+          className={hideMap ? "absolute inset-0 hidden" : "h-full"}
+          aria-hidden={hideMap}
+          inert={hideMap ? true : undefined}
+        >
+          <CustomerApp
+            pane={tab === "siparis" ? "orders" : "map"}
+            mapActive={tab === "harita"}
+            meAvatar={account.avatarUrl}
+            viewerId={account.id}
+            homeLat={account.homeLat}
+            homeLng={account.homeLng}
+            onOpenOrders={() => go("siparis")}
+            onPlacedOrder={() => go("siparis")}
+            onBackToMap={() => go("harita")}
+            onEditDiscovery={() => setEditDiscovery(true)}
+            onOpenMessages={(orderId) => {
+              setChatOrderId(orderId);
+              go("mesaj");
+            }}
+          />
+        </div>
+      )}
+      {tab === "mesaj" && !staff && (
         <div className="absolute inset-0 z-10 overflow-y-auto">
           <MessagesScreen
             openOrderId={chatOrderId}
@@ -136,7 +158,7 @@ export function AppShell() {
           />
         </div>
       )}
-      {tab === "hizmet" && (
+      {tab === "hizmet" && !staff && (
         <div className="absolute inset-0 z-10 overflow-y-auto">
           <ProviderDesk
             onEditDiscovery={() => setEditDiscovery(true)}

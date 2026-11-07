@@ -24,7 +24,7 @@ import {
 } from "@/lib/db/messages";
 import { moderateMessage } from "@/lib/moderation/messageModeration";
 import { collapseSpaces } from "@/lib/moderation/normalize";
-import { isOrderParty } from "@/lib/orders/orderAuth";
+import { isAdminActor, isOrderParty } from "@/lib/orders/orderAuth";
 import { notifyOrderMessage } from "@/lib/services/notificationService";
 import { ApiError } from "@/lib/errors";
 
@@ -260,7 +260,7 @@ export function deleteOrderMessage(user: AuthUser, orderId: string, messageId: s
   if (!msg || msg.conversation_id !== convo.id || msg.moderation_status === "block") {
     throw new ApiError(404, "Mesaj yok.", "MESSAGE_NOT_FOUND");
   }
-  if (msg.sender_id !== user.id && user.role !== "admin") {
+  if (msg.sender_id !== user.id && !isAdminActor(user)) {
     throw new ApiError(404, "Mesaj yok.", "MESSAGE_NOT_FOUND");
   }
   const at = new Date().toISOString();

@@ -166,10 +166,18 @@ export function verifyIdentity(user: AuthUser, name: string): AuthUser {
   return toAuthUser(markIdentityVerified(user.id, assertName(name)));
 }
 
+const SEED_PASSKEY_IDS = new Set(["demo-staff-passkey", "demo-customer-passkey"]);
+
 export function enablePasskey(user: AuthUser, credentialId: string): AuthUser {
   if (!user.identityVerified) throw new ApiError(403, "Önce kimliği doğrula.", "FORBIDDEN");
   const id = credentialId.trim().slice(0, 512);
   if (id.length < 8) throw new ApiError(400, "Cihaz kilidi alınamadı.", "VALIDATION_ERROR");
+  if (
+    process.env.NODE_ENV === "production" &&
+    (SEED_PASSKEY_IDS.has(id) || id.startsWith("pilot-device:"))
+  ) {
+    throw new ApiError(400, "Bu cihaz kilidi üretimde kullanılamaz.", "VALIDATION_ERROR");
+  }
   return toAuthUser(setPasskey(user.id, id));
 }
 

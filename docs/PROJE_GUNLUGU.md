@@ -6,6 +6,13 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-07 – K-013: admin yetkisi, self-promote kapanışı, admin:create
+- Dal: `fix/kendine-siparis` (PR #5 üzerine; main’e birleştirilmedi).
+- Önce: OTP/profil zod rol kabul etmiyordu; `insertUser` varsayılan `customer`. `requireAuth` `role===admin` her rolü geçiriyordu. `seedStaffUsers` (5321100099 + `demo-staff-passkey`) production’da da çalışıyordu. Admin `createOrder` yapabiliyordu.
+- Rol/super_admin yalnız DB. `requireAuth` bypass kaldırıldı. `service_admin` yalnız `/api/admin/*`. Sipariş mutasyonu / ödeme / çekim / kodsuz teslim: veren veya `super_admin`. Admin rolleri sipariş oluşturamaz (`ADMIN_CANNOT_ORDER`). UI: Yönetim + Hesap.
+- Demo admin ve seed passkey yalnız `NODE_ENV !== production`. `npm run admin:create -- <telefon> <service_admin|super_admin>` (production’da sunucu terminali; audit + cüzdan).
+- Kontrol: `npm test`, lint, `next build`. Main’e merge yok.
+
 ## 2026-11-07 – K-012: işlem bazlı yetki, REQUIRE_PROVIDER_TO_MUTATE kaldırıldı
 - Dal: `fix/kendine-siparis` (PR #5 üzerine; main’e birleştirilmedi).
 - `REQUIRE_PROVIDER_TO_MUTATE=false` siparişi gören herkese kabul/red/kod veriyordu. Bayrak silindi; yetki işlem + kimlik (`user.id === provider_id` / `user_id`) ile.

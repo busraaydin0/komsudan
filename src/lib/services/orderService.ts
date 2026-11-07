@@ -28,11 +28,14 @@ import { listSlots } from "@/lib/db/providers";
 import { computeRespondBy } from "@/lib/scheduling/respondBy";
 import { pickupInstantIso, windowLabel } from "@/lib/scheduling/windows";
 import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
+import { getUserById } from "@/lib/db/auth";
+import { isStaffRole, isSuperAdminUser } from "@/lib/auth/staff";
 import { assertNotSelfOrder } from "@/lib/orders/selfOrder";
 import {
   assertCustomerAction,
   assertOrderVisible,
   assertProviderAction,
+  isAdminActor,
 } from "@/lib/orders/orderAuth";
 import { assertCalendarWindow } from "@/lib/services/calendarService";
 import { laundryDeliveryStrategy } from "@/lib/fulfillment";
@@ -94,7 +97,7 @@ function deliveryMode(): "door" {
 
 function isCustomerViewer(viewer: AuthUser | undefined, row: OrderRow) {
   if (!viewer) return false;
-  if (viewer.role === "admin") return false;
+  if (isAdminActor(viewer)) return false;
   return row.user_id === viewer.id;
 }
 
@@ -180,10 +183,9 @@ export function getOrderFor(user: AuthUser, id: string): Order {
 }
 
 export function listOrdersFor(user: AuthUser, limit = 100, offset = 0): Order[] {
-  const rows =
-    user.role === "admin"
-      ? listOrderRowsAll(limit, offset)
-      : listOrderRowsForProvider(user.id, limit, offset);
+  const rows = isSuperAdminUser(user)
+    ? listOrderRowsAll(limit, offset)
+    : listOrderRowsForProvider(user.id, limit, offset);
   const payCache = paymentsForOrders(rows.map((r) => r.id));
   return rows.flatMap((row) => {
     try {
@@ -195,7 +197,15 @@ export function listOrdersFor(user: AuthUser, limit = 100, offset = 0): Order[] 
   });
 }
 
+function assertNotAdminOrder(userId: string) {
+  const row = getUserById(userId);
+  if (row && (isStaffRole(row.role) || row.super_admin)) {
+    throw new ApiError(403, "Yönetim hesabı sipariş veremez.", "ADMIN_CANNOT_ORDER");
+  }
+}
+
 export function createOrder(input: CreateOrderInput, userId: string): Order {
+  assertNotAdminOrder(userId);
   const provider = getProvider(input.providerId);
   if (!provider) throw new ApiError(404, "Hizmet veren bulunamadı.", "NOT_FOUND");
   assertNotSelfOrder(userId, provider.id);
@@ -436,7 +446,7 @@ function assertFulfillmentReady() {
 }
 
 function transitionRole(user: AuthUser, row: OrderRow, to: OrderStatusId): AuthUser["role"] {
-  if (user.role === "admin") return "admin";
+  if (isSuperAdminUser(user)) return "admin";
   if (to === "cancelled" || to === "disputed") {
     return row.user_id === user.id ? "customer" : user.role;
   }

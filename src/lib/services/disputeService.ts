@@ -12,7 +12,7 @@ import {
   type DisputeOpenerRole,
   type DisputeRow,
 } from "@/lib/db/disputes";
-import { assertCustomerAction, isOrderParty } from "@/lib/orders/orderAuth";
+import { assertCustomerAction, isAdminActor, isOrderParty } from "@/lib/orders/orderAuth";
 import { ApiError } from "@/lib/errors";
 
 export type PublicDispute = {
@@ -48,7 +48,7 @@ function requireOrderParty(user: AuthUser, orderId: string) {
 }
 
 function openerRoleFor(user: AuthUser, order: { user_id: string | null; provider_id: string }): DisputeOpenerRole {
-  if (user.role === "admin") return "admin";
+  if (isAdminActor(user)) return "admin";
   if (order.provider_id === user.id) return "provider";
   return "customer";
 }
@@ -81,7 +81,7 @@ export function listDisputesOnOrder(user: AuthUser, orderId: string): PublicDisp
 }
 
 export function listMyDisputes(user: AuthUser): PublicDispute[] {
-  const rows = user.role === "admin" ? listDisputesAll() : listDisputesForParty(user.id);
+  const rows = isAdminActor(user) ? listDisputesAll() : listDisputesForParty(user.id);
   return rows.map(toPublic);
 }
 
