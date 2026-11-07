@@ -6,6 +6,9 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-07 – Takvim zarfı: sipariş penceresi görünmüyordu
+- Dal: `fix/pencere-butonu`. `AppointmentCalendar` `{ data: { windows } }` açmıyordu; takvim boş kalıyordu. `parseCalendarWindows` + test.
+
 ## 2026-11-07 – Oturum çerezi HTTP'de düşüyordu
 - Dal: `fix/oturum-kaybi`. `next start` (NODE_ENV=production) `Secure` çerez yazıyordu; HTTP LAN IP'de tarayıcı `komsu_sid/at/rt` reddediyordu → her yenilemede giriş.
 - Secure yalnız production + HTTPS. `JWT_SECRET` yoksa durur, rastgele üretilmez.
