@@ -172,11 +172,10 @@ describe("uçtan uca duman (Adım 5)", () => {
     expect(getWalletRow("elif")!.balance).toBeGreaterThanOrEqual(net);
     expect(conserved(customer.id, order.id, 1000)).toBe(true);
 
-    const review = createReview(
-      order.id,
-      { rating: 5, body: "Kapıda temiz teslim, teşekkürler." },
-      customer.name || "Müşteri",
-    );
+    const review = createReview(customer, order.id, {
+      rating: 5,
+      body: "Kapıda temiz teslim, teşekkürler.",
+    });
     expect(review.rating).toBe(5);
   });
 

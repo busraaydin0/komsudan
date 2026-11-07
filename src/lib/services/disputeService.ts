@@ -12,7 +12,7 @@ import {
   type DisputeOpenerRole,
   type DisputeRow,
 } from "@/lib/db/disputes";
-import { isOrderParty } from "@/lib/services/orderService";
+import { assertCustomerAction, isOrderParty } from "@/lib/orders/orderAuth";
 import { ApiError } from "@/lib/errors";
 
 export type PublicDispute = {
@@ -54,7 +54,9 @@ function openerRoleFor(user: AuthUser, order: { user_id: string | null; provider
 }
 
 export function openDispute(user: AuthUser, orderId: string, reason: string): PublicDispute {
-  const order = requireOrderParty(user, orderId);
+  const order = getOrderRow(orderId);
+  if (!order) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
+  assertCustomerAction(user, order);
   if (getOpenDisputeForOrder(orderId)) {
     throw new ApiError(409, "Bu siparişte açık itiraz zaten var.", "CONFLICT");
   }

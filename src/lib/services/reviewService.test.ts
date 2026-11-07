@@ -152,29 +152,25 @@ describe("yorum yazma kuralları", () => {
     seedOrder("ord-rev-cancel", user.id, "cancelled");
     seedOrder("ord-rev-open", user.id, "pending");
 
-    const first = createReview(
-      "ord-rev-ok",
-      {
-        rating: 5,
-        body: "Teslim temizdi, tekrar bırakırım.",
-        quality: 5,
-        timeliness: 4,
-        communication: 5,
-        wouldRepeat: true,
-      },
-      user.name,
-    );
+    const first = createReview(user, "ord-rev-ok", {
+      rating: 5,
+      body: "Teslim temizdi, tekrar bırakırım.",
+      quality: 5,
+      timeliness: 4,
+      communication: 5,
+      wouldRepeat: true,
+    });
     expect(first.quality).toBe(5);
     expect(first.wouldRepeat).toBe(true);
 
     expect(() =>
-      createReview("ord-rev-ok", { rating: 4, body: "İkinci yorum olmamalıdır." }, user.name),
+      createReview(user, "ord-rev-ok", { rating: 4, body: "İkinci yorum olmamalıdır." }),
     ).toThrow(ApiError);
     expect(() =>
-      createReview("ord-rev-cancel", { rating: 2, body: "İptal siparişe yorum yok." }, user.name),
+      createReview(user, "ord-rev-cancel", { rating: 2, body: "İptal siparişe yorum yok." }),
     ).toThrow(ApiError);
     expect(() =>
-      createReview("ord-rev-open", { rating: 3, body: "Bitmeyen siparişe yorum yok." }, user.name),
+      createReview(user, "ord-rev-open", { rating: 3, body: "Bitmeyen siparişe yorum yok." }),
     ).toThrow(ApiError);
   });
 });

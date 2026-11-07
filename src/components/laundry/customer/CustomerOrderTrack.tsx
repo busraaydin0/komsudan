@@ -26,6 +26,7 @@ export function CustomerOrderTrack({
   onBack,
   onReload,
   onOpenMessages,
+  viewerId,
 }: {
   order: Order;
   provider: Provider | undefined;
@@ -33,6 +34,7 @@ export function CustomerOrderTrack({
   onBack: () => void;
   onReload: () => void;
   onOpenMessages?: (orderId: string) => void;
+  viewerId?: string | null;
 }) {
   const steps = trackSteps(order.packageId);
   const highlight = trackHighlightStatus(order.status);
@@ -40,6 +42,7 @@ export function CustomerOrderTrack({
   const terminal = order.status === "cancelled" || order.status === "rejected" || order.status === "disputed";
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const isCustomer = Boolean(viewerId) && viewerId === order.customerId;
   return (
     <div className="p-4 pt-2">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
@@ -54,7 +57,7 @@ export function CustomerOrderTrack({
       <p className="mt-1 text-xs text-[var(--muted)]">
         Evde yokken kapıya veya komşuya bırakma yok; teslim yalnız yüz yüze ve kodla.
       </p>
-      {order.priceChange === "pending" && !terminal && (
+      {isCustomer && order.priceChange === "pending" && !terminal && (
         <div className="k-rise mt-4 rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-[var(--clay)]">
           <p className="text-sm font-medium">Kapıda farklı boy veya ek</p>
           <p className="mt-1 text-sm text-[var(--muted)]">
@@ -110,7 +113,8 @@ export function CustomerOrderTrack({
           {order.cancelReason === "size_rejected" ? " (Boy/ek uyuşmadı.)" : ""}
         </p>
       )}
-      {order.pickupConfirmedAt &&
+      {isCustomer &&
+        order.pickupConfirmedAt &&
         !order.pickupSummaryApprovedAt &&
         order.priceChange !== "pending" &&
         !terminal && (
@@ -239,7 +243,7 @@ export function CustomerOrderTrack({
           Mesajlar’da aç
         </button>
       )}
-      {canCancel(order.status) && (
+      {isCustomer && canCancel(order.status) && (
         <button
           type="button"
           disabled={busy}
@@ -251,7 +255,7 @@ export function CustomerOrderTrack({
               setBusy(true);
               setErr("");
               try {
-                await patchOrder(order.id, "reject");
+                await patchOrder(order.id, "cancel");
                 onReload();
               } catch (e) {
                 setErr(e instanceof Error ? e.message : "İptal alınamadı.");
@@ -271,7 +275,7 @@ export function CustomerOrderTrack({
           <ReviewList reviews={[order.review]} />
         </div>
       )}
-      {order.status === "completed" && !order.review && (
+      {isCustomer && order.status === "completed" && !order.review && (
         <ReviewComposer
           busy={busy}
           err={err}

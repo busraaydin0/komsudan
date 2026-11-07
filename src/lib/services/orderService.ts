@@ -29,6 +29,11 @@ import { computeRespondBy } from "@/lib/scheduling/respondBy";
 import { pickupInstantIso, windowLabel } from "@/lib/scheduling/windows";
 import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
 import { assertNotSelfOrder } from "@/lib/orders/selfOrder";
+import {
+  assertCustomerAction,
+  assertOrderVisible,
+  assertProviderAction,
+} from "@/lib/orders/orderAuth";
 import { assertCalendarWindow } from "@/lib/services/calendarService";
 import { laundryDeliveryStrategy } from "@/lib/fulfillment";
 import {
@@ -56,7 +61,6 @@ import {
   insertOrderRow,
   listHistoryRows,
   listOrderRowsAll,
-  listOrderRowsForCustomer,
   listOrderRowsForProvider,
   recordTransition,
   runOrderTx,
@@ -82,7 +86,7 @@ import {
 } from "@/lib/services/paymentService";
 import { holdForOrder } from "@/lib/services/walletService";
 
-export type OrderAction = "accept" | "reject" | "advance" | "deliver";
+export type OrderAction = "accept" | "reject" | "advance" | "deliver" | "cancel";
 
 function deliveryMode(): "door" {
   return "door";
@@ -164,31 +168,6 @@ function toOrder(
   };
 }
 
-/** Şimdilik: giriş yapan herkes tüm siparişleri listelesin / açsın (pilot). */
-const PILOT_SEE_ALL_ORDERS = true;
-
-export function isOrderParty(user: AuthUser, row: OrderRow) {
-  if (user.role === "admin") return true;
-  if (row.user_id === user.id) return true;
-  if (row.provider_id === user.id) return true;
-  return false;
-}
-
-export function canSeeOrder(user: AuthUser, row: OrderRow) {
-  if (PILOT_SEE_ALL_ORDERS) return true;
-  return isOrderParty(user, row);
-}
-
-/** Şimdilik kapalı: PWA masasında siparişi gören (müşteri dahil) kabul/ilerletsin. */
-const REQUIRE_PROVIDER_TO_MUTATE = false;
-
-function canMutateOrder(user: AuthUser, row: OrderRow) {
-  if (user.role === "admin") return true;
-  if (!canSeeOrder(user, row)) return false;
-  if (!REQUIRE_PROVIDER_TO_MUTATE) return true;
-  return user.role === "provider" && row.provider_id === user.id;
-}
-
 export function getOrder(id: string, viewer?: AuthUser): Order | undefined {
   const row = getOrderRow(id);
   return row ? toOrder(row, viewer) : undefined;
@@ -196,20 +175,15 @@ export function getOrder(id: string, viewer?: AuthUser): Order | undefined {
 
 export function getOrderFor(user: AuthUser, id: string): Order {
   const row = getOrderRow(id);
-  if (!row || !canSeeOrder(user, row)) {
-    throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  }
-  return toOrder(row, user);
+  assertOrderVisible(user, row);
+  return toOrder(row!, user);
 }
 
 export function listOrdersFor(user: AuthUser, limit = 100, offset = 0): Order[] {
-  const asProvider = user.role === "provider" || Boolean(getProfile(user.id));
   const rows =
-    user.role === "admin" || PILOT_SEE_ALL_ORDERS
+    user.role === "admin"
       ? listOrderRowsAll(limit, offset)
-      : asProvider
-        ? listOrderRowsForProvider(user.id, limit, offset)
-        : listOrderRowsForCustomer(user.id, limit, offset);
+      : listOrderRowsForProvider(user.id, limit, offset);
   const payCache = paymentsForOrders(rows.map((r) => r.id));
   return rows.flatMap((row) => {
     try {
@@ -461,21 +435,19 @@ function assertFulfillmentReady() {
   return laundryDeliveryStrategy;
 }
 
+function transitionRole(user: AuthUser, row: OrderRow, to: OrderStatusId): AuthUser["role"] {
+  if (user.role === "admin") return "admin";
+  if (to === "cancelled" || to === "disputed") {
+    return row.user_id === user.id ? "customer" : user.role;
+  }
+  if (row.provider_id === user.id) return "provider";
+  if (row.user_id === user.id) return "customer";
+  return user.role;
+}
+
 function assertCanMove(row: OrderRow, from: OrderStatusId, to: OrderStatusId, user: AuthUser, packageId: PackageId) {
   assertFulfillmentReady();
-  const isOrderParty = row.user_id === user.id || row.provider_id === user.id;
-  const roleForCheck =
-    user.role === "admin"
-      ? "admin"
-      : !REQUIRE_PROVIDER_TO_MUTATE && canMutateOrder(user, row)
-        ? "provider"
-        : user.role;
-  if (
-    canTransition(from, to, roleForCheck, {
-      packageId,
-      isOrderParty,
-    })
-  ) {
+  if (canTransition(from, to, transitionRole(user, row, to), { packageId })) {
     return;
   }
   if (to === "ironing" && packageId !== "tam") {
@@ -491,6 +463,14 @@ export function completeOrderOverride(user: AuthUser, orderId: string, reason: s
   return applyStatus(orderId, user, "completed", undefined, `override:${reason}`, { skipHandoff: true });
 }
 
+function assertActionForStatus(user: AuthUser, row: OrderRow, next: OrderStatusId) {
+  if (next === "cancelled" || next === "disputed") {
+    assertCustomerAction(user, row);
+    return;
+  }
+  assertProviderAction(user, row);
+}
+
 export function applyStatus(
   id: string,
   user: AuthUser,
@@ -500,9 +480,8 @@ export function applyStatus(
   opts?: { skipHandoff?: boolean },
 ): Order {
   const row = getOrderRow(id);
-  if (!row || !canSeeOrder(user, row)) {
-    throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  }
+  if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
+  assertActionForStatus(user, row, next);
   const from = orderStatus(row);
   const pack = row.package_id as PackageId;
   assertCanMove(row, from, next, user, pack);
@@ -575,9 +554,8 @@ export function applyStatus(
 export function applyOrderAction(id: string, action: OrderAction, user: AuthUser, code?: string): Order {
   const row = getOrderRow(id);
   if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  if (!canMutateOrder(user, row)) {
-    throw new ApiError(403, "Bu siparişi yalnızca hizmet veren ilerletebilir.", "FORBIDDEN");
-  }
+  if (action === "cancel") assertCustomerAction(user, row);
+  else assertProviderAction(user, row);
 
   const order = toOrder(row);
   let next: OrderStatusId;
@@ -612,7 +590,12 @@ export function applyOrderAction(id: string, action: OrderAction, user: AuthUser
     if (!canCancel(order.status)) {
       throw new ApiError(409, "Bu aşamada iptal yok.", "INVALID_TRANSITION");
     }
-    next = orderStatus(row) === "pending" ? "rejected" : "cancelled";
+    next = "rejected";
+  } else if (action === "cancel") {
+    if (!canCancel(order.status)) {
+      throw new ApiError(409, "Bu aşamada iptal yok.", "INVALID_TRANSITION");
+    }
+    next = "cancelled";
   } else if (action === "deliver") {
     if (order.status !== "ready" || order.adminHold) {
       throw new ApiError(409, "Kod ancak hazır siparişte geçer.", "INVALID_TRANSITION");
@@ -660,12 +643,8 @@ export function listOrderPhotosFor(user: AuthUser, id: string) {
 
 export function addOrderPhoto(user: AuthUser, id: string, buf: Buffer, kindRaw?: string) {
   const row = getOrderRow(id);
-  if (!row || !canSeeOrder(user, row)) {
-    throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  }
-  if (!canMutateOrder(user, row)) {
-    throw new ApiError(403, "Fotoğrafı hizmet veren ekler.", "FORBIDDEN");
-  }
+  if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
+  assertProviderAction(user, row);
   if (!canAddPhotos(orderStatus(row))) {
     throw new ApiError(409, "Bu aşamada fotoğraf eklenmez.", "INVALID_TRANSITION");
   }

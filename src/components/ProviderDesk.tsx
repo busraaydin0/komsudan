@@ -23,7 +23,12 @@ export function ProviderDesk({
   const { account } = useSession();
   const { providers, reload: reloadCatalog } = useCatalog();
   const { orders, ready, reload, err: ordersErr } = useOrders();
-  const open = orders.filter(
+  const actorId = account?.id;
+  const deskOrders = useMemo(
+    () => (actorId ? orders.filter((o) => o.providerId === actorId) : []),
+    [orders, actorId],
+  );
+  const open = deskOrders.filter(
     (o) =>
       o.status !== "completed" &&
       o.status !== "cancelled" &&
@@ -33,7 +38,7 @@ export function ProviderDesk({
   const [openMonth, setOpenMonth] = useState<string | null>(null);
   const months = useMemo(() => {
     const map = new Map<string, Order[]>();
-    for (const o of orders) {
+    for (const o of deskOrders) {
       if (
         o.status !== "completed" &&
         o.status !== "cancelled" &&
@@ -48,7 +53,7 @@ export function ProviderDesk({
       else map.set(key, [o]);
     }
     return [...map.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  }, [orders]);
+  }, [deskOrders]);
 
   function reloadAll() {
     void Promise.all([reload(), reloadCatalog()]);
@@ -93,7 +98,7 @@ export function ProviderDesk({
               <li key={i} className="k-skel h-32 rounded-3xl" />
             ))}
           </ul>
-        ) : orders.length === 0 ? (
+        ) : deskOrders.length === 0 ? (
           <p className="k-rise mt-3 text-sm text-[var(--muted)]">
             Henüz sipariş yok. Haritadan bir katlayan seçip sipariş bırak.
           </p>
@@ -111,6 +116,7 @@ export function ProviderDesk({
                       onChanged={reloadAll}
                       delay={i * 40}
                       onOpenMessages={onOpenMessages}
+                      actorId={actorId}
                     />
                   ))}
                 </ul>
@@ -145,6 +151,7 @@ export function ProviderDesk({
                                 onChanged={reloadAll}
                                 delay={i * 30}
                                 onOpenMessages={onOpenMessages}
+                                actorId={actorId}
                               />
                             ))}
                           </ul>

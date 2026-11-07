@@ -42,7 +42,7 @@ function seedOrder(id: string, userId: string, providerId = "elif") {
 }
 
 describe("itiraz kaydı", () => {
-  it("müşteri veya sağlayıcı açar, ikinci açık itiraz olmaz, sipariş durumu değişmez", async () => {
+  it("müşteri açar, ikinci açık itiraz olmaz, sipariş durumu değişmez", async () => {
     const user = await customer("5550000201");
     seedOrder("ord-dsp-1", user.id);
     const opened = openDispute(user, "ord-dsp-1", "Teslim eksik geldi, üç gömlek yok.");
@@ -63,8 +63,9 @@ describe("itiraz kaydı", () => {
     expect(closed.resolvedAt).toBeTruthy();
     expect(getOrderRow("ord-dsp-1")?.status).toBe("completed");
 
-    const again = openDispute(provider!, "ord-dsp-1", "Sağlayıcı da itiraz açabilsin diye.");
-    expect(again.openerRole).toBe("provider");
+    expect(() => openDispute(provider!, "ord-dsp-1", "Sağlayıcı itiraz açamasın.")).toThrow(ApiError);
+    const again = openDispute(user, "ord-dsp-1", "Müşteri ikinci kez, ilki kapandı.");
+    expect(again.openerRole).toBe("customer");
     expect(again.status).toBe("open");
   });
 

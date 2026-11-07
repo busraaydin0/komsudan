@@ -24,7 +24,7 @@ import {
 } from "@/lib/db/messages";
 import { moderateMessage } from "@/lib/moderation/messageModeration";
 import { collapseSpaces } from "@/lib/moderation/normalize";
-import { isOrderParty } from "@/lib/services/orderService";
+import { isOrderParty } from "@/lib/orders/orderAuth";
 import { notifyOrderMessage } from "@/lib/services/notificationService";
 import { ApiError } from "@/lib/errors";
 

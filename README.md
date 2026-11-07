@@ -62,6 +62,8 @@ Kimlik + cihaz kilidi demo hesaplarda işaretli. İzin penceresinde “şimdilik
 
 **K-011:** kendine sipariş kapalı (`user_id === provider_id` → `SELF_ORDER`). Keşif listesinde kendi kartın müşteri olarak çıkmaz. Tek cihazla aynı hesabı hem veren hem müşteri diye denemek için `.env` içine `ALLOW_SELF_ORDER=1` (yalnız `NODE_ENV !== production`; production’da bayrak yok sayılır).
 
+**K-012:** sipariş işlemi kimliğe bağlı. Müşteri kabul/ilerletme/kod giremez; Elif masasında yalnız kendi işleri ve veren düğmeleri. Yanlış rol 403. Admin (`role=admin`) tüm işlemleri yapabilir; Hizmet Admini (`5321100099`) yönetim sekmesidir, sipariş ilerletmez.
+
 ### 8–10 dk senaryo
 
 1. Müşteri `5321100090` — OTP’yi ekrandan yaz. Harita: Çukurambar iğneleri.

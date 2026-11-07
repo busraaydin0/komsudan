@@ -63,6 +63,10 @@ export function CustomerApp({
 }: Props) {
   const { providers, ready, reload: reloadCatalog } = useCatalog();
   const { orders, reload: reloadOrders } = useOrders();
+  const myOrders = useMemo(
+    () => orders.filter((o) => !viewerId || o.customerId === viewerId),
+    [orders, viewerId],
+  );
   const [mode, setMode] = useState<MapMode>("3d");
   const [user, setUser] = useState<LngLat | null>(null);
   const [far, setFar] = useState(false);
@@ -102,7 +106,7 @@ export function CustomerApp({
   const available = ranked.filter(({ p }) => p.capacity?.configured && p.capacity.weekTone !== "full").length;
 
   const selected = selectedId ? ranked.find(({ p }) => p.id === selectedId)?.p : undefined;
-  const active = orders.find((o) => o.id === activeId) ?? orders[0];
+  const active = myOrders.find((o) => o.id === activeId) ?? myOrders[0];
   const pickupDate = pickup?.date ?? isoDateInIstanbul(new Date());
   const express = Boolean(expressWanted && selected?.express);
   const quote = quoteForProvider(selected, {
@@ -149,22 +153,22 @@ export function CustomerApp({
     if (pane !== "orders") return;
     setHello(false);
     const prefer =
-      orders.find((o) => o.status === "ready" || o.status === "admin_pending") ??
-      orders.find(
+      myOrders.find((o) => o.status === "ready" || o.status === "admin_pending") ??
+      myOrders.find(
         (o) =>
           o.status !== "completed" &&
           o.status !== "cancelled" &&
           o.status !== "rejected" &&
           o.status !== "disputed",
       ) ??
-      orders[0];
+      myOrders[0];
     if (prefer) {
       setActiveId(prefer.id);
       setSheet("track");
     } else {
       setSheet("list");
     }
-  }, [pane, orders]);
+  }, [pane, myOrders]);
 
   useEffect(() => {
     if (selected) {
@@ -416,18 +420,18 @@ export function CustomerApp({
                 onSortChange={() => setListTall(true)}
                 onEditDiscovery={onEditDiscovery}
                 onTrack={
-                  orders[0]
+                  myOrders[0]
                     ? () => {
                         const prefer =
-                          orders.find((o) => o.status === "ready" || o.status === "admin_pending") ??
-                          orders.find(
+                          myOrders.find((o) => o.status === "ready" || o.status === "admin_pending") ??
+                          myOrders.find(
                             (o) =>
                               o.status !== "completed" &&
                               o.status !== "cancelled" &&
                               o.status !== "rejected" &&
                               o.status !== "disputed",
                           ) ??
-                          orders[0];
+                          myOrders[0];
                         setActiveId(prefer.id);
                         setSheet("track");
                         onOpenOrders?.();
@@ -496,9 +500,9 @@ export function CustomerApp({
             )}
             {sheet === "track" && active && (
               <>
-                {pane === "orders" && orders.length > 1 && (
+                {pane === "orders" && myOrders.length > 1 && (
                   <div className="flex gap-1.5 overflow-x-auto px-4 pb-1">
-                    {orders.map((o) => (
+                    {myOrders.map((o) => (
                       <button
                         key={o.id}
                         type="button"
@@ -518,6 +522,7 @@ export function CustomerApp({
                 <CustomerOrderTrack
                 order={active}
                 provider={providers.find((p) => p.id === active.providerId)}
+                viewerId={viewerId}
                 backLabel={pane === "orders" ? "Harita" : "Liste"}
                 onBack={() => {
                   if (pane === "orders") onBackToMap?.();

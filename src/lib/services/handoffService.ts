@@ -10,6 +10,7 @@ import {
 import { getOrderRow, updateOrderPickupSummaryApproved } from "@/lib/db/orders";
 import type { AuthUser } from "@/lib/auth/types";
 import { ApiError } from "@/lib/errors";
+import { assertCustomerAction } from "@/lib/orders/orderAuth";
 import { isOrderStatus } from "@/lib/status";
 import { notifyHandoffCodeRotated } from "@/lib/services/notificationService";
 
@@ -53,9 +54,7 @@ export function customerHandoffSecrets(row: NonNullable<ReturnType<typeof getOrd
 export function approvePickupSummary(user: AuthUser, orderId: string) {
   const row = getOrderRow(orderId);
   if (!row) throw new ApiError(404, "Sipariş yok.", "NOT_FOUND");
-  if (row.user_id !== user.id && user.role !== "admin") {
-    throw new ApiError(403, "Özet onayını müşteri verir.", "FORBIDDEN");
-  }
+  assertCustomerAction(user, row);
   if (!row.pickup_confirmed_at) {
     throw new ApiError(409, "Kapı özeti henüz yok.", "INVALID_TRANSITION");
   }

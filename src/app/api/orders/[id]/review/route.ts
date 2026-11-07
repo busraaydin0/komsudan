@@ -1,4 +1,5 @@
 import { fail } from "@/lib/http/response";
+import { requireAuth } from "@/lib/auth/middleware";
 import { requireAccount } from "@/lib/auth/routeAccount";
 import { addReviewPhoto } from "@/lib/services/photoService";
 import { createReview, reviewForOrder } from "@/lib/services/reviewService";
@@ -24,23 +25,19 @@ function formRepeat(form: FormData): boolean | undefined {
 
 export async function POST(req: Request, ctx: Ctx) {
   try {
-    const account = await requireAccount();
+    const user = await requireAuth(req);
     const { id } = await ctx.params;
     const form = await req.formData();
     const rating = Number(form.get("rating"));
     const body = String(form.get("body") ?? "");
-    const review = createReview(
-      id,
-      {
-        rating,
-        body,
-        quality: formNumber(form, "quality"),
-        timeliness: formNumber(form, "timeliness"),
-        communication: formNumber(form, "communication"),
-        wouldRepeat: formRepeat(form),
-      },
-      account.name,
-    );
+    const review = createReview(user, id, {
+      rating,
+      body,
+      quality: formNumber(form, "quality"),
+      timeliness: formNumber(form, "timeliness"),
+      communication: formNumber(form, "communication"),
+      wouldRepeat: formRepeat(form),
+    });
     const files = form.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
     for (const file of files.slice(0, 4)) {
       await addReviewPhoto(review.id, Buffer.from(await file.arrayBuffer()));

@@ -28,7 +28,7 @@ export const createOrderSchema = z.object({
 });
 
 export const patchOrderSchema = z.object({
-  action: z.enum(["accept", "reject", "advance", "deliver"]),
+  action: z.enum(["accept", "reject", "advance", "deliver", "cancel"]),
   code: z.string().optional(),
 });
 
