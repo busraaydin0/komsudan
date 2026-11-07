@@ -20,6 +20,7 @@ export default defineConfig({
         : demoReset
           ? "development"
           : "test",
+      JWT_SECRET: process.env.JWT_SECRET || "test-jwt-secret-must-be-at-least-32-chars",
     },
   },
   resolve: {
