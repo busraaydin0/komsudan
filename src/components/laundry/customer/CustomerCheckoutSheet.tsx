@@ -18,6 +18,7 @@ import {
 import { tl } from "@/lib/pricing";
 import { INSUFFICIENT_BALANCE_MESSAGE } from "@/lib/walletMethods";
 import { AppointmentCalendar } from "@/components/AppointmentCalendar";
+import { CALENDAR_COPY } from "@/lib/calendar/gapCopy";
 import type { AppointmentWindow, Provider } from "@/lib/types";
 
 export function CustomerCheckoutSheet({
@@ -81,7 +82,7 @@ export function CustomerCheckoutSheet({
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="flex-1 p-4 pt-2 pb-3">
+      <div className="flex-1 p-4 pt-2 pb-28">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
         {checkoutBackLabel()}
       </button>
@@ -170,17 +171,26 @@ export function CustomerCheckoutSheet({
           type="button"
           disabled={!pickup}
           onClick={() => onScheduleStep("delivery")}
+          title={!pickup ? CALENDAR_COPY.pickupFirst : undefined}
           className={`k-chip rounded-full px-3 py-1 text-xs ring-1 ${scheduleStep === "delivery" ? "bg-[var(--ink)] text-[var(--paper)]" : "ring-[var(--line)]"} disabled:opacity-40`}
         >
           2 · Teslim
         </button>
       </div>
+      {!pickup ? <p className="mt-2 text-xs text-[var(--muted)]">{CALENDAR_COPY.pickupFirst}</p> : null}
+      {pickup ? (
+        <p className="mt-2 text-xs text-[var(--teal)]">
+          Alım {pickup.date} {pickup.windowStart}–{pickup.windowEnd}
+          {delivery ? ` · teslim ${delivery.date} ${delivery.windowStart}–${delivery.windowEnd}` : ""}
+        </p>
+      ) : null}
       {scheduleStep === "pickup" ? (
         <AppointmentCalendar
           providerId={p.id}
           title="Alım penceresi (2 saat)"
           maxDate={maxPickupDate}
           express={express}
+          neededUnits={quote.machineUnits}
           value={pickup}
           onPick={onPickup}
         />
@@ -189,7 +199,8 @@ export function CustomerCheckoutSheet({
           providerId={p.id}
           title="Teslim penceresi"
           minDate={minDeliveryDate}
-          express={express}
+          express={false}
+          neededUnits={quote.machineUnits}
           value={delivery}
           onPick={onDelivery}
         />
