@@ -6,6 +6,13 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-09 – Alım takvimi: neden yoktu, Pazar ve kota sessiz doluyordu
+- Dal: `fix/alim-takvimi` (main’den; merge yok).
+- Önce: 7 günlük API Pazar’ı atıyordu; öğleden sonra/acil kalan pencere yokken chip’ler disabled, neden yok. `express_quota=0` (Ayşe/Merve) `?express=1` ile tüm pencereleri `full` yapıyordu. Kota 2/8 Elif’i sıfırlamıyordu. Boy/ekler takvime hiç girmezdi. Teslim alımsız kilitli, açıklamasız. Sticky CTA tıklamayı yutabiliyordu.
+- `buildProviderCalendarDays`: 7 gün + `closed` / `reason`. Cumartesi 17:00 → “Bugün için uygun pencere kalmadı” (sonraki iş günü seçilir). Pazar “Bu gün çalışmıyor”. Acil kota 0 / bugün pencere yok → “Acil için bugün uygun pencere yok”. Acil boy > kota → “Seçtiğin boy bu günlere sığmıyor”. Teslim takvimi acil kotasından bağımsız.
+- UI: neden Türkçe; `Önce alım penceresi seç`; seçilen alım/teslim özeti; içerik `pb-28`.
+- Kontrol: `npm test` **177**, lint ve `next build` yeşil. 390px: Elif acilsiz ve acil alım+teslim seçilip sipariş 201.
+
 ## 2026-11-07 – Adım 10: Oturum, pencere, yetki ve admin ayrımı main'e alındı
 - PR **#4** (`fix/oturum-kaybi`) merge: `4592fb9`. PR **#3** (`fix/pencere-butonu`) merge: `b13ecf1`. PR **#5** (`fix/kendine-siparis`, K-011/K-012/K-013) merge: `3cce159`. Squash yok.
 - Etiket: `sunum-v2` (`3cce159`).

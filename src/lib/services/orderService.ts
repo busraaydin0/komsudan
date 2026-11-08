@@ -232,7 +232,7 @@ function validateWindows(
   const now = new Date();
   try {
     assertCalendarWindow(providerId, input.pickup, now, express);
-    assertCalendarWindow(providerId, input.delivery, now, express);
+    assertCalendarWindow(providerId, input.delivery, now, false);
   } catch {
     throw new ApiError(400, "Seçilen pencere müsait değil.", "VALIDATION_ERROR");
   }
