@@ -6,6 +6,12 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-07 – Adım 10: Oturum, pencere, yetki ve admin ayrımı main'e alındı
+- PR **#4** (`fix/oturum-kaybi`) merge: `4592fb9`. PR **#3** (`fix/pencere-butonu`) merge: `b13ecf1`. PR **#5** (`fix/kendine-siparis`, K-011/K-012/K-013) merge: `3cce159`. Squash yok.
+- Etiket: `sunum-v2` (`3cce159`).
+- Temiz klon: `npm ci`, `npm test` **168**, lint ve `next build` yeşil; `demo:reset` + `npm run dev -- --port 3001`.
+- 390px tur: oturum yenileme/sunucu restart sonrası duruyor; Elif takviminde alım pencereleri seçiliyor; müşteri kabul 403; Elif kabul→yıkama→hazır→teslim kodu, cüzdan hold/capture/pending doğru; Elif SELF_ORDER 403; admin yalnız Yönetim+Hesap ve sipariş 403. Canlı ikinci acil: saat ~23:58, bugün alım penceresi yok (`EXPRESS_NOT_TODAY`); kota kuralı `expressQuota.test.ts` 12/12.
+
 ## 2026-11-07 – K-013: admin yetkisi, self-promote kapanışı, admin:create
 - Dal: `fix/kendine-siparis` (PR #5 üzerine; main’e birleştirilmedi).
 - Önce: OTP/profil zod rol kabul etmiyordu; `insertUser` varsayılan `customer`. `requireAuth` `role===admin` her rolü geçiriyordu. `seedStaffUsers` (5321100099 + `demo-staff-passkey`) production’da da çalışıyordu. Admin `createOrder` yapabiliyordu.
