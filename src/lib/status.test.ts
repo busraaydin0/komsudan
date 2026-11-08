@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACCEPTED_CUSTOMER_HINT,
   ALLOWED_TRANSITIONS,
+  PENDING_CUSTOMER_HINT,
   canTransition,
+  customerStatusHint,
   nextOperationalStatus,
+  statusMeta,
   trackSteps,
 } from "./status";
 
 describe("ALLOWED_TRANSITIONS", () => {
   it("pending çıkışları", () => {
-    expect(ALLOWED_TRANSITIONS.pending).toEqual(["accepted", "rejected", "dropped_off", "cancelled"]);
+    expect(ALLOWED_TRANSITIONS.pending).toEqual(["accepted", "rejected", "cancelled"]);
+    expect(canTransition("pending", "dropped_off", "provider", { packageId: "katlama" })).toBe(false);
+    expect(canTransition("pending", "washing", "provider", { packageId: "katlama" })).toBe(false);
   });
 });
 
@@ -65,5 +71,16 @@ describe("operasyon adımları", () => {
     expect(nextOperationalStatus("accepted", "yikama")).toBe("dropped_off");
     expect(nextOperationalStatus("washing", "tam")).toBe("ironing");
     expect(nextOperationalStatus("washing", "katlama")).toBe("ready");
+    expect(nextOperationalStatus("pending", "katlama")).toBeNull();
+  });
+});
+
+describe("müşteri durum metni", () => {
+  it("pending onay bekliyor, accepted kabul, teslim alındı değil", () => {
+    expect(customerStatusHint("pending")).toBe(PENDING_CUSTOMER_HINT);
+    expect(customerStatusHint("accepted")).toBe(ACCEPTED_CUSTOMER_HINT);
+    expect(statusMeta("pending").label).toBe("Onay bekliyor");
+    expect(statusMeta("accepted").trackLabel).toBe("Hizmet veren kabul etti");
+    expect(statusMeta("accepted").trackLabel).not.toMatch(/teslim alındı/i);
   });
 });

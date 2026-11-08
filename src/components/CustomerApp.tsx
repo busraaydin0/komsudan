@@ -16,6 +16,7 @@ import {
   quoteForProvider,
 } from "@/lib/laundry/customerUi";
 import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
+import { pickTrackedOrderId } from "@/lib/orders/pickTrackedOrder";
 import { statusMeta } from "@/lib/status";
 import { CustomerNearbyList } from "@/components/laundry/customer/CustomerNearbyList";
 import { CustomerProviderSheet } from "@/components/laundry/customer/CustomerProviderSheet";
@@ -152,22 +153,8 @@ export function CustomerApp({
   useEffect(() => {
     if (pane !== "orders") return;
     setHello(false);
-    const prefer =
-      myOrders.find((o) => o.status === "ready" || o.status === "admin_pending") ??
-      myOrders.find(
-        (o) =>
-          o.status !== "completed" &&
-          o.status !== "cancelled" &&
-          o.status !== "rejected" &&
-          o.status !== "disputed",
-      ) ??
-      myOrders[0];
-    if (prefer) {
-      setActiveId(prefer.id);
-      setSheet("track");
-    } else {
-      setSheet("list");
-    }
+    setActiveId((current) => pickTrackedOrderId(myOrders, current));
+    setSheet(myOrders.length ? "track" : "list");
   }, [pane, myOrders]);
 
   useEffect(() => {

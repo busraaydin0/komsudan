@@ -136,6 +136,8 @@ describe("sipariş mesajı", () => {
     sendOrderMessage(user, "ord-msg-inbox", { body: "Kapıda 18 gibi olur muyum?" });
     const inbox = listMessageInbox(user);
     expect(inbox.threads.some((t) => t.orderId === "ord-msg-inbox")).toBe(true);
-    expect(inbox.threads.find((t) => t.orderId === "ord-msg-inbox")?.preview).toContain("Kapıda");
+    const thread = inbox.threads.find((t) => t.orderId === "ord-msg-inbox");
+    expect(thread?.preview).toContain("Kapıda");
+    expect(thread?.title).toContain("Kabul edildi");
   });
 });

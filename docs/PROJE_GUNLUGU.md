@@ -6,6 +6,14 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-09 – Sipariş, veren onaylamadan “alınmış” görünüyordu
+- Dal: `fix/siparis-onay-bekliyor` (main’den; `fix/alim-takvimi` PR #6 ayrı). **K-012 bu dalda var** (`061366c`, `orderAuth.ts`).
+- Otomatik kabul yok: `createOrder` → `pending` + history `to_status=pending` (aktör müşteri). `accepted` yalnız `applyOrderAction accept` + `assertProviderAction`. Expire `pending→rejected`. Seed `demo-live-accepted/ready` başka satırlar.
+- Yanıltma: (1) Sipariş sekmesi hazır demoyu (`KL-EADY`) yeni `pending` talebin üstüne açıyordu. (2) `accepted.trackLabel` “Teslim alındı” idi.
+- Düzeltme: `pickTrackedOrderId` onay bekleyen kaydı öne alır. Etiketler: pending “Onay bekliyor” / `PENDING_CUSTOMER_HINT`; accepted “Hizmet veren kabul etti”. `pending→dropped_off` kapatıldı. Kapasite kabulde ayrılmaya devam.
+- Test: oluşturma pending; müşteri kabul 403; yalnız veren accepted + kapasite; kabulsüz alım/yıkama yok. `npm test` 173, lint, build.
+- Main’e merge yok.
+
 ## 2026-11-07 – Adım 10: Oturum, pencere, yetki ve admin ayrımı main'e alındı
 - PR **#4** (`fix/oturum-kaybi`) merge: `4592fb9`. PR **#3** (`fix/pencere-butonu`) merge: `b13ecf1`. PR **#5** (`fix/kendine-siparis`, K-011/K-012/K-013) merge: `3cce159`. Squash yok.
 - Etiket: `sunum-v2` (`3cce159`).

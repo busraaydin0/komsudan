@@ -229,11 +229,12 @@ export function CustomerOrderTrack({
           );
         })}
       </ol>
-      <p className="mt-2 text-xs text-[var(--muted)]">
-        {order.status === "pending"
-          ? "Komşu kabul etmeden iptal edebilirsin. Tutanak çözülür, para çekilmez."
-          : customerStatusHint(order.status)}
-      </p>
+      <p className="mt-2 text-xs text-[var(--muted)]">{customerStatusHint(order.status)}</p>
+      {order.status === "pending" ? (
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          Komşu kabul etmeden iptal edebilirsin. Tutanak çözülür, para çekilmez.
+        </p>
+      ) : null}
       {onOpenMessages && (
         <button
           type="button"

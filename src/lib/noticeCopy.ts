@@ -50,8 +50,8 @@ const CAMASIR: Record<NoticeKind, Template[]> = {
     { title: "Poşet yolda", body: (c) => `${c.qty} sipariş. Hizmet’ten bak.` },
   ],
   accepted: [
-    { title: "Çamaşır kabul edildi", body: (c) => `${c.orderId} alındı. Yıkama sırasına girdi.` },
-    { title: "Makine sırası", body: (c) => `${c.qty} kabul. Yıkamaya alındı.` },
+    { title: "Hizmet veren kabul etti", body: (c) => `${c.orderId} onaylandı. Alım penceresinde kapıda olur.` },
+    { title: "Hizmet veren kabul etti", body: (c) => `${c.qty} kabul edildi. Çamaşır henüz alınmadı.` },
   ],
   ready: [
     { title: "Çamaşır hazır", body: (c) => `${c.orderId} katlanmış, teslime hazır.${c.code} (SMS simülasyonu, gerçek SMS yok.)` },
