@@ -27,6 +27,7 @@ import { collapseSpaces } from "@/lib/moderation/normalize";
 import { isAdminActor, isOrderParty } from "@/lib/orders/orderAuth";
 import { notifyOrderMessage } from "@/lib/services/notificationService";
 import { ApiError } from "@/lib/errors";
+import { isOrderStatus, statusLabel } from "@/lib/status";
 
 export const MSG_PER_MINUTE = 8;
 export const MSG_PER_HOUR = 40;
@@ -119,11 +120,17 @@ function audit(messageId: string, action: string, reason: string | null) {
   });
 }
 
+function inboxTitle(row: { package_id: string | null; status: string }) {
+  const pack = row.package_id ? `Sipariş · ${row.package_id}` : "Sipariş";
+  if (isOrderStatus(row.status)) return `${pack} · ${statusLabel(row.status)}`;
+  return pack;
+}
+
 export function listMessageInbox(user: AuthUser) {
   const threads = listInboxRows(user.id).map((row) => ({
     orderId: row.order_id,
     peerName: row.peer_name?.trim() || "Komşu",
-    title: row.package_id ? `Sipariş · ${row.package_id}` : "Sipariş",
+    title: inboxTitle(row),
     status: row.status,
     preview: row.preview?.trim() || "Henüz mesaj yok.",
     unread: Number(row.unread) || 0,

@@ -31,7 +31,7 @@ export const ORDER_STATUSES: OrderStatusId[] = [
 ];
 
 export const ALLOWED_TRANSITIONS: Record<OrderStatusId, OrderStatusId[]> = {
-  pending: ["accepted", "rejected", "dropped_off", "cancelled"],
+  pending: ["accepted", "rejected", "cancelled"],
   accepted: ["dropped_off", "washing", "cancelled"],
   dropped_off: ["washing", "cancelled"],
   washing: ["ironing", "ready"],
@@ -55,16 +55,20 @@ export type StatusMeta = {
   badgeClass: string;
 };
 
+export const PENDING_CUSTOMER_HINT =
+  "Talebin hizmet verene iletildi. Onay bekleniyor (cevap süresi: 45 dk, acilde 15 dk)";
+export const ACCEPTED_CUSTOMER_HINT = "Hizmet veren kabul etti";
+
 export const STATUS_META: Record<OrderStatusId, StatusMeta> = {
   pending: {
-    label: "Bekliyor",
+    label: "Onay bekliyor",
     trackLabel: "Onay bekliyor",
     tone: "neutral",
     badgeClass: "bg-[var(--sand)] text-[var(--clay)]",
   },
   accepted: {
     label: "Kabul edildi",
-    trackLabel: "Teslim alındı",
+    trackLabel: "Hizmet veren kabul etti",
     tone: "active",
     badgeClass: "bg-[color-mix(in_srgb,var(--teal)_14%,transparent)] text-[var(--teal)]",
   },
@@ -160,11 +164,12 @@ export function providerAdvanceLabel(
 
 /** Müşteri takip ekranı alt metni. */
 export function customerStatusHint(status: OrderStatusId): string {
+  if (status === "pending") return PENDING_CUSTOMER_HINT;
+  if (status === "accepted") return ACCEPTED_CUSTOMER_HINT;
   if (status === "ready" || status === "admin_pending") {
     return "Hizmet veren kodu girince iş biter ve para geçer.";
   }
   if (status === "completed") return "Teslim bitti. İstersen yorum ve fotoğraf bırak.";
-  if (status === "pending") return "Hizmet veren onayını bekliyor.";
   return STATUS_META[status].trackLabel;
 }
 

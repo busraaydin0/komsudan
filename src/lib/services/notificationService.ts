@@ -6,6 +6,7 @@ import type { AuthUser } from "@/lib/auth/types";
 import { formatDeliveryDayTr } from "@/lib/capacity/istanbul";
 import { customerHasOpenOrder, getOrderRow, type OrderRow } from "@/lib/db/orders";
 import { pickNudgeCopy, pickOrderNotice } from "@/lib/noticeCopy";
+import { PENDING_CUSTOMER_HINT } from "@/lib/status";
 import {
   countUnread,
   getNotification,
@@ -64,6 +65,14 @@ export function notifyNewOrder(row: {
     title: copy.title,
     body: copy.body,
   });
+  if (row.user_id && row.user_id !== row.provider_id) {
+    pushTo(row.user_id, {
+      orderId: row.id,
+      type: "order_created",
+      title: "Onay bekliyor",
+      body: PENDING_CUSTOMER_HINT,
+    });
+  }
 }
 
 export function notifyStatusChange(input: {
