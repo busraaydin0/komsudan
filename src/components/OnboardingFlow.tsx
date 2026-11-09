@@ -188,7 +188,7 @@ export function OnboardingFlow({
                 <OnboardingRoleCard
                   on={seek}
                   title="Hizmet arıyorum"
-                  hint={`${LAUNDRY_PRODUCT_NAME} — komşudan al`}
+                  hint="Çamaşırını kapında teslim et, mahalledeki komşun yıkayıp geri getirsin."
                   onClick={() => {
                     setSeek((v) => !v);
                     setErr("");
@@ -197,7 +197,7 @@ export function OnboardingFlow({
                 <OnboardingRoleCard
                   on={offer}
                   title="Hizmet vermek istiyorum"
-                  hint={`${LAUNDRY_PRODUCT_NAME} — boy fiyatlarını ve kurutmayı sonra yazarsın`}
+                  hint="Makine kapasiteni gir, talepleri kabul et, kazancın teslimden sonra cüzdanına yatsın."
                   onClick={() => {
                     setOffer((v) => !v);
                     setLaundryAdded(false);
