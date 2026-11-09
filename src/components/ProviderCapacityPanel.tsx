@@ -21,7 +21,7 @@ async function fetchCapacity(): Promise<CapacityForm> {
     }>(await fetch("/api/providers/me/capacity", { credentials: "same-origin" })),
   );
   const c = data.capacity;
-  if (!c) throw new Error("Kapasite alınamadı.");
+  if (!c) throw new Error("Bilgiler alınamadı.");
   return {
     halfUnitsPerDay: c.halfUnitsPerDay,
     workingDays: c.workingDays,
@@ -53,6 +53,7 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
+  const [expressOver, setExpressOver] = useState(false);
 
   useEffect(() => {
     void fetchCapacity()
@@ -74,10 +75,10 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
     setOk("");
     try {
       await saveCapacity(form);
-      setOk("Kapasite kaydedildi. Müşteriler takvim dolulukunu görür.");
+      setOk("Kaydedildi.");
       onSaved?.();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Kaydedilemedi.");
+    } catch {
+      setErr("Kaydedilemedi, tekrar dene.");
     } finally {
       setBusy(false);
     }
@@ -87,12 +88,13 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
 
   return (
     <div className="k-rise mt-6 rounded-3xl bg-[var(--card)] p-4 ring-1 ring-[var(--line)]">
-      <p className="text-[11px] font-medium tracking-[0.14em] text-[var(--teal)] uppercase">Makine kapasitesi</p>
-      <p className="mt-1 text-xs text-[var(--muted)]">
-        Günlük yarım-makine birimi. Orta = 2, büyük = 4, 5 makine = 10 birim.
+      <p className="text-[11px] font-medium tracking-[0.14em] text-[var(--teal)] uppercase">Çamaşır makinen</p>
+      <p className="mt-1 text-xs leading-snug text-[var(--muted)]">
+        Bir gün kaç makine çamaşır yıkayabilirsen onu yaz. Küçük sipariş yarım makine, orta bir makine, büyük iki
+        makine sayılır.
       </p>
       <label className="mt-4 block text-sm">
-        Günlük makine (≈ yarım-makine × 2)
+        Bir günde kaç makine yıkarsın?
         <input
           type="number"
           min={1}
@@ -102,15 +104,22 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
           onChange={(e) => {
             const m = Number(e.target.value);
             if (!Number.isFinite(m)) return;
-            setForm((f) => {
-              const half = machinesToHalfUnits(m);
-              return { ...f, halfUnitsPerDay: half, expressQuota: Math.min(f.expressQuota, half) };
-            });
+            const half = machinesToHalfUnits(m);
+            setExpressOver(form.expressQuota > half);
+            setForm((f) => ({
+              ...f,
+              halfUnitsPerDay: half,
+              expressQuota: Math.min(f.expressQuota, half),
+            }));
           }}
           className="mt-1 w-full rounded-xl bg-[var(--paper)] px-3 py-2 ring-1 ring-[var(--line)]"
         />
       </label>
-      <p className="mt-3 text-sm font-medium">Çalışma günleri</p>
+      <p className="mt-1 text-xs leading-snug text-[var(--muted)]">
+        Örnek: 3 yazarsan günde 3 orta boy sipariş alırsın.
+      </p>
+      <p className="mt-3 text-sm font-medium">Hangi günler yıkarsın?</p>
+      <p className="mt-1 text-xs leading-snug text-[var(--muted)]">Sadece seçtiğin günler sipariş gelir.</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {DAY_LABELS.map((label, i) => {
           const iso = i + 1;
@@ -128,7 +137,7 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
         })}
       </div>
       <label className="mt-4 block text-sm">
-        Acil kontenjan (makine/gün)
+        Acil işler için kaç makine ayıralım?
         <input
           type="number"
           min={0}
@@ -139,6 +148,7 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
             const m = Number(e.target.value);
             if (!Number.isFinite(m)) return;
             const units = machinesToHalfUnits(m);
+            setExpressOver(units > form.halfUnitsPerDay);
             setForm((f) => ({
               ...f,
               expressQuota: Math.max(0, Math.min(units, f.halfUnitsPerDay)),
@@ -147,21 +157,27 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
           className="mt-1 w-full rounded-xl bg-[var(--paper)] px-3 py-2 ring-1 ring-[var(--line)]"
         />
       </label>
-      <p className="mt-1 text-xs text-[var(--muted)]">
-        Bu kadar makine günlük acil siparişlere ayrılır. Normal siparişler kalan kapasiteyi görür.
-        Kullanılmayan kota akşam normale dönmez. 0 ise acil seçilemez.
+      <p className="mt-1 text-xs leading-snug text-[var(--muted)]">
+        Acil işler bir gün içinde yetişmesi gereken işlerdir, fazladan ücret ödenir. Buraya yazdığın makineler
+        sadece acil işlere ayrılır. Hiç acil iş almak istemiyorsan 0 bırak. Acil işe ayırdığın makine boş kalırsa da
+        normal siparişe verilmez.
       </p>
+      {expressOver ? (
+        <p className="mt-1 text-xs leading-snug text-[var(--clay)]">
+          Acil için ayırdığın makine, günlük makineden fazla olamaz.
+        </p>
+      ) : null}
       <label className="mt-4 block text-sm">
-        Tek sipariş üst sınırı
+        Tek siparişte en fazla kaç makine alırsın?
         <select
           value={form.maxUnitsPerOrder}
           onChange={(e) => setForm((f) => ({ ...f, maxUnitsPerOrder: Number(e.target.value) }))}
           className="mt-1 w-full rounded-xl bg-[var(--paper)] px-3 py-2 ring-1 ring-[var(--line)]"
         >
           {[
-            { n: 1, label: "½ makine · Küçük" },
-            { n: 2, label: "1 makine · Orta" },
-            { n: 4, label: "2 makine · Büyük" },
+            { n: 1, label: "½ makine" },
+            { n: 2, label: "1 makine" },
+            { n: 4, label: "2 makine" },
             { n: 6, label: "3 makine" },
             { n: 8, label: "4 makine" },
             { n: 10, label: "5 makine" },
@@ -172,6 +188,7 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
           ))}
         </select>
       </label>
+      <p className="mt-1 text-xs leading-snug text-[var(--muted)]">Bundan büyük sipariş sana gelmez.</p>
       {err ? <p className="mt-2 text-xs text-[var(--clay)]">{err}</p> : null}
       {ok ? <p className="mt-2 text-xs text-[var(--teal)]">{ok}</p> : null}
       <button
@@ -180,7 +197,7 @@ export function ProviderCapacityPanel({ onSaved }: { onSaved?: () => void }) {
         onClick={() => void save()}
         className="k-press mt-4 w-full rounded-2xl bg-[var(--ink)] py-3 text-sm font-medium text-[var(--paper)] disabled:opacity-50"
       >
-        {busy ? "Kaydediliyor…" : "Kapasiteyi kaydet"}
+        Kaydet
       </button>
     </div>
   );
