@@ -6,6 +6,11 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-09 – Keşif: Konumu kullan geri bildirimi
+- Dal: `fix/konum` (main’den). “Konumumu kullan” basınca sonuç state’e yazılıyordu ama düğmenin altında metin yoktu; hata kodları `null`’a iniyordu.
+- Düzeltme: alınıyor / bulundu / izin yok / https / zaman aşımı / pilot dışı — Türkçe durum + Çukurambar yedek merkez; liste boş kalmaz.
+- GPS canlı sıralama cihazda; keşif bitince `home_lat`/`home_lng` `PATCH /api/me/preferences` ile yazılır. “Sunucuya gönderilmez” yazılmadı.
+
 ## 2026-11-07 – Adım 10: Oturum, pencere, yetki ve admin ayrımı main'e alındı
 - PR **#4** (`fix/oturum-kaybi`) merge: `4592fb9`. PR **#3** (`fix/pencere-butonu`) merge: `b13ecf1`. PR **#5** (`fix/kendine-siparis`, K-011/K-012/K-013) merge: `3cce159`. Squash yok.
 - Etiket: `sunum-v2` (`3cce159`).

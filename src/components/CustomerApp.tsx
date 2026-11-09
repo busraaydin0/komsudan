@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PILOT_AREA } from "@/lib/laundry/pilot";
 import { kmBetween } from "@/lib/geo";
+import { isInsecureGeoContext, LOCATION_COPY, rankByDistance } from "@/lib/geo/locationOrigin";
 import { machineUnitsFor, type LaundrySize, type OrderAddonLine } from "@/lib/laundryModel";
 import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
 import { expressDeliveryDate } from "@/lib/capacity/computeSchedule";
@@ -70,6 +71,7 @@ export function CustomerApp({
   const [mode, setMode] = useState<MapMode>("3d");
   const [user, setUser] = useState<LngLat | null>(null);
   const [far, setFar] = useState(false);
+  const [insecureGeo, setInsecureGeo] = useState(false);
   const [hello, setHello] = useState(true);
   const [sheet, setSheet] = useState<Sheet>("list");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -96,12 +98,11 @@ export function CustomerApp({
   const origin = user ?? home ?? PILOT_AREA.center;
   const units = machineUnitsFor(size, addons);
   const ranked = useMemo(() => {
-    return providers
+    const filtered = providers
       .filter((p) => (dryerOnly ? p.hasDryer : true))
       .filter((p) => (expressWanted ? canListForExpress(p, units) : true))
-      .filter((p) => !viewerId || p.id !== viewerId)
-      .map((p) => ({ p, km: kmBetween(origin, p.loc) }))
-      .sort((a, b) => a.km - b.km);
+      .filter((p) => !viewerId || p.id !== viewerId);
+    return rankByDistance(filtered, origin).map(({ item, km }) => ({ p: item, km }));
   }, [origin, dryerOnly, expressWanted, providers, units, viewerId]);
   const available = ranked.filter(({ p }) => p.capacity?.configured && p.capacity.weekTone !== "full").length;
 
@@ -133,9 +134,12 @@ export function CustomerApp({
       }
       const dist = kmBetween(loc, PILOT_AREA.center);
       setFar(dist > PILOT_AREA.radiusKm);
-      setUser(dist > PILOT_AREA.radiusKm ? (home ?? PILOT_AREA.center) : loc);
+      setUser(dist > PILOT_AREA.radiusKm ? PILOT_AREA.center : loc);
     }
 
+    if (typeof window !== "undefined") {
+      setInsecureGeo(isInsecureGeoContext(window.isSecureContext));
+    }
     apply(null);
     const unsub = subscribeLocation(apply);
     void readLocationIfGranted().then(apply);
@@ -342,7 +346,12 @@ export function CustomerApp({
         </div>
         {far && (
           <p className="k-glass k-rise pointer-events-auto mt-2 max-w-[16rem] rounded-xl px-3 py-2 text-xs text-[var(--muted)] ring-1 ring-[var(--line)]">
-            Pilot bölge Çukurambar. Harita oraya alındı — sen uzaktasın.
+            {LOCATION_COPY["outside-pilot"]}
+          </p>
+        )}
+        {insecureGeo && !far && (
+          <p className="k-glass k-rise pointer-events-auto mt-2 max-w-[16rem] rounded-xl px-3 py-2 text-xs text-[var(--muted)] ring-1 ring-[var(--line)]">
+            {LOCATION_COPY.insecure}
           </p>
         )}
       </div>

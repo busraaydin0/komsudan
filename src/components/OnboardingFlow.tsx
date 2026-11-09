@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { LAUNDRY_PACKAGES } from "@/lib/laundry/packages";
 import { LAUNDRY_PRODUCT_NAME, PILOT_AREA, PILOT_NEIGHBORHOODS } from "@/lib/laundry/pilot";
-import { patchPreferences, postMyOffer } from "@/lib/api";
-import { readLocationIfGranted, requestLocation } from "@/lib/permissions";
+import { patchPreferences, postMyOffer, useCatalog } from "@/lib/api";
+import { formatKm } from "@/lib/geo";
+import {
+  locationFeedback,
+  rankByDistance,
+  resolveLocationOrigin,
+  type LocationKind,
+} from "@/lib/geo/locationOrigin";
+import { acquireLocation } from "@/lib/permissions";
 import type { Account, DryingType, PackageId, PreferredIntent } from "@/lib/types";
 import { LaundryOfferSetup } from "@/components/laundry/onboarding/LaundryOfferSetup";
 import { OnboardingRoleCard } from "@/components/laundry/onboarding/OnboardingRoleCard";
@@ -42,7 +49,10 @@ export function OnboardingFlow({
       : null,
   );
   const [busy, setBusy] = useState(false);
+  const [locBusy, setLocBusy] = useState(false);
+  const [locKind, setLocKind] = useState<LocationKind | "loading" | "idle">("idle");
   const [err, setErr] = useState("");
+  const { providers, ready: catalogReady } = useCatalog();
 
   const intent: PreferredIntent | null = seek && offer ? "both" : seek ? "seek" : offer ? "offer" : null;
   const steps: Step[] = offer ? ["role", "offer", "location"] : ["role", "location"];
@@ -122,22 +132,35 @@ export function OnboardingFlow({
     setStep("location");
   }
 
+  const nearbyPreview = useMemo(
+    () =>
+      rankByDistance(providers, home ? { lat: home.lat, lng: home.lng } : PILOT_AREA.center).slice(
+        0,
+        5,
+      ),
+    [providers, home],
+  );
+  const locFeedback = locKind === "idle" ? null : locationFeedback(locKind);
+
   async function captureLocation() {
     setErr("");
-    setBusy(true);
+    setLocBusy(true);
+    setLocKind("loading");
     try {
-      const state = await requestLocation();
-      if (state !== "granted") {
-        setErr("Konum kapalı. Mahalle seçebilirsin.");
-        return;
-      }
-      const loc = await readLocationIfGranted();
-      const spot = loc ?? PILOT_AREA.center;
-      const name = neighborhood || "Çukurambar";
+      const result = await acquireLocation();
+      const resolved = resolveLocationOrigin(
+        result.status === "ok" ? result.loc : null,
+        result.status === "ok" ? null : result.status,
+        PILOT_AREA.center,
+        PILOT_AREA.radiusKm,
+      );
+      const name =
+        resolved.kind === "ok" ? neighborhood || "Çukurambar" : "Çukurambar";
       setNeighborhood(name);
-      setHome({ lat: spot.lat, lng: spot.lng, neighborhood: name });
+      setHome({ lat: resolved.origin.lat, lng: resolved.origin.lng, neighborhood: name });
+      setLocKind(resolved.kind);
     } finally {
-      setBusy(false);
+      setLocBusy(false);
     }
   }
 
@@ -250,12 +273,53 @@ export function OnboardingFlow({
               </p>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || locBusy}
                 onClick={() => void captureLocation()}
                 className="k-press mt-4 w-full rounded-full bg-[var(--teal)] py-3 text-sm font-medium text-white"
               >
-                Konumumu kullan
+                {locBusy ? "Konum alınıyor…" : "Konumumu kullan"}
               </button>
+              {locFeedback && (
+                <div className="mt-3 rounded-2xl bg-[var(--paper)] px-3 py-2.5 ring-1 ring-[var(--line)]" role="status">
+                  <p className="text-sm">{locFeedback.message}</p>
+                  {locFeedback.hint && (
+                    <p className="mt-1 text-xs text-[var(--muted)]">{locFeedback.hint}</p>
+                  )}
+                  {locFeedback.retry && (
+                    <button
+                      type="button"
+                      disabled={locBusy}
+                      onClick={() => void captureLocation()}
+                      className="k-press mt-2 text-xs font-medium text-[var(--teal)]"
+                    >
+                      Yeniden dene
+                    </button>
+                  )}
+                </div>
+              )}
+              {locKind !== "idle" && locKind !== "loading" && (
+                <ul className="mt-3 space-y-1.5" aria-label="Yakındakiler">
+                  {!catalogReady ? (
+                    <li className="text-xs text-[var(--muted)]">Yakındakiler yükleniyor…</li>
+                  ) : nearbyPreview.length === 0 ? (
+                    <li className="text-xs text-[var(--muted)]">
+                      Katalog boş; Çukurambar merkezi yine de açık. Mahalle seçebilirsin.
+                    </li>
+                  ) : (
+                    nearbyPreview.map(({ item, km }) => (
+                      <li
+                        key={item.id}
+                        className="flex items-baseline justify-between rounded-xl bg-[var(--paper)] px-3 py-2 text-sm ring-1 ring-[var(--line)]"
+                      >
+                        <span className="truncate font-medium">{item.name}</span>
+                        <span className="ml-2 shrink-0 tabular-nums text-xs text-[var(--muted)]">
+                          {item.neighborhood} · {formatKm(km)}
+                        </span>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
               <p className="mt-4 text-xs text-[var(--muted)]">veya mahalle</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {PILOT_NEIGHBORHOODS.map((n) => (
@@ -302,14 +366,14 @@ export function OnboardingFlow({
             {step === "location" && (
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || locBusy}
                 onClick={() => void finishCustomer()}
                 className="k-press k-cta w-full rounded-full bg-[var(--clay)] py-3 text-sm font-medium text-white"
               >
                 {busy ? "Kaydediliyor…" : "Haritaya geç"}
               </button>
             )}
-            <button type="button" disabled={busy} onClick={() => void skip()} className="mt-3 w-full text-xs text-[var(--muted)]">
+            <button type="button" disabled={busy || locBusy} onClick={() => void skip()} className="mt-3 w-full text-xs text-[var(--muted)]">
               Şimdi değil
             </button>
           </div>
