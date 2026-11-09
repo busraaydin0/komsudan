@@ -27,6 +27,10 @@ npm run dev
 
 Tarayıcı: [http://localhost:3000](http://localhost:3000)
 
+### Konum ve HTTPS
+
+Tarayıcı Konum API’si yalnız **güvenli bağlamda** çalışır: `https://` veya `http://localhost` / `http://127.0.0.1`. Telefonda LAN adresiyle (`http://192.168.x.x:3000`) “Konumu kullan” konum vermez. Bilgisayarda `localhost` aç veya bir **https tüneli** kullan.
+
 Üretim: kalıcı `next start` (Vercel/serverless değil; SQLite tek dosya). `JWT_SECRET` zorunlu.
 
 ```bash

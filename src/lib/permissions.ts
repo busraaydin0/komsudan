@@ -1,5 +1,6 @@
 "use client";
 
+import { classifyGeoError, isInsecureGeoContext, type GeoFailure } from "./geo/locationOrigin";
 import type { LngLat } from "./types";
 
 export type PermState = "granted" | "denied" | "prompt" | "unsupported";
@@ -76,33 +77,43 @@ export async function cameraState(): Promise<PermState> {
   return query("camera");
 }
 
-export async function readLocationIfGranted(): Promise<LngLat | null> {
-  if (!("geolocation" in navigator)) return null;
-  const state = await locationState();
-  if (state !== "granted") return null;
-  return readPosition();
-}
+export type GeoAcquireResult = { status: "ok"; loc: LngLat } | { status: GeoFailure };
 
-function readPosition(): Promise<LngLat | null> {
+export async function acquireLocation(): Promise<GeoAcquireResult> {
+  if (typeof window === "undefined" || !("geolocation" in navigator)) {
+    return { status: "unsupported" };
+  }
+  if (isInsecureGeoContext(window.isSecureContext)) {
+    return { status: "insecure" };
+  }
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const loc = { lng: pos.coords.longitude, lat: pos.coords.latitude };
         publishLocation(loc);
-        resolve(loc);
+        resolve({ status: "ok", loc });
       },
-      () => resolve(null),
+      (err) => resolve({ status: classifyGeoError(err.code) }),
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 },
     );
   });
 }
 
+export async function readLocationIfGranted(): Promise<LngLat | null> {
+  if (!("geolocation" in navigator)) return null;
+  if (typeof window !== "undefined" && isInsecureGeoContext(window.isSecureContext)) return null;
+  const state = await locationState();
+  if (state !== "granted") return null;
+  const result = await acquireLocation();
+  return result.status === "ok" ? result.loc : null;
+}
+
 export async function requestLocation(): Promise<PermState> {
-  if (!("geolocation" in navigator)) return "unsupported";
-  const loc = await readPosition();
-  const state = loc ? "granted" : await locationState();
-  if (loc) publishLocation(loc);
-  return state === "unsupported" ? "denied" : state;
+  const result = await acquireLocation();
+  if (result.status === "ok") return "granted";
+  if (result.status === "unsupported") return "unsupported";
+  if (result.status === "denied") return "denied";
+  return "denied";
 }
 
 export async function requestNotifications(): Promise<PermState> {
