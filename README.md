@@ -27,6 +27,18 @@ npm run dev
 
 Tarayıcı: [http://localhost:3000](http://localhost:3000)
 
+### Telefonda deneme (HTTPS tünel)
+
+LAN IP (`http://192.168.x.x:3000`) konum ve bazı tarayıcı API’lerini vermez. `npm run dev` çalışırken ayrı bir terminalde:
+
+```bash
+cloudflared tunnel --url http://localhost:3000
+```
+
+Çıkan `https://….trycloudflare.com` adresini telefonda aç. **Bu adres herkese açıktır** (şifre yok); jüri/demo bitince tüneli `Ctrl+C` ile kapat.
+
+Dev sunucu `*.trycloudflare.com` kökenine izin verir (`allowedDevOrigins`). Başka bir tünel için `.env` içine `DEV_ALLOWED_ORIGINS` (virgülle hostlar) yazıp `npm run dev`’i yeniden başlat.
+
 Üretim: kalıcı `next start` (Vercel/serverless değil; SQLite tek dosya). `JWT_SECRET` zorunlu.
 
 ```bash
