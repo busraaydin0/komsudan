@@ -6,6 +6,9 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-10 – Dev tünel: HMR Unauthorized
+- cloudflared (`https://*.trycloudflare.com`) ile `/_next/hmr` 403 Unauthorized. Next 16 `allowedDevOrigins` yalnız `next dev`; varsayılan `*.trycloudflare.com`, `DEV_ALLOWED_ORIGINS` ile genişler. Production derlemesine yazılmaz.
+
 ## 2026-11-07 – Adım 10: Oturum, pencere, yetki ve admin ayrımı main'e alındı
 - PR **#4** (`fix/oturum-kaybi`) merge: `4592fb9`. PR **#3** (`fix/pencere-butonu`) merge: `b13ecf1`. PR **#5** (`fix/kendine-siparis`, K-011/K-012/K-013) merge: `3cce159`. Squash yok.
 - Etiket: `sunum-v2` (`3cce159`).
