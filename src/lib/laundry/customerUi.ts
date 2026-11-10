@@ -1,7 +1,12 @@
 /** Müşteri PWA metinleri ve teklif hesabı (çamaşır). */
 
 import type { LaundrySize, OrderAddonLine } from "@/lib/laundryModel";
-import { addonKey, resolveSizePrice } from "@/lib/laundryModel";
+import {
+  addonKey,
+  DEFAULT_ADDON_PRICES,
+  defaultSizePricesFromLegacy,
+  resolveSizePrice,
+} from "@/lib/laundryModel";
 import { quoteLaundry, tl } from "@/lib/pricing";
 import type { CreateOrderInput, PackageId, Provider } from "@/lib/types";
 
@@ -60,8 +65,10 @@ export function quoteForProvider(
 ) {
   if (!selected) return ZERO_QUOTE;
   const grid = selected.laundryPrices;
-  if (!grid) return ZERO_QUOTE;
-  const sizePrice = resolveSizePrice(args.size, grid.sizes[args.pkg]);
+  const pack = selected.packages.find((x) => x.id === args.pkg);
+  const sizePrice =
+    resolveSizePrice(args.size, grid?.sizes[args.pkg]) ??
+    (pack ? resolveSizePrice(args.size, defaultSizePricesFromLegacy(args.pkg, pack.pricePerPiece)) : null);
   if (sizePrice == null) return ZERO_QUOTE;
   void args.pickupDate;
   const express = Boolean(args.express && selected.express);
@@ -70,7 +77,7 @@ export function quoteForProvider(
     for (const a of args.addons) {
       if (a.qty < 1) continue;
       const key = addonKey(a.addon, a.variant);
-      const unit = grid.addons[key];
+      const unit = grid?.addons[key] ?? DEFAULT_ADDON_PRICES[key];
       if (unit == null) return ZERO_QUOTE;
       addonUnitPrices[key] = unit;
     }

@@ -6,6 +6,15 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-10 – Bugünkü keşif kaydı
+- `fix/alim-takvim` origin'e push: keşif sahnesi, sıralama, teslim min gün, fiyat ızgarası; ROL/KONUM yok.
+
+## 2026-11-10 – Animasyon stash parçaları
+- `stash@{0}` pop edilmedi. Keşif sahnesi, yakındakiler sıralama, teslim min gün, teklif fiyat ızgarası geri alındı. ROL/KONUM yok; logo, ana sayfa, sap duruyor.
+
+## 2026-11-10 – Rol Konum yazısı
+- Keşif üstündeki ROL / KONUM adım etiketleri kalktı; kart doğrudan sloganın altında.
+
 ## 2026-11-10 – Hareketli logo
 - Stash’ten yalnız `KomsudanLogo` alındı. Harita başlığında logo; tıklanınca ana sayfa. Liste sapı aynı.
 

@@ -53,7 +53,7 @@ export function LaundryOfferSetup({
         </p>
       )}
 
-      <p className="mt-4 text-sm font-medium">Parça başı fiyatın ne?</p>
+      <p className="mt-4 text-sm font-medium">Fiyat girin</p>
       <div className="mt-2 grid gap-2">
         {LAUNDRY_PACKAGES.map((pack) => {
           const on = offered.includes(pack.id);
@@ -67,7 +67,7 @@ export function LaundryOfferSetup({
               <button type="button" onClick={() => onTogglePack(pack.id)} className="flex w-full justify-between text-left font-medium">
                 {pack.title}
                 <span className="tabular-nums text-sm font-normal text-[var(--muted)]">
-                  {on ? `${tl(prices[pack.id])}/orta` : "kapalı"}
+                  {on ? (prices[pack.id] ? `${tl(prices[pack.id])}/orta` : "Fiyat girin") : "kapalı"}
                 </span>
               </button>
               <span className="mt-0.5 block text-xs text-[var(--muted)]">{pack.blurb}</span>
@@ -76,12 +76,13 @@ export function LaundryOfferSetup({
                   ₺/orta boy · 3–5 makine = orta × adet
                   <input
                     inputMode="numeric"
-                    value={prices[pack.id]}
+                    placeholder="Fiyat girin"
+                    value={prices[pack.id] ? String(prices[pack.id]) : ""}
                     onChange={(e) => {
-                      const n = Number(e.target.value.replace(/\D/g, "").slice(0, 2));
-                      onPrice(pack.id, n || 1);
+                      const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+                      onPrice(pack.id, raw ? Number(raw) : 0);
                     }}
-                    className="w-14 rounded-full bg-[var(--paper)] px-2 py-1 text-center tabular-nums ring-1 ring-[var(--line)] outline-none focus:ring-[var(--teal)]"
+                    className="w-24 rounded-full bg-[var(--paper)] px-2 py-1 text-center tabular-nums ring-1 ring-[var(--line)] outline-none placeholder:text-[10px] focus:ring-[var(--teal)]"
                   />
                 </label>
               )}

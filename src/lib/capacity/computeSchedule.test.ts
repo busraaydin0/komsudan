@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computeSchedule, type CapacitySettings, type DayUsage } from "./computeSchedule";
+import {
+  computeSchedule,
+  customerDeliveryMinDate,
+  type CapacitySettings,
+  type DayUsage,
+} from "./computeSchedule";
 
 const settings: CapacitySettings = {
   halfUnitsPerDay: 4,
@@ -175,5 +180,35 @@ describe("computeSchedule", () => {
     );
     expect(express).not.toBeNull();
     expect(express!.allocations).toEqual([{ date: "2026-10-08", units: 2 }]);
+  });
+});
+
+describe("customerDeliveryMinDate", () => {
+  it("alım günü teslim olamaz", () => {
+    expect(
+      customerDeliveryMinDate({
+        pickupDate: "2026-10-08",
+        packageId: "katlama",
+        hasHeavyAddon: false,
+        express: false,
+      }),
+    ).toBe("2026-10-10");
+    expect(
+      customerDeliveryMinDate({
+        pickupDate: "2026-10-08",
+        packageId: "tam",
+        hasHeavyAddon: false,
+        express: false,
+      }),
+    ).toBe("2026-10-11");
+    expect(
+      customerDeliveryMinDate({
+        pickupDate: "2026-10-08",
+        pickupWindowStart: "08:00",
+        packageId: "tam",
+        hasHeavyAddon: true,
+        express: true,
+      }),
+    ).toBe("2026-10-09");
   });
 });

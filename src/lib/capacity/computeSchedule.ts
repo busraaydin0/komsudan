@@ -80,6 +80,20 @@ function deliveryDateFromLastWash(lastWashIso: string, packageId: PackageId, has
   return isoDateInIstanbul(new Date(ms));
 }
 
+/** Müşteri teslim günü: acil alım+24sa, değilse paket süresi. Alım günü asla teslim olmaz. */
+export function customerDeliveryMinDate(input: {
+  pickupDate: string;
+  pickupWindowStart?: string;
+  packageId: PackageId;
+  hasHeavyAddon: boolean;
+  express: boolean;
+}): string {
+  if (input.express) {
+    return expressDeliveryDate(input.pickupDate, input.pickupWindowStart);
+  }
+  return deliveryDateFromLastWash(input.pickupDate, input.packageId, input.hasHeavyAddon);
+}
+
 /**
  * Kapasite planı: yıkama birimleri çalışma günlerine yayılır; teslim son yıkama günü + süre.
  */

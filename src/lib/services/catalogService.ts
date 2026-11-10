@@ -1,7 +1,8 @@
-import { addonKey, EXTRA_MACHINE_SIZES, scaledSizePrice, type LaundrySize } from "@/lib/laundryModel";
+import { addonKey, EXTRA_MACHINE_SIZES, scaledSizePrice, STORED_LAUNDRY_SIZES, type LaundrySize } from "@/lib/laundryModel";
 import { db } from "@/lib/db/client";
 import { toProvider } from "@/lib/db/catalog";
 import {
+  ensureProviderPriceGrid,
   listAddonPricesForProviders,
   listSizePricesForProviders,
   type ProviderAddonPriceRow,
@@ -85,8 +86,15 @@ function hydrate(
     capacities: Map<string, Provider["capacity"]>;
   },
 ): Provider {
-  const sizeRows = ctx.prices.sizeByProvider.get(p.id) ?? [];
-  const addonRows = ctx.prices.addonByProvider.get(p.id) ?? [];
+  let sizeRows = ctx.prices.sizeByProvider.get(p.id) ?? [];
+  let addonRows = ctx.prices.addonByProvider.get(p.id) ?? [];
+  if (p.packages.length > 0 && sizeRows.length < STORED_LAUNDRY_SIZES.length) {
+    ensureProviderPriceGrid(p.id);
+    sizeRows = listSizePricesForProviders([p.id]);
+    addonRows = listAddonPricesForProviders([p.id]);
+    ctx.prices.sizeByProvider.set(p.id, sizeRows);
+    ctx.prices.addonByProvider.set(p.id, addonRows);
+  }
   const live = ratingFromAggregate(p.id, { rating: p.rating, reviews: p.reviews }, ctx.ratings);
   return {
     ...p,

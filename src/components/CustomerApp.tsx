@@ -6,7 +6,7 @@ import { PILOT_AREA } from "@/lib/laundry/pilot";
 import { kmBetween } from "@/lib/geo";
 import { machineUnitsFor, type LaundrySize, type OrderAddonLine } from "@/lib/laundryModel";
 import { isoDateInIstanbul } from "@/lib/capacity/istanbul";
-import { expressDeliveryDate } from "@/lib/capacity/computeSchedule";
+import { customerDeliveryMinDate } from "@/lib/capacity/computeSchedule";
 import { postOrder, fetchWallet, useCatalog, useOrders } from "@/lib/api";
 import {
   canListForExpress,
@@ -538,9 +538,15 @@ export function CustomerApp({
                 delivery={delivery}
                 onDelivery={setDelivery}
                 minDeliveryDate={
-                  express && pickup
-                    ? expressDeliveryDate(pickup.date, pickup.windowStart)
-                    : pickup?.date
+                  pickup
+                    ? customerDeliveryMinDate({
+                        pickupDate: pickup.date,
+                        pickupWindowStart: pickup.windowStart,
+                        packageId: pkg,
+                        hasHeavyAddon: addons.some((a) => a.qty > 0),
+                        express,
+                      })
+                    : undefined
                 }
                 maxPickupDate={express ? isoDateInIstanbul(new Date()) : undefined}
                 note={note}

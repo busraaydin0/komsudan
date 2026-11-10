@@ -6,6 +6,7 @@ import { LAUNDRY_PRODUCT_NAME, PILOT_AREA, PILOT_NEIGHBORHOODS } from "@/lib/lau
 import { patchPreferences, postMyOffer } from "@/lib/api";
 import { readLocationIfGranted, requestLocation } from "@/lib/permissions";
 import type { Account, DryingType, PackageId, PreferredIntent } from "@/lib/types";
+import { HomeLaundryScene } from "@/components/HomeLaundryScene";
 import { KomsudanLogo } from "@/components/KomsudanLogo";
 import { LaundryOfferSetup } from "@/components/laundry/onboarding/LaundryOfferSetup";
 import { OnboardingRoleCard } from "@/components/laundry/onboarding/OnboardingRoleCard";
@@ -27,9 +28,9 @@ export function OnboardingFlow({
   const [dryingType, setDryingType] = useState<DryingType | null>(null);
   const [offered, setOffered] = useState<PackageId[]>(["yikama", "katlama", "tam"]);
   const [prices, setPrices] = useState<Record<PackageId, number>>({
-    yikama: 9,
-    katlama: 13,
-    tam: 18,
+    yikama: 0,
+    katlama: 0,
+    tam: 0,
   });
   const [laundryAdded, setLaundryAdded] = useState(false);
   const [neighborhood, setNeighborhood] = useState(account.homeNeighborhood ?? "");
@@ -46,8 +47,6 @@ export function OnboardingFlow({
   const [err, setErr] = useState("");
 
   const intent: PreferredIntent | null = seek && offer ? "both" : seek ? "seek" : offer ? "offer" : null;
-  const steps: Step[] = offer ? ["role", "offer", "location"] : ["role", "location"];
-  const labels = offer ? ["Rol", "Hizmet", "Konum"] : ["Rol", "Konum"];
 
   function addLaundry() {
     if (!dryingType) {
@@ -56,6 +55,10 @@ export function OnboardingFlow({
     }
     if (offered.length === 0) {
       setErr("En az bir paket seç.");
+      return false;
+    }
+    if (offered.some((id) => !prices[id])) {
+      setErr("Açık paketlere fiyat gir.");
       return false;
     }
     setLaundryAdded(true);
@@ -168,18 +171,12 @@ export function OnboardingFlow({
         <p className="mt-3 shrink-0 font-[family-name:var(--font-display)] text-xl leading-snug">
           {LAUNDRY_PRODUCT_NAME} — harita ona göre açılsın.
         </p>
-        <ol className="mt-6 flex shrink-0 gap-2 text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
-          {labels.map((label, i) => (
-            <li key={label} className={steps.indexOf(step) >= i ? "text-[var(--teal)]" : undefined}>
-              {label}
-            </li>
-          ))}
-        </ol>
 
         <div className="k-rise mt-6 flex min-h-0 flex-1 flex-col rounded-3xl bg-[var(--card)] p-5 shadow-[var(--shadow-card)] ring-1 ring-[var(--line)]">
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {step === "role" && (
             <>
+              <HomeLaundryScene />
               <h1 className="font-[family-name:var(--font-display)] text-2xl">Nasıl başlayalım?</h1>
               <p className="mt-2 text-sm text-[var(--muted)]">İkisini de işaretleyebilirsin. Varsayılan sekme buna göre açılır.</p>
               <div className="mt-4 grid gap-2">
