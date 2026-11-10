@@ -53,6 +53,9 @@ export function AppointmentCalendar({
   return (
     <div className="mt-3 space-y-3">
       <h3 className="text-sm font-medium">{title}</h3>
+      {days.length === 0 ? (
+        <p className="text-xs text-[var(--muted)]">Bu komşunun seçilebilir saati yok.</p>
+      ) : null}
       {days.map((date) => (
         <div key={date}>
           <p className="text-xs font-medium text-[var(--muted)]">

@@ -20,7 +20,7 @@ export function TabBar({
 
   return (
     <nav
-      className="k-tabbar absolute inset-x-0 bottom-0 z-40 mx-auto max-w-lg border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--card)_92%,transparent)] backdrop-blur-md"
+      className="k-tabbar fixed inset-x-0 bottom-0 z-50 mx-auto max-w-lg border-t border-[var(--line)] bg-[var(--card)]"
       aria-label="Ana menü"
     >
       <ul className={showAdmin ? "grid grid-cols-2" : "grid grid-cols-5"}>

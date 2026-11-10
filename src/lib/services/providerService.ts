@@ -307,13 +307,6 @@ function ensureDirectoryEntry(
         providerId: user.id,
         dayOfWeek: day,
         startTime: "18:00",
-        endTime: "19:00",
-        deliveryMode: "door",
-      });
-      insertSlot({
-        providerId: user.id,
-        dayOfWeek: day,
-        startTime: "19:00",
         endTime: "20:00",
         deliveryMode: "door",
       });

@@ -17,6 +17,7 @@ import {
 } from "@/lib/laundry/customerUi";
 import { readLocationIfGranted, subscribeLocation } from "@/lib/permissions";
 import { statusMeta } from "@/lib/status";
+import { KomsudanLogo } from "@/components/KomsudanLogo";
 import { CustomerNearbyList } from "@/components/laundry/customer/CustomerNearbyList";
 import { CustomerProviderSheet } from "@/components/laundry/customer/CustomerProviderSheet";
 import { CustomerCheckoutSheet } from "@/components/laundry/customer/CustomerCheckoutSheet";
@@ -37,6 +38,7 @@ type Sheet = "list" | "provider" | "checkout" | "track";
 type Props = {
   pane?: "map" | "orders";
   mapActive?: boolean;
+  homeTick?: number;
   meAvatar?: string | null;
   viewerId?: string | null;
   homeLat?: number | null;
@@ -51,6 +53,7 @@ type Props = {
 export function CustomerApp({
   pane = "map",
   mapActive = true,
+  homeTick = 0,
   meAvatar,
   viewerId,
   homeLat,
@@ -84,7 +87,8 @@ export function CustomerApp({
   const [expressWanted, setExpressWanted] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [listTall, setListTall] = useState(false);
-  const listDrag = useRef<{ y: number } | null>(null);
+  const [sheetDragH, setSheetDragH] = useState<number | null>(null);
+  const listDrag = useRef<{ y: number; h: number } | null>(null);
   const [err, setErr] = useState("");
   const [placing, setPlacing] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -150,6 +154,14 @@ export function CustomerApp({
   }, [pane]);
 
   useEffect(() => {
+    if (homeTick === 0) return;
+    setSheet("list");
+    setSelectedId(null);
+    setListTall(false);
+    setHello(false);
+  }, [homeTick]);
+
+  useEffect(() => {
     if (pane !== "orders") return;
     setHello(false);
     const prefer =
@@ -191,22 +203,50 @@ export function CustomerApp({
     if (!listTall && e.currentTarget.scrollTop > 8) setListTall(true);
   }
 
+  function sheetPeekPx() {
+    return 48;
+  }
+
+  function sheetMaxPx() {
+    if (typeof window === "undefined") return 640;
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    return Math.max(sheetPeekPx(), window.innerHeight - (3.65 + 5.5) * rem);
+  }
+
   function onSheetPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
     if (pane !== "map" || sheet !== "list") return;
-    listDrag.current = { y: e.clientY };
-    e.currentTarget.setPointerCapture(e.pointerId);
+    const section = e.currentTarget.closest("section");
+    const h = section?.getBoundingClientRect().height ?? (listTall ? sheetMaxPx() : window.innerHeight * 0.38);
+    listDrag.current = { y: e.clientY, h };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* iOS / sentetik pointer */
+    }
+  }
+
+  function onSheetPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!listDrag.current) return;
+    const next = listDrag.current.h + (listDrag.current.y - e.clientY);
+    setSheetDragH(Math.min(sheetMaxPx(), Math.max(sheetPeekPx(), next)));
   }
 
   function onSheetPointerUp(e: React.PointerEvent<HTMLButtonElement>) {
     if (!listDrag.current) return;
     const dy = listDrag.current.y - e.clientY;
     listDrag.current = null;
+    setSheetDragH(null);
     if (Math.abs(dy) < 12) {
       setListTall((open) => !open);
       return;
     }
-    if (dy > 28) setListTall(true);
-    else if (dy < -28) setListTall(false);
+    if (dy > 12) setListTall(true);
+    else setListTall(false);
+  }
+
+  function onSheetPointerCancel() {
+    listDrag.current = null;
+    setSheetDragH(null);
   }
 
   async function place() {
@@ -259,16 +299,24 @@ export function CustomerApp({
         visible={mapActive}
         onSelect={openProvider}
       />
-      <div className="k-map-vignette pointer-events-none absolute inset-0 z-[1]" />
+      <div className="k-map-vignette pointer-events-none absolute inset-x-0 top-0 bottom-[var(--tabbar)] z-[1]" />
 
       <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-4">
-        <div className="k-glass k-rise pointer-events-auto rounded-2xl px-3 py-2 ring-1 ring-[var(--line)]">
-          <p className="flex items-center gap-1.5 font-[family-name:var(--font-display)] text-lg leading-none">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
-            Komşudan
-          </p>
-          <p className="mt-0.5 text-[11px] text-[var(--muted)]">{PILOT_AREA.label}</p>
-        </div>
+        <button
+          type="button"
+          aria-label="Ana sayfa"
+          onClick={() => {
+            setSheet("list");
+            setSelectedId(null);
+            setListTall(false);
+            setHello(false);
+            onBackToMap?.();
+          }}
+          className="k-glass k-press k-rise pointer-events-auto rounded-2xl px-3 py-2 text-left ring-1 ring-[var(--line)]"
+        >
+          <KomsudanLogo size="md" />
+          <p className="mt-1 text-[11px] text-[var(--muted)]">{PILOT_AREA.label}</p>
+        </button>
         <div className="k-rise pointer-events-auto mr-12 flex items-center gap-2" style={{ animationDelay: "60ms" }}>
           <div
             className="k-glass relative grid grid-cols-2 rounded-full p-1 ring-1 ring-[var(--line)]"
@@ -382,13 +430,22 @@ export function CustomerApp({
       )}
 
       <section
-        className={`absolute inset-x-0 z-10 mx-auto max-w-lg min-h-0 overflow-hidden px-3 transition-[height,max-height,top] duration-300 ease-[var(--ease-out)] ${
-          pane === "orders"
-            ? "top-[calc(env(safe-area-inset-top)+4.25rem)] bottom-[var(--tabbar)]"
-            : `bottom-[var(--tabbar)] ${
-                sheet === "list" && !listTall
-                  ? "h-[38vh] max-h-[38vh]"
-                  : "h-[calc(100dvh-var(--tabbar)-5.5rem)] max-h-[calc(100dvh-var(--tabbar)-5.5rem)]"
+        style={
+          sheetDragH != null && pane === "map"
+            ? { height: sheetDragH, maxHeight: sheetDragH }
+            : undefined
+        }
+        className={`absolute inset-x-0 z-10 mx-auto max-w-lg min-h-0 overflow-hidden px-3 ${
+          sheetDragH != null && pane === "map"
+            ? "bottom-[var(--tabbar)]"
+            : `transition-[height,max-height,top] duration-300 ease-[var(--ease-out)] ${
+                pane === "orders"
+                  ? "top-[calc(env(safe-area-inset-top)+4.25rem)] bottom-[var(--tabbar)]"
+                  : `bottom-[var(--tabbar)] ${
+                      sheet === "list" && !listTall
+                        ? "h-[38vh] max-h-[38vh]"
+                        : "h-[calc(100dvh-var(--tabbar)-5.5rem)] max-h-[calc(100dvh-var(--tabbar)-5.5rem)]"
+                    }`
               }`
         }`}
       >
@@ -403,10 +460,9 @@ export function CustomerApp({
               aria-expanded={listTall}
               className="flex h-7 w-full touch-none items-center justify-center"
               onPointerDown={onSheetPointerDown}
+              onPointerMove={onSheetPointerMove}
               onPointerUp={onSheetPointerUp}
-              onPointerCancel={() => {
-                listDrag.current = null;
-              }}
+              onPointerCancel={onSheetPointerCancel}
             >
               <span className="h-1 w-10 rounded-full bg-[var(--line)]" />
             </button>
@@ -537,7 +593,9 @@ export function CustomerApp({
               <div className="p-6 pt-2">
                 <h2 className="font-[family-name:var(--font-display)] text-2xl">Siparişin</h2>
                 <p className="mt-2 text-sm text-[var(--muted)]">
-                  Henüz sipariş yok. Haritadan bir komşu seç, çamaşırı bırak.
+                  {orders.some((o) => o.providerId === viewerId)
+                    ? "Gelen onaylar Hizmet sekmesinde. Kabul veya red oradan."
+                    : "Henüz sipariş yok. Haritadan bir komşu seç, çamaşırı bırak."}
                 </p>
                 <button
                   type="button"

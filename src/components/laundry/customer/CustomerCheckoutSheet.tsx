@@ -81,7 +81,7 @@ export function CustomerCheckoutSheet({
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="flex-1 p-4 pt-2 pb-3">
+      <div className="flex-1 p-4 pt-2 pb-28">
       <button type="button" onClick={onBack} className="k-press text-xs text-[var(--muted)]">
         {checkoutBackLabel()}
       </button>

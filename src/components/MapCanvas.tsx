@@ -1,30 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Map as MaplibreMap, Marker as MaplibreMarker, StyleSpecification } from "maplibre-gl";
+import type { Map as MaplibreMap, Marker as MaplibreMarker } from "maplibre-gl";
 import { PILOT_AREA } from "@/lib/laundry/pilot";
 import { initials } from "@/lib/avatar";
 import { providerLoadDisplay } from "@/lib/capacity/display";
 import type { LngLat, MapMode, Provider } from "@/lib/types";
 
-/** OSM sokak haritası (Carto Voyager). 3D binalar yüklenince eklenir. */
-const STYLE: StyleSpecification = {
-  version: 8,
-  sources: {
-    carto: {
-      type: "raster",
-      tiles: [
-        "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
-        "https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
-        "https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
-      ],
-      tileSize: 256,
-      maxzoom: 20,
-      attribution: "© OpenStreetMap © CARTO",
-    },
-  },
-  layers: [{ id: "carto", type: "raster", source: "carto" }],
-};
+/** OpenFreeMap Liberty — anahtar yok. Carto raster Eyl 2026'dan beri anahtarsız filigran basıyor. */
+const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
 type Props = {
   mode: MapMode;
@@ -109,7 +93,7 @@ export function MapCanvas({
       map.on("load", onReady);
       map.once("idle", () => syncMode(map, modeRef.current));
       map.on("sourcedata", (e) => {
-        if (e.sourceId === "openfreemap" && e.isSourceLoaded) {
+        if (e.sourceId === "openmaptiles" && e.isSourceLoaded) {
           ensureBuildings(map, modeRef.current);
         }
       });
@@ -278,7 +262,7 @@ export function MapCanvas({
   }, [user, meAvatar]);
 
   return (
-    <div className="absolute inset-0">
+    <div className="absolute inset-x-0 top-0 bottom-[var(--tabbar)] z-0 isolate">
       <div ref={root} className="h-full w-full" />
     </div>
   );
@@ -330,38 +314,7 @@ function syncMode(map: MaplibreMap, mode: MapMode) {
 
 function ensureBuildings(map: MaplibreMap, mode: MapMode) {
   if (!map.isStyleLoaded()) return;
-  if (!map.getSource("openfreemap")) {
-    try {
-      map.addSource("openfreemap", {
-        type: "vector",
-        url: "https://tiles.openfreemap.org/planet",
-      });
-    } catch {
-      /* already added */
-    }
-  }
-  if (!map.getLayer("3d-buildings") && map.getSource("openfreemap")) {
-    try {
-      map.addLayer({
-        id: "3d-buildings",
-        source: "openfreemap",
-        "source-layer": "building",
-        type: "fill-extrusion",
-        minzoom: 14,
-        filter: ["!=", ["get", "hide_3d"], true],
-        paint: {
-          "fill-extrusion-color": "#8f7d64",
-          "fill-extrusion-height": ["coalesce", ["get", "render_height"], 16],
-          "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
-          "fill-extrusion-opacity": 0.86,
-          "fill-extrusion-vertical-gradient": true,
-        },
-      });
-    } catch {
-      /* TileJSON / source-layer not ready; sourcedata retries */
-    }
-  }
-  if (map.getLayer("3d-buildings")) {
-    map.setLayoutProperty("3d-buildings", "visibility", mode === "3d" ? "visible" : "none");
+  if (map.getLayer("building-3d")) {
+    map.setLayoutProperty("building-3d", "visibility", mode === "3d" ? "visible" : "none");
   }
 }

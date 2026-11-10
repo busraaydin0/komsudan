@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Account } from "@/lib/types";
 import { patchAccount, postPasskey, requestOtp, verifyOtp } from "@/lib/api";
 import { permissionAsked } from "@/lib/permissions";
+import { KomsudanLogo } from "@/components/KomsudanLogo";
 import { PermissionPrompt } from "@/components/PermissionPrompt";
 import { pilotPasskeyId, registerPasskey } from "@/lib/passkey";
 
@@ -108,10 +109,7 @@ export function LoginGate({
   return (
     <div className="flex h-dvh flex-col bg-[var(--paper)] px-5 pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
-        <p className="flex items-center gap-1.5 font-[family-name:var(--font-display)] text-3xl">
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
-          Komşudan
-        </p>
+        <KomsudanLogo size="lg" />
         <p className="mt-3 font-[family-name:var(--font-display)] text-xl leading-snug">
           Önceliğimiz, kendinizi evinizde gibi güvende hissetmeniz.
         </p>

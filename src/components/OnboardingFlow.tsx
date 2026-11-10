@@ -6,6 +6,7 @@ import { LAUNDRY_PRODUCT_NAME, PILOT_AREA, PILOT_NEIGHBORHOODS } from "@/lib/lau
 import { patchPreferences, postMyOffer } from "@/lib/api";
 import { readLocationIfGranted, requestLocation } from "@/lib/permissions";
 import type { Account, DryingType, PackageId, PreferredIntent } from "@/lib/types";
+import { KomsudanLogo } from "@/components/KomsudanLogo";
 import { LaundryOfferSetup } from "@/components/laundry/onboarding/LaundryOfferSetup";
 import { OnboardingRoleCard } from "@/components/laundry/onboarding/OnboardingRoleCard";
 
@@ -163,10 +164,7 @@ export function OnboardingFlow({
   return (
     <div className="flex h-dvh flex-col bg-[var(--paper)] px-5 pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col">
-        <p className="flex shrink-0 items-center gap-1.5 font-[family-name:var(--font-display)] text-3xl">
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
-          Komşudan
-        </p>
+        <KomsudanLogo size="lg" className="shrink-0" />
         <p className="mt-3 shrink-0 font-[family-name:var(--font-display)] text-xl leading-snug">
           {LAUNDRY_PRODUCT_NAME} — harita ona göre açılsın.
         </p>

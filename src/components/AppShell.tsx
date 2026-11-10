@@ -12,6 +12,7 @@ import { MessagesScreen } from "@/components/MessagesScreen";
 import { AdminDesk } from "@/components/AdminDesk";
 import { ProviderDesk } from "@/components/ProviderDesk";
 import { TabBar, type AppTab } from "@/components/TabBar";
+import { tabForNotice } from "@/lib/noticeTab";
 import { useSession } from "@/lib/api";
 import { permissionAsked } from "@/lib/permissions";
 import type { PreferredIntent } from "@/lib/types";
@@ -37,6 +38,7 @@ function readTab(intent?: PreferredIntent | null, staff = false): AppTab {
 
 export function AppShell() {
   const [tab, setTab] = useState<AppTab | null>(null);
+  const [homeTick, setHomeTick] = useState(0);
   const [askPerms, setAskPerms] = useState(false);
   const [editDiscovery, setEditDiscovery] = useState(false);
   const [discoveryDone, setDiscoveryDone] = useState(false);
@@ -72,6 +74,7 @@ export function AppShell() {
     const staff = isStaffRole(account?.role);
     const dest = staff && next !== "hesap" ? "yonetim" : next;
     if (dest !== "mesaj") setChatOrderId(null);
+    if (dest === "harita") setHomeTick((n) => n + 1);
     setTab(dest);
     const url = dest === "harita" ? "/" : `/?tab=${dest}`;
     window.history.replaceState(null, "", url);
@@ -82,10 +85,7 @@ export function AppShell() {
       go("yonetim");
       return;
     }
-    if (n.type === "nudge") go("harita");
-    else if (n.type === "order_message") go("mesaj");
-    else if (n.type.startsWith("order_") || n.type === "pickup_code") go("siparis");
-    else go("hesap");
+    go(tabForNotice(n.type));
   }
 
   if (!ready) {
@@ -135,6 +135,7 @@ export function AppShell() {
           <CustomerApp
             pane={tab === "siparis" ? "orders" : "map"}
             mapActive={tab === "harita"}
+            homeTick={homeTick}
             meAvatar={account.avatarUrl}
             viewerId={account.id}
             homeLat={account.homeLat}

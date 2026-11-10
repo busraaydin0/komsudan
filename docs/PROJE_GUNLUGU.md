@@ -6,6 +6,30 @@ Kaynak dokümanlar: MVP Tanım v0.3, Karar Kaydı v0.3, Süreç Haritası v0.4 (
 
 ---
 
+## 2026-11-10 – Hareketli logo
+- Stash’ten yalnız `KomsudanLogo` alındı. Harita başlığında logo; tıklanınca ana sayfa. Liste sapı aynı.
+
+## 2026-11-10 – Yakındakiler sapı
+- Liste sapı parmağı takip eder: aşağı çekince sheet küçülür (harita açılır), yukarı çekince büyür. Kısa tık hâlâ aç/kapa.
+
+## 2026-11-10 – Komşudan ana sayfa
+- Harita başlığındaki Komşudan tıklanınca listeye ve haritaya dönülür. Değişiklikler `fix/alim-takvim` dalında commit.
+
+## 2026-11-10 – Gelen onay Hizmet’te
+- Yeni sipariş bildirimi Sipariş sekmesine gidiyordu; veren gelen işi göremiyordu. `order_created` artık Hizmet’e açılır.
+
+## 2026-11-10 – Alt menü görünsün
+- 3D harita tuvali tab baru örtüyordu. Harita `bottom: var(--tabbar)`; menü `fixed` + opak zemin.
+
+## 2026-11-10 – Telefondan aç
+- `next.config.ts` `allowedDevOrigins`: `*.trycloudflare.com` + LAN `192.168.1.27`. Yalnız `next dev`.
+
+## 2026-11-10 – Harita filigranı
+- Carto Voyager anahtarsız “API KEY REQUIRED” basıyordu. Taban OpenFreeMap Liberty; 3D binalar aynı stilden.
+
+## 2026-11-10 – Alım saati görünsün
+- Dal: `fix/alim-takvim`. 1 saatlik yan yana slotlar 2 saatlik pencere oluyor; checkout’ta takvim fiyat çubuğunun altında kaybolmuyor.
+
 ## 2026-11-07 – Adım 10: Oturum, pencere, yetki ve admin ayrımı main'e alındı
 - PR **#4** (`fix/oturum-kaybi`) merge: `4592fb9`. PR **#3** (`fix/pencere-butonu`) merge: `b13ecf1`. PR **#5** (`fix/kendine-siparis`, K-011/K-012/K-013) merge: `3cce159`. Squash yok.
 - Etiket: `sunum-v2` (`3cce159`).

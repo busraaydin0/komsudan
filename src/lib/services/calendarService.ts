@@ -3,7 +3,7 @@ import { loadToneFromFreeRatio } from "@/lib/capacity/loadTone";
 import { loadDayUsage, settingsFromRow } from "@/lib/services/capacityService";
 import { getCapacitySettings } from "@/lib/db/providerCapacity";
 import { listSlots } from "@/lib/db/providers";
-import { splitTwoHourWindows, pickupInstantIso } from "@/lib/scheduling/windows";
+import { windowsFromAvailabilitySlots, pickupInstantIso } from "@/lib/scheduling/windows";
 
 export type WindowStatus = "ok" | "low" | "full";
 
@@ -56,20 +56,18 @@ export function buildProviderCalendar(
     const daySlots = slots.filter((s) => s.day_of_week === dow);
     const status = settings ? dayStatus(providerId, date, settings, express) : ("ok" as WindowStatus);
 
-    for (const slot of daySlots) {
-      for (const w of splitTwoHourWindows(slot.start_time, slot.end_time)) {
-        const startInstant = pickupInstantIso(date, w.start);
-        const selectable =
-          status !== "full" &&
-          (date !== today || startInstant.getTime() >= now.getTime() + leadMs);
-        out.push({
-          date,
-          start: w.start,
-          end: w.end,
-          status,
-          selectable,
-        });
-      }
+    for (const w of windowsFromAvailabilitySlots(daySlots)) {
+      const startInstant = pickupInstantIso(date, w.start);
+      const selectable =
+        status !== "full" &&
+        (date !== today || startInstant.getTime() >= now.getTime() + leadMs);
+      out.push({
+        date,
+        start: w.start,
+        end: w.end,
+        status,
+        selectable,
+      });
     }
   }
 

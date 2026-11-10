@@ -1,0 +1,194 @@
+.word {
+  display: inline-flex;
+  align-items: baseline;
+  overflow: visible;
+  white-space: nowrap;
+  padding-top: 0.42em;
+  padding-right: 1.05em;
+  padding-bottom: 1.55em;
+  line-height: 1;
+  font-family: var(--font-display), Fraunces, serif;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  color: var(--teal);
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 1;
+}
+
+.span {
+  position: relative;
+  display: inline-block;
+}
+
+.tail {
+  position: relative;
+  display: inline-block;
+}
+
+.o {
+  position: relative;
+  display: inline-block;
+  width: 0.58em;
+  height: 0.58em;
+  margin: 0 0.03em 0 0.02em;
+  overflow: hidden;
+  vertical-align: -0.02em;
+  border: 0.08em solid var(--teal);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--teal) 16%, var(--card));
+  transform: skewX(-10deg);
+}
+
+.drum {
+  position: absolute;
+  inset: -28%;
+  animation: k-logo-drum 1.15s linear infinite;
+}
+
+.washShirt,
+.washSocks,
+.washTowel {
+  position: absolute;
+  display: block;
+}
+
+.washShirt {
+  left: 8%;
+  top: 6%;
+  width: 52%;
+  height: 52%;
+}
+
+.washSocks {
+  right: 4%;
+  top: 28%;
+  width: 48%;
+  height: 48%;
+}
+
+.washTowel {
+  left: 18%;
+  bottom: 8%;
+  width: 58%;
+  height: 28%;
+}
+
+.washShirt svg,
+.washSocks svg,
+.washTowel svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.corner {
+  position: absolute;
+  top: -0.48em;
+  right: -0.95em;
+  bottom: auto;
+  z-index: 1;
+  display: block;
+  width: 0.98em;
+  height: 0.62em;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.iron {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 1px 1px rgba(28, 23, 18, 0.18));
+  transform-origin: 78% 78%;
+  animation: k-logo-iron 2.4s var(--ease-in-out) infinite;
+}
+
+.line {
+  position: absolute;
+  left: 0.4em;
+  top: 0.9em;
+  right: auto;
+  bottom: auto;
+  z-index: 0;
+  display: block;
+  width: calc(100% - 0.76em);
+  height: 1.48em;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.steam {
+  position: absolute;
+  left: 4%;
+  top: 0.28em;
+  width: 0.24em;
+  height: 0.24em;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card) 70%, var(--teal));
+  box-shadow: 0 0 0.12em color-mix(in srgb, var(--card) 80%, transparent);
+  pointer-events: none;
+  animation: k-logo-steam 1.8s var(--ease-out) infinite;
+}
+
+.steam:nth-child(2) {
+  left: 18%;
+  width: 0.2em;
+  height: 0.2em;
+  animation-delay: 0.45s;
+}
+
+.steam:nth-child(3) {
+  left: -2%;
+  width: 0.18em;
+  height: 0.18em;
+  animation-delay: 0.9s;
+}
+
+@keyframes k-logo-drum {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes k-logo-iron {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-12deg);
+  }
+  40% {
+    transform: translate3d(0.16em, 0.05em, 0) rotate(-3deg);
+  }
+  70% {
+    transform: translate3d(-0.04em, -0.02em, 0) rotate(-14deg);
+  }
+}
+
+@keyframes k-logo-steam {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0.12em, 0) scale(0.4);
+  }
+  22% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-0.12em, -0.7em, 0) scale(1.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iron,
+  .steam,
+  .drum {
+    animation: none;
+  }
+
+  .steam {
+    opacity: 0;
+  }
+
+  .iron {
+    transform: rotate(-10deg);
+  }
+}
